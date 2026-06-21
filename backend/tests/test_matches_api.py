@@ -4,7 +4,13 @@ from conftest import get_data, get_error, make_client
 def create_resume_and_job(client):
     resume_response = client.post(
         "/api/resumes/upload",
-        files={"file": ("resume.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+        files={
+            "file": (
+                "resume.md",
+                b"Python FastAPI React project experience.",
+                "text/markdown",
+            )
+        },
     )
     job_response = client.post(
         "/api/jobs",
@@ -47,6 +53,7 @@ def test_match_run_returns_mock_report():
     assert data["gaps"]
     assert data["rewrite_priorities"]
     assert data["risk_flags"] == []
+    assert data["dimension_scores"]["skill_match"] > 70
 
 
 def test_match_run_rejects_missing_resume():
@@ -60,6 +67,28 @@ def test_match_run_rejects_missing_resume():
 
     assert response.status_code == 404
     assert get_error(response)["code"] == "resume_not_found"
+
+
+def test_match_run_rejects_missing_job():
+    client = make_client()
+    resume_id, _ = create_resume_and_job(client)
+
+    response = client.post(
+        "/api/matches/run",
+        json={"resume_id": resume_id, "jd_id": "jd_missing"},
+    )
+
+    assert response.status_code == 404
+    assert get_error(response)["code"] == "job_not_found"
+
+
+def test_match_run_rejects_missing_input_fields():
+    client = make_client()
+
+    response = client.post("/api/matches/run", json={"resume_id": ""})
+
+    assert response.status_code == 422
+    assert get_error(response)["code"] == "validation_error"
 
 
 def test_match_list_and_detail_return_created_report():

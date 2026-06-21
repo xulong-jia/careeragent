@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AppShell } from "./components/AppShell";
+import { listJobs } from "./api/jobs";
+import { listMatches } from "./api/matches";
+import { listResumes } from "./api/resumes";
 import { DashboardPage } from "./pages/DashboardPage";
 import { JDCenterPage } from "./pages/JDCenterPage";
 import { MatchReportPage } from "./pages/MatchReportPage";
@@ -36,11 +39,40 @@ export default function App() {
   const [latestResume, setLatestResume] = useState<ResumeRecord | null>(null);
   const [latestJob, setLatestJob] = useState<JobRecord | null>(null);
   const [latestMatch, setLatestMatch] = useState<MatchReport | null>(null);
+  const [resumes, setResumes] = useState<ResumeRecord[]>([]);
+  const [jobs, setJobs] = useState<JobRecord[]>([]);
+  const [matches, setMatches] = useState<MatchReport[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const refreshWorkbench = async () => {
+    try {
+      const [resumeList, jobList, matchList] = await Promise.all([
+        listResumes(),
+        listJobs(),
+        listMatches(),
+      ]);
+      setResumes(resumeList.items);
+      setJobs(jobList.items);
+      setMatches(matchList.items);
+      setLoadError(null);
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load mock state.",
+      );
+    }
+  };
+
+  useEffect(() => {
+    void refreshWorkbench();
+  }, []);
 
   const workbenchState = {
     latestResume,
     latestJob,
     latestMatch,
+    resumes,
+    jobs,
+    matches,
   };
 
   const renderPage = () => {
@@ -48,24 +80,43 @@ export default function App() {
       return (
         <ResumeCenterPage
           latestResume={latestResume}
+          onRefresh={refreshWorkbench}
           onResumeUploaded={setLatestResume}
+          resumes={resumes}
         />
       );
     }
     if (activePage === "jd") {
-      return <JDCenterPage latestJob={latestJob} onJobCreated={setLatestJob} />;
+      return (
+        <JDCenterPage
+          jobs={jobs}
+          latestJob={latestJob}
+          onJobCreated={setLatestJob}
+          onRefresh={refreshWorkbench}
+        />
+      );
     }
     if (activePage === "match") {
       return (
         <MatchReportPage
+          jobs={jobs}
           latestJob={latestJob}
           latestMatch={latestMatch}
           latestResume={latestResume}
+          matches={matches}
           onMatchRun={setLatestMatch}
+          onRefresh={refreshWorkbench}
+          resumes={resumes}
         />
       );
     }
-    return <DashboardPage state={workbenchState} onNavigate={setActivePage} />;
+    return (
+      <DashboardPage
+        loadError={loadError}
+        onNavigate={setActivePage}
+        state={workbenchState}
+      />
+    );
   };
 
   return (

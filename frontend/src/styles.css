@@ -441,6 +441,12 @@ button:disabled {
   font-weight: 700;
 }
 
+.hint-text {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .json-preview {
   overflow: auto;
   max-height: 320px;

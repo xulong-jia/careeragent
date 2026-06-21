@@ -4,11 +4,18 @@ import { createJob } from "../api/jobs";
 import type { JobRecord } from "../types/api";
 
 type JDCenterPageProps = {
+  jobs: JobRecord[];
   latestJob: JobRecord | null;
+  onRefresh: () => Promise<void>;
   onJobCreated: (job: JobRecord) => void;
 };
 
-export function JDCenterPage({ latestJob, onJobCreated }: JDCenterPageProps) {
+export function JDCenterPage({
+  jobs,
+  latestJob,
+  onRefresh,
+  onJobCreated,
+}: JDCenterPageProps) {
   const [company, setCompany] = useState("Mock Company");
   const [jobTitle, setJobTitle] = useState("AI Application Engineer");
   const [location, setLocation] = useState("Shanghai");
@@ -31,6 +38,7 @@ export function JDCenterPage({ latestJob, onJobCreated }: JDCenterPageProps) {
         source_url: sourceUrl || null,
       });
       onJobCreated(job);
+      await onRefresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "创建 JD 失败。");
     } finally {
@@ -43,7 +51,7 @@ export function JDCenterPage({ latestJob, onJobCreated }: JDCenterPageProps) {
       <div className="page-heading">
         <p className="eyebrow">Job Description</p>
         <h2 id="jd-title">JD Center</h2>
-        <p>提交 JD 后返回 Mock job profile，不调用真实 LLM。</p>
+        <p>提交 JD 后返回 deterministic Mock job profile，不调用真实 LLM；内存数据重启会丢失。</p>
       </div>
 
       <div className="two-column wide-left">
@@ -144,6 +152,28 @@ export function JDCenterPage({ latestJob, onJobCreated }: JDCenterPageProps) {
           )}
         </article>
       </div>
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>JD 列表</h3>
+          <span className="status-pill">{jobs.length} items</span>
+        </div>
+        {jobs.length ? (
+          <ul className="activity-list">
+            {jobs.map((job) => (
+              <li key={job.jd_id}>
+                <strong>{job.job_title}</strong>
+                <span>{job.jd_id}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="empty-state">
+            <strong>暂无 JD 记录</strong>
+            <span>创建 JD 后会出现在这里。</span>
+          </div>
+        )}
+      </article>
     </section>
   );
 }

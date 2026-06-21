@@ -96,4 +96,7 @@ export type WorkbenchState = {
   latestResume: ResumeRecord | null;
   latestJob: JobRecord | null;
   latestMatch: MatchReport | null;
+  resumes: ResumeRecord[];
+  jobs: JobRecord[];
+  matches: MatchReport[];
 };

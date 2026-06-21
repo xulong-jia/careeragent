@@ -33,6 +33,73 @@ def test_resume_upload_rejects_unsupported_file_type():
     assert error["code"] == "unsupported_resume_file_type"
 
 
+def test_resume_upload_rejects_empty_file():
+    client = make_client()
+
+    response = client.post(
+        "/api/resumes/upload",
+        files={"file": ("empty.pdf", b"", "application/pdf")},
+    )
+
+    assert response.status_code == 400
+    assert get_error(response)["code"] == "resume_file_empty"
+
+
+def test_resume_upload_rejects_file_that_is_too_large():
+    client = make_client()
+    too_large_content = b"x" * (5 * 1024 * 1024 + 1)
+
+    response = client.post(
+        "/api/resumes/upload",
+        files={"file": ("large.pdf", too_large_content, "application/pdf")},
+    )
+
+    assert response.status_code == 413
+    assert get_error(response)["code"] == "resume_file_too_large"
+
+
+def test_resume_upload_rejects_mime_extension_mismatch():
+    client = make_client()
+
+    response = client.post(
+        "/api/resumes/upload",
+        files={"file": ("resume.pdf", b"not really pdf", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert get_error(response)["code"] == "resume_file_mime_mismatch"
+
+
+def test_resume_upload_without_file_returns_validation_error():
+    client = make_client()
+
+    response = client.post("/api/resumes/upload")
+
+    assert response.status_code == 422
+    assert get_error(response)["code"] == "validation_error"
+
+
+def test_resume_upload_extracts_mock_skills_from_markdown_text():
+    client = make_client()
+
+    response = client.post(
+        "/api/resumes/upload",
+        files={
+            "file": (
+                "candidate.md",
+                b"# Resume\nBuilt Python FastAPI and React tools.",
+                "text/markdown",
+            )
+        },
+    )
+
+    assert response.status_code == 201
+    skills = get_data(response)["structured_resume"]["skills"]
+    assert "Python" in skills["programming"]
+    assert "FastAPI" in skills["backend"]
+    assert "React" in skills["frontend"]
+
+
 def test_resume_list_and_detail_return_uploaded_resume():
     client = make_client()
     upload = client.post(

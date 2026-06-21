@@ -44,6 +44,64 @@ def test_job_create_rejects_empty_raw_text():
     assert get_error(response)["code"] == "validation_error"
 
 
+def test_job_create_rejects_too_short_raw_text():
+    client = make_client()
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "company": "Mock Company",
+            "job_title": "Backend Engineer",
+            "location": "Sydney",
+            "raw_text": "Python",
+            "source_url": None,
+        },
+    )
+
+    assert response.status_code == 400
+    assert get_error(response)["code"] == "job_description_too_short"
+
+
+def test_job_create_rejects_invalid_source_url():
+    client = make_client()
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "company": "Mock Company",
+            "job_title": "Backend Engineer",
+            "location": "Sydney",
+            "raw_text": "Build backend APIs with Python and FastAPI for internal tools.",
+            "source_url": "not-a-url",
+        },
+    )
+
+    assert response.status_code == 422
+    assert get_error(response)["code"] == "validation_error"
+
+
+def test_job_create_extracts_role_category_from_title_and_skills_from_text():
+    client = make_client()
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "company": "Mock Company",
+            "job_title": "Backend Platform Engineer",
+            "location": "Sydney",
+            "raw_text": "Responsibilities include building Python FastAPI services. Docker is a plus.",
+            "source_url": None,
+        },
+    )
+
+    assert response.status_code == 201
+    profile = get_data(response)["job_profile"]
+    assert profile["role_category"] == "Python Backend Developer"
+    assert profile["required_skills"] == ["Python", "FastAPI"]
+    assert profile["preferred_skills"] == ["Docker"]
+    assert profile["responsibilities"]
+
+
 def test_job_list_and_detail_return_created_job():
     client = make_client()
     create = client.post(

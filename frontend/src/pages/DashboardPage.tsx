@@ -2,6 +2,7 @@ import type { PageKey } from "../types/navigation";
 import type { WorkbenchState } from "../types/api";
 
 type DashboardPageProps = {
+  loadError: string | null;
   state: WorkbenchState;
   onNavigate: (page: PageKey) => void;
 };
@@ -13,25 +14,29 @@ const workflow = [
   "Frontend Display",
 ];
 
-export function DashboardPage({ state, onNavigate }: DashboardPageProps) {
+export function DashboardPage({
+  loadError,
+  state,
+  onNavigate,
+}: DashboardPageProps) {
   const metrics = [
     {
       label: "Resume",
-      value: state.latestResume ? "1" : "0",
+      value: String(state.resumes.length),
       detail: state.latestResume?.resume_id ?? "等待上传",
       tone: "green",
       page: "resume" as const,
     },
     {
       label: "JD",
-      value: state.latestJob ? "1" : "0",
+      value: String(state.jobs.length),
       detail: state.latestJob?.jd_id ?? "等待创建",
       tone: "blue",
       page: "jd" as const,
     },
     {
       label: "Match",
-      value: state.latestMatch ? String(state.latestMatch.total_score) : "0",
+      value: String(state.matches.length),
       detail: state.latestMatch?.match_report_id ?? "等待运行",
       tone: "amber",
       page: "match" as const,
@@ -50,8 +55,9 @@ export function DashboardPage({ state, onNavigate }: DashboardPageProps) {
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>阶段 1A 跑通 Resume Upload、JD Create、Match Report 的 Mock 闭环。</p>
+        <p>阶段 1B 展示内存 Mock 状态；刷新页面或重启后端会丢失数据。</p>
       </div>
+      {loadError ? <p className="error-text">{loadError}</p> : null}
 
       <div className="metric-grid">
         {metrics.map((metric) => (

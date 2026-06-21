@@ -5,6 +5,8 @@ import type { ResumeRecord } from "../types/api";
 
 type ResumeCenterPageProps = {
   latestResume: ResumeRecord | null;
+  resumes: ResumeRecord[];
+  onRefresh: () => Promise<void>;
   onResumeUploaded: (resume: ResumeRecord) => void;
 };
 
@@ -19,6 +21,8 @@ const resumeSections = [
 
 export function ResumeCenterPage({
   latestResume,
+  resumes,
+  onRefresh,
   onResumeUploaded,
 }: ResumeCenterPageProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -36,6 +40,7 @@ export function ResumeCenterPage({
     try {
       const resume = await uploadResume(selectedFile);
       onResumeUploaded(resume);
+      await onRefresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "上传失败。");
     } finally {
@@ -48,7 +53,7 @@ export function ResumeCenterPage({
       <div className="page-heading">
         <p className="eyebrow">Resume</p>
         <h2 id="resume-title">Resume Center</h2>
-        <p>上传文件后返回 Mock raw text 和结构化简历占位结果，不保存真实文件。</p>
+        <p>上传后返回 deterministic Mock 结果；数据仅保存在内存中，刷新页面或重启服务会丢失。</p>
       </div>
 
       <div className="two-column wide-left">
@@ -107,6 +112,28 @@ export function ResumeCenterPage({
           )}
         </article>
       </div>
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Resume 列表</h3>
+          <span className="status-pill">{resumes.length} items</span>
+        </div>
+        {resumes.length ? (
+          <ul className="activity-list">
+            {resumes.map((resume) => (
+              <li key={resume.resume_id}>
+                <strong>{resume.filename}</strong>
+                <span>{resume.resume_id}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="empty-state">
+            <strong>暂无 Resume 记录</strong>
+            <span>上传 PDF、DOCX 或 Markdown 文件后会出现在这里。</span>
+          </div>
+        )}
+      </article>
 
       <article className="panel">
         <div className="panel-header">

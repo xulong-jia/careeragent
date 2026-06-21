@@ -4,10 +4,14 @@ import { runMatch } from "../api/matches";
 import type { JobRecord, MatchReport, ResumeRecord } from "../types/api";
 
 type MatchReportPageProps = {
+  jobs: JobRecord[];
   latestResume: ResumeRecord | null;
   latestJob: JobRecord | null;
   latestMatch: MatchReport | null;
+  matches: MatchReport[];
+  onRefresh: () => Promise<void>;
   onMatchRun: (report: MatchReport) => void;
+  resumes: ResumeRecord[];
 };
 
 const dimensionLabels: Record<string, string> = {
@@ -20,10 +24,14 @@ const dimensionLabels: Record<string, string> = {
 };
 
 export function MatchReportPage({
+  jobs,
   latestResume,
   latestJob,
   latestMatch,
+  matches,
+  onRefresh,
   onMatchRun,
+  resumes,
 }: MatchReportPageProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -40,6 +48,7 @@ export function MatchReportPage({
     try {
       const report = await runMatch(latestResume.resume_id, latestJob.jd_id);
       onMatchRun(report);
+      await onRefresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "匹配失败。");
     } finally {
@@ -56,7 +65,7 @@ export function MatchReportPage({
       <div className="page-heading">
         <p className="eyebrow">Report</p>
         <h2 id="match-title">Match Report</h2>
-        <p>使用最近的 resume_id 和 jd_id 生成 Mock match report。</p>
+        <p>使用最近的 resume_id 和 jd_id 生成 deterministic Mock match report。</p>
       </div>
 
       <article className="panel">
@@ -65,8 +74,8 @@ export function MatchReportPage({
           <span className="status-pill muted">POST /api/matches/run</span>
         </div>
         <div className="run-row">
-          <span>Resume: {latestResume?.resume_id ?? "未上传"}</span>
-          <span>JD: {latestJob?.jd_id ?? "未创建"}</span>
+          <span>Resume: {latestResume?.resume_id ?? "未上传"} ({resumes.length})</span>
+          <span>JD: {latestJob?.jd_id ?? "未创建"} ({jobs.length})</span>
           <button
             className="primary-action"
             disabled={!canRun || isRunning}
@@ -76,6 +85,9 @@ export function MatchReportPage({
             {isRunning ? "Running..." : "Run mock match"}
           </button>
         </div>
+        {!canRun ? (
+          <p className="hint-text">需要至少一个 Resume 和一个 JD 才能运行 Match。</p>
+        ) : null}
         {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
       </article>
 
@@ -142,6 +154,28 @@ export function MatchReportPage({
           </ul>
         </article>
       </div>
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Match 列表</h3>
+          <span className="status-pill">{matches.length} items</span>
+        </div>
+        {matches.length ? (
+          <ul className="activity-list">
+            {matches.map((match) => (
+              <li key={match.match_report_id}>
+                <strong>{match.match_report_id}</strong>
+                <span>score {match.total_score}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="empty-state">
+            <strong>暂无 Match Report</strong>
+            <span>运行 Mock Match 后会出现在这里。</span>
+          </div>
+        )}
+      </article>
     </section>
   );
 }
