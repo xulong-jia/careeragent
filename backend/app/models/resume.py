@@ -40,6 +40,7 @@ class ResumeVersion(Base):
     )
     version_name: Mapped[str] = mapped_column(String(200), nullable=False)
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_role: Mapped[str | None] = mapped_column(String(160), nullable=True)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
     raw_text_preview: Mapped[str] = mapped_column(Text, nullable=False)
     structured_resume: Mapped[dict] = mapped_column(JSON, nullable=False)

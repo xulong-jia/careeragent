@@ -5,7 +5,12 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.repositories import resume_repository
-from app.schemas.resumes import ResumeRecord, StructuredResume
+from app.schemas.resumes import (
+    ResumeRecord,
+    ResumeVersionCloneRequest,
+    ResumeVersionRecord,
+    StructuredResume,
+)
 from app.services.text_extraction_service import extract_resume_text
 
 
@@ -26,6 +31,8 @@ ALLOWED_MIME_TYPES = {
     "text": {"text/plain", "application/octet-stream"},
 }
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+VERSION_NAME_MAX_LENGTH = 200
+TARGET_ROLE_MAX_LENGTH = 160
 
 
 def detect_file_type(filename: str) -> str:
@@ -131,3 +138,50 @@ def list_resumes(db: Session) -> list[ResumeRecord]:
 
 def get_resume(db: Session, resume_id: str) -> ResumeRecord:
     return resume_repository.get_resume(db, resume_id)
+
+
+def _normalize_optional_text(
+    value: str | None, max_length: int, field_name: str
+) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if len(normalized) > max_length:
+        raise AppError(
+            code="validation_error",
+            message=f"{field_name} is too long.",
+            status_code=400,
+            details={"field": field_name, "max_length": max_length},
+        )
+    return normalized
+
+
+def list_resume_versions(db: Session, resume_id: str) -> list[ResumeVersionRecord]:
+    return resume_repository.list_resume_versions(db, resume_id)
+
+
+def get_resume_version(db: Session, version_id: str) -> ResumeVersionRecord:
+    return resume_repository.get_resume_version(db, version_id)
+
+
+def clone_resume_version(
+    db: Session, version_id: str, payload: ResumeVersionCloneRequest
+) -> ResumeVersionRecord:
+    version_name = _normalize_optional_text(
+        payload.version_name, VERSION_NAME_MAX_LENGTH, "version_name"
+    )
+    target_role = _normalize_optional_text(
+        payload.target_role, TARGET_ROLE_MAX_LENGTH, "target_role"
+    )
+    return resume_repository.clone_resume_version(
+        db,
+        version_id,
+        version_name=version_name,
+        target_role=target_role,
+    )
+
+
+def archive_resume_version(db: Session, version_id: str) -> ResumeVersionRecord:
+    return resume_repository.archive_resume_version(db, version_id)

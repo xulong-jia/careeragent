@@ -238,7 +238,7 @@ resume_versions + job_descriptions/job_profiles
 - 不在同一个提交里同时引入 DB、重写 API、重写前端。
 - 不让 `mock_store` 和 DB 在同一业务主路径中长期并存。
 
-当前状态：阶段 2C 已将 Resume / JD 主路径切换到 DB repository。Resume 创建时写入 `resumes` 和 initial `resume_versions`；JD 创建时写入 `job_descriptions` 和 `job_profiles`。Match Report 仍未持久化，留到阶段 2E。
+当前状态：阶段 2D 已在阶段 2C 的 Resume / JD DB 主路径基础上新增 Resume Version 后端能力。Resume Version 支持历史列表、详情、clone 和 archive；archive 只更新 `status="archived"` 和 `archived_at`，不删除历史内容。Match Report 仍未持久化，留到阶段 2E；同一 JD 多版本对比仍未实现。
 
 ## 9. 测试策略
 

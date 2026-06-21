@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -29,3 +31,27 @@ class ResumeRecord(BaseModel):
     structured_resume: StructuredResume
     source_file: SourceFile
     risk_flags: list[dict[str, object]] = Field(default_factory=list)
+
+
+class ResumeVersionRecord(BaseModel):
+    resume_version_id: str
+    resume_id: str
+    version_name: str
+    version_number: int
+    target_role: str | None = None
+    raw_text: str
+    raw_text_preview: str
+    structured_resume: StructuredResume
+    extraction_status: str
+    extraction_method: str
+    extraction_warnings: list[str] = Field(default_factory=list)
+    risk_flags: list[dict[str, object]] = Field(default_factory=list)
+    status: str
+    is_archived: bool
+    created_at: datetime
+    archived_at: datetime | None = None
+
+
+class ResumeVersionCloneRequest(BaseModel):
+    version_name: str | None = Field(default=None, max_length=200)
+    target_role: str | None = Field(default=None, max_length=160)
