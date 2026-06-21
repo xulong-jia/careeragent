@@ -49,7 +49,7 @@ def build_mock_report(payload: MatchRunRequest) -> MatchReport:
         strengths=[
             "Matched required skills: " + ", ".join(matched_skills)
             if matched_skills
-            else "Resume file passed Phase 1B validation."
+            else "Resume file passed Phase 1 validation."
         ],
         gaps=[
             "Missing required skills: " + ", ".join(missing_skills)
@@ -76,7 +76,7 @@ def get_mock_match(match_report_id: str) -> MatchReport:
 
         raise AppError(
             code="match_report_not_found",
-            message="Match report was not found in the Phase 1B mock store.",
+            message="Match report was not found in the Phase 1 mock store.",
             status_code=404,
             details={"match_report_id": match_report_id},
         )

@@ -55,7 +55,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>阶段 1B 展示内存 Mock 状态；刷新页面或重启后端会丢失数据。</p>
+        <p>阶段 1C 展示内存 Mock 状态；刷新页面或重启后端会丢失数据。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -78,9 +78,9 @@ export function DashboardPage({
         <article className="panel">
           <div className="panel-header">
             <h3>Mock 闭环</h3>
-            <span className="status-pill">Phase 1A</span>
+            <span className="status-pill">Phase 1C</span>
           </div>
-          <div className="workflow-rail" aria-label="阶段 1A Mock 流程">
+          <div className="workflow-rail" aria-label="阶段 1C Mock 流程">
             {workflow.map((step) => (
               <div className="workflow-step" key={step}>
                 <span aria-hidden="true" />

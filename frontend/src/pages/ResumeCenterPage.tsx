@@ -31,7 +31,7 @@ export function ResumeCenterPage({
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setErrorMessage("请选择 PDF、DOCX 或 Markdown 文件。");
+      setErrorMessage("请选择 PDF、DOCX、Markdown 或 txt 文件。");
       return;
     }
 
@@ -53,7 +53,7 @@ export function ResumeCenterPage({
       <div className="page-heading">
         <p className="eyebrow">Resume</p>
         <h2 id="resume-title">Resume Center</h2>
-        <p>上传后返回 deterministic Mock 结果；数据仅保存在内存中，刷新页面或重启服务会丢失。</p>
+        <p>Markdown / txt 会真实读取 UTF-8 文本；PDF / DOCX 当前返回 parser placeholder。数据仅保存在内存中，刷新页面或重启服务会丢失。</p>
       </div>
 
       <div className="two-column wide-left">
@@ -64,7 +64,7 @@ export function ResumeCenterPage({
           </div>
           <div className="form-stack">
             <input
-              accept=".pdf,.docx,.md,.markdown"
+              accept=".pdf,.docx,.md,.markdown,.txt"
               onChange={(event) =>
                 setSelectedFile(event.target.files?.[0] ?? null)
               }
@@ -103,6 +103,14 @@ export function ResumeCenterPage({
                 <strong>Status</strong>
                 <span>{latestResume.parse_status}</span>
               </li>
+              <li>
+                <strong>Extraction</strong>
+                <span>{latestResume.extraction_status}</span>
+              </li>
+              <li>
+                <strong>Method</strong>
+                <span>{latestResume.extraction_method}</span>
+              </li>
             </ul>
           ) : (
             <div className="empty-state">
@@ -130,10 +138,41 @@ export function ResumeCenterPage({
         ) : (
           <div className="empty-state">
             <strong>暂无 Resume 记录</strong>
-            <span>上传 PDF、DOCX 或 Markdown 文件后会出现在这里。</span>
+            <span>上传 PDF、DOCX、Markdown 或 txt 文件后会出现在这里。</span>
           </div>
         )}
       </article>
+
+      {latestResume ? (
+        <article className="panel">
+          <div className="panel-header">
+            <h3>文本提取结果</h3>
+            <span className="status-pill">{latestResume.extraction_status}</span>
+          </div>
+          <ul className="activity-list">
+            <li>
+              <strong>Method</strong>
+              <span>{latestResume.extraction_method}</span>
+            </li>
+            <li>
+              <strong>Warnings</strong>
+              <span>
+                {latestResume.extraction_warnings.length
+                  ? latestResume.extraction_warnings.join(" | ")
+                  : "None"}
+              </span>
+            </li>
+          </ul>
+          {latestResume.extraction_status === "parser_placeholder" ? (
+            <p className="hint-text">
+              当前阶段未接入 PDF / DOCX parser，raw text 为明确占位文本，不代表真实解析结果。
+            </p>
+          ) : null}
+          <pre className="json-preview text-preview">
+            {latestResume.raw_text_preview || latestResume.raw_text}
+          </pre>
+        </article>
+      ) : null}
 
       <article className="panel">
         <div className="panel-header">

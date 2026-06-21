@@ -10,7 +10,7 @@ def validate_job_description(raw_text: str) -> None:
     if len(raw_text.strip()) < MIN_JD_TEXT_LENGTH:
         raise AppError(
             code="job_description_too_short",
-            message="JD raw_text is too short for Phase 1B mock extraction.",
+            message="JD raw_text is too short for Phase 1 mock extraction.",
             status_code=400,
             details={"min_length": MIN_JD_TEXT_LENGTH},
         )
@@ -59,7 +59,7 @@ def extract_responsibilities(raw_text: str) -> list[str]:
     ]
     if sentences:
         return [sentences[0]]
-    return ["Mock responsibility extracted from JD text for Phase 1B."]
+    return ["Mock responsibility extracted from JD text for Phase 1."]
 
 
 def build_mock_job_profile(jd_id: str, payload: JobCreateRequest) -> JobProfile:
@@ -108,7 +108,7 @@ def get_mock_job(jd_id: str) -> JobRecord:
     if not job:
         raise AppError(
             code="job_not_found",
-            message="JD was not found in the Phase 1B mock store.",
+            message="JD was not found in the Phase 1 mock store.",
             status_code=404,
             details={"jd_id": jd_id},
         )

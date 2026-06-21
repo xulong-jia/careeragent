@@ -22,6 +22,10 @@ class ResumeRecord(BaseModel):
     file_type: str
     parse_status: str
     raw_text: str
+    raw_text_preview: str
+    extraction_status: str
+    extraction_method: str
+    extraction_warnings: list[str] = Field(default_factory=list)
     structured_resume: StructuredResume
     source_file: SourceFile
     risk_flags: list[dict[str, object]] = Field(default_factory=list)

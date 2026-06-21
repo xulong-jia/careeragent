@@ -32,6 +32,10 @@ export type ResumeRecord = {
   file_type: string;
   parse_status: string;
   raw_text: string;
+  raw_text_preview: string;
+  extraction_status: string;
+  extraction_method: string;
+  extraction_warnings: string[];
   structured_resume: StructuredResume;
   source_file: {
     filename: string;

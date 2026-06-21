@@ -4,6 +4,7 @@ from pathlib import Path
 from app.core.errors import AppError
 from app.schemas.resumes import ResumeRecord, SourceFile, StructuredResume
 from app.services.mock_store import store
+from app.services.text_extraction_service import extract_resume_text
 
 
 SUPPORTED_EXTENSIONS = {
@@ -11,6 +12,7 @@ SUPPORTED_EXTENSIONS = {
     ".docx": "docx",
     ".md": "markdown",
     ".markdown": "markdown",
+    ".txt": "text",
 }
 ALLOWED_MIME_TYPES = {
     "pdf": {"application/pdf"},
@@ -19,6 +21,7 @@ ALLOWED_MIME_TYPES = {
         "application/octet-stream",
     },
     "markdown": {"text/markdown", "text/plain", "application/octet-stream"},
+    "text": {"text/plain", "application/octet-stream"},
 }
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
@@ -29,7 +32,7 @@ def detect_file_type(filename: str) -> str:
     if not file_type:
         raise AppError(
             code="unsupported_resume_file_type",
-            message="Supported resume file types are PDF, DOCX, and Markdown.",
+            message="Supported resume file types are PDF, DOCX, Markdown, and text.",
             status_code=400,
             details={"filename": filename},
         )
@@ -50,7 +53,7 @@ def validate_resume_upload(
     if len(content) > MAX_UPLOAD_BYTES:
         raise AppError(
             code="resume_file_too_large",
-            message="Resume file exceeds the Phase 1B upload size limit.",
+            message="Resume file exceeds the Phase 1C upload size limit.",
             status_code=413,
             details={"max_bytes": MAX_UPLOAD_BYTES},
         )
@@ -66,13 +69,6 @@ def validate_resume_upload(
             },
         )
     return file_type
-
-
-def extract_mock_resume_text(file_type: str, content: bytes) -> str:
-    if file_type == "markdown":
-        text = content.decode("utf-8", errors="ignore").strip()
-        return text or "Mock markdown resume text placeholder."
-    return "Mock resume raw text placeholder. No real resume content is stored."
 
 
 def extract_mock_skills(text: str) -> dict[str, list[str]]:
@@ -107,7 +103,8 @@ def create_mock_resume(
 ) -> ResumeRecord:
     file_type = validate_resume_upload(filename, content_type, content)
     resume_id = store.next_id("resume", len(store.resumes))
-    raw_text = extract_mock_resume_text(file_type, content)
+    extraction = extract_resume_text(filename, file_type, content_type, content)
+    raw_text = extraction.raw_text
     structured_resume = StructuredResume(
         basic_info={"name": None, "email": None, "phone": None, "location": None},
         skills=extract_mock_skills(raw_text),
@@ -118,6 +115,10 @@ def create_mock_resume(
         file_type=file_type,
         parse_status="mock_parsed",
         raw_text=raw_text,
+        raw_text_preview=raw_text[:500],
+        extraction_status=extraction.extraction_status,
+        extraction_method=extraction.extraction_method,
+        extraction_warnings=extraction.warnings,
         structured_resume=structured_resume,
         source_file=SourceFile(
             filename=filename,
@@ -139,7 +140,7 @@ def get_mock_resume(resume_id: str) -> ResumeRecord:
     if not resume:
         raise AppError(
             code="resume_not_found",
-            message="Resume was not found in the Phase 1B mock store.",
+            message="Resume was not found in the Phase 1 mock store.",
             status_code=404,
             details={"resume_id": resume_id},
         )

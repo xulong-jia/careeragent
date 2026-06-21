@@ -458,6 +458,11 @@ button:disabled {
   padding: 14px;
 }
 
+.text-preview {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .run-row {
   display: flex;
   flex-wrap: wrap;
