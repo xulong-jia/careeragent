@@ -170,6 +170,39 @@ def list_chunks(
     return [_to_chunk_record(chunk) for chunk in chunks]
 
 
+def list_indexed_chunks_for_search(
+    db: Session,
+    *,
+    source_type: str | None = None,
+    doc_id: str | None = None,
+) -> list[dict[str, object]]:
+    statement = (
+        select(RagChunk, RagDocument)
+        .join(RagDocument, RagChunk.document_id == RagDocument.id)
+        .where(RagDocument.index_status == "indexed")
+    )
+    if source_type:
+        statement = statement.where(RagDocument.source_type == source_type)
+    if doc_id:
+        statement = statement.where(RagDocument.id == doc_id)
+
+    rows = db.execute(
+        statement.order_by(RagDocument.id, RagChunk.chunk_index)
+    ).all()
+    return [
+        {
+            "doc_id": document.id,
+            "chunk_id": chunk.id,
+            "title": document.title,
+            "source_type": document.source_type,
+            "section": chunk.section,
+            "text": chunk.text,
+            "metadata": dict(document.metadata_json or {}) | dict(chunk.metadata_json or {}),
+        }
+        for chunk, document in rows
+    ]
+
+
 def count_chunks_for_document(db: Session, doc_id: str) -> int:
     return (
         db.scalar(select(func.count()).select_from(RagChunk).where(RagChunk.document_id == doc_id))

@@ -31,7 +31,7 @@
 
 ## 3. RAG 数据模型设计
 
-阶段 3A 只做设计，不新增表。阶段 3B 已新增 RAG ORM models、Alembic migration、schemas skeleton 和 DB smoke tests，但未实现 repository、API、chunking、retrieval 或 answer。阶段 3C 新增 document create/list/detail、deterministic chunking/indexing backend 和 chunk list API；search、answer、embedding 和 vector store 仍留到后续阶段。
+阶段 3A 只做设计，不新增表。阶段 3B 已新增 RAG ORM models、Alembic migration、schemas skeleton 和 DB smoke tests。阶段 3C 新增 document create/list/detail、deterministic chunking/indexing backend 和 chunk list API。阶段 3D 新增 lexical retrieval 和 `POST /api/rag/search`，返回 sources / score / snippet / metadata；answer、LLM、embedding 和 vector store 仍留到后续阶段。
 
 ### rag_documents
 

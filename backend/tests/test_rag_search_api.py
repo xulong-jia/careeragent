@@ -1,0 +1,185 @@
+from conftest import get_data, get_error, make_client
+
+
+def _create_and_index_document(
+    client,
+    *,
+    title: str,
+    source_type: str = "manual",
+    raw_text: str,
+    metadata: dict[str, object],
+):
+    document_response = client.post(
+        "/api/rag/documents",
+        json={
+            "title": title,
+            "source_type": source_type,
+            "source_uri": f"synthetic://{title.lower().replace(' ', '-')}",
+            "raw_text": raw_text,
+            "metadata": metadata,
+        },
+    )
+    assert document_response.status_code == 201
+    document = get_data(document_response)
+    index_response = client.post(
+        f"/api/rag/documents/{document['doc_id']}/index",
+        json={"max_chars": 160, "overlap_chars": 0},
+    )
+    assert index_response.status_code == 200
+    return document
+
+
+def test_search_returns_relevant_sources_with_snippets_and_scores():
+    client = make_client()
+    document = _create_and_index_document(
+        client,
+        title="Synthetic Backend Notes",
+        raw_text=(
+            "# Backend\n\n"
+            "FastAPI pytest coverage protects CareerAgent service contracts.\n\n"
+            "React dashboard text is unrelated."
+        ),
+        metadata={"tags": ["backend", "testing"], "topic": "quality"},
+    )
+
+    response = client.post(
+        "/api/rag/search",
+        json={"query": "FastAPI pytest contracts", "top_k": 5},
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert result["query"] == "FastAPI pytest contracts"
+    assert result["top_k"] == 5
+    assert result["uncertainty"] is None
+    assert len(result["sources"]) >= 1
+    source = result["sources"][0]
+    assert source["doc_id"] == document["doc_id"]
+    assert source["chunk_id"]
+    assert source["title"] == "Synthetic Backend Notes"
+    assert source["source_type"] == "manual"
+    assert source["score"] > 0
+    assert "FastAPI" in source["snippet"]
+    assert source["metadata"]["topic"] == "quality"
+    assert "text" not in source
+    assert "raw_text" not in source
+
+
+def test_search_respects_top_k_and_source_type_filter():
+    client = make_client()
+    _create_and_index_document(
+        client,
+        title="Manual Backend",
+        source_type="manual",
+        raw_text="FastAPI pytest backend testing notes.",
+        metadata={"tags": ["backend"]},
+    )
+    _create_and_index_document(
+        client,
+        title="Markdown Backend",
+        source_type="markdown",
+        raw_text="# Backend\n\nFastAPI pytest markdown notes.",
+        metadata={"tags": ["backend"]},
+    )
+
+    response = client.post(
+        "/api/rag/search",
+        json={
+            "query": "FastAPI pytest",
+            "top_k": 1,
+            "filters": {"source_type": "markdown"},
+        },
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert result["top_k"] == 1
+    assert len(result["sources"]) == 1
+    assert result["sources"][0]["source_type"] == "markdown"
+
+
+def test_search_respects_doc_id_and_metadata_filters():
+    client = make_client()
+    target = _create_and_index_document(
+        client,
+        title="Target Notes",
+        raw_text="FastAPI testing notes for SyntheticCo interview preparation.",
+        metadata={
+            "tags": ["backend", "interview"],
+            "topic": "interview",
+            "company": "SyntheticCo",
+            "domain": "career",
+            "role_category": "AI Application Engineer",
+        },
+    )
+    _create_and_index_document(
+        client,
+        title="Other Notes",
+        raw_text="FastAPI testing notes for another company.",
+        metadata={
+            "tags": ["backend"],
+            "topic": "quality",
+            "company": "OtherCo",
+            "domain": "career",
+        },
+    )
+
+    response = client.post(
+        "/api/rag/search",
+        json={
+            "query": "FastAPI interview testing",
+            "filters": {
+                "doc_id": target["doc_id"],
+                "tags": ["interview"],
+                "topic": "interview",
+                "company": "SyntheticCo",
+                "domain": "career",
+                "role_category": "AI Application Engineer",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert {source["doc_id"] for source in result["sources"]} == {target["doc_id"]}
+
+
+def test_search_returns_uncertainty_when_no_relevant_source():
+    client = make_client()
+    _create_and_index_document(
+        client,
+        title="Frontend Notes",
+        raw_text="React dashboard rendering and local UI state.",
+        metadata={"tags": ["frontend"]},
+    )
+
+    response = client.post(
+        "/api/rag/search",
+        json={"query": "kubernetes distributed tracing"},
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert result["sources"] == []
+    assert result["uncertainty"] == "no_relevant_source"
+
+
+def test_search_rejects_empty_query_and_caps_top_k():
+    client = make_client()
+
+    empty_response = client.post("/api/rag/search", json={"query": "   "})
+    assert empty_response.status_code == 400
+    assert get_error(empty_response)["code"] == "rag_search_validation_error"
+
+    _create_and_index_document(
+        client,
+        title="Backend Notes",
+        raw_text="FastAPI pytest backend testing notes.",
+        metadata={"tags": ["backend"]},
+    )
+    capped_response = client.post(
+        "/api/rag/search",
+        json={"query": "FastAPI", "top_k": 100},
+    )
+    assert capped_response.status_code == 200
+    assert get_data(capped_response)["top_k"] == 20

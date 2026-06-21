@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.rag.chunking import chunk_document_text
+from app.rag.retriever import rank_chunks
 from app.repositories import rag_repository
 from app.schemas.rag import (
     RagChunkRecord,
@@ -9,6 +10,9 @@ from app.schemas.rag import (
     RagDocumentIndexRequest,
     RagDocumentIndexResult,
     RagDocumentRecord,
+    RagSearchRequest,
+    RagSearchResult,
+    RagSearchSource,
 )
 
 
@@ -22,6 +26,7 @@ ALLOWED_SOURCE_TYPES = {
     "learning",
     "company",
 }
+MAX_SEARCH_TOP_K = 20
 
 
 def _validation_error(message: str, field: str) -> AppError:
@@ -150,4 +155,49 @@ def list_chunks(
         db,
         doc_id=doc_id,
         source_type=normalized_source_type,
+    )
+
+
+def search_documents(db: Session, payload: RagSearchRequest) -> RagSearchResult:
+    query = payload.query.strip()
+    if not query:
+        raise AppError(
+            code="rag_search_validation_error",
+            message="RAG search query is required.",
+            status_code=400,
+            details={"field": "query"},
+        )
+
+    requested_top_k = payload.top_k
+    if requested_top_k <= 0:
+        raise AppError(
+            code="rag_search_validation_error",
+            message="top_k must be greater than zero.",
+            status_code=400,
+            details={"field": "top_k"},
+        )
+    top_k = min(requested_top_k, MAX_SEARCH_TOP_K)
+
+    filters_model = payload.filters
+    filters = filters_model.model_dump(exclude_none=True) if filters_model else {}
+    source_type = _normalize_source_type(filters["source_type"]) if filters.get("source_type") else None
+    doc_id = filters.get("doc_id")
+
+    candidates = rag_repository.list_indexed_chunks_for_search(
+        db,
+        source_type=source_type,
+        doc_id=str(doc_id) if doc_id else None,
+    )
+    ranked_sources = rank_chunks(
+        query,
+        candidates,
+        top_k=top_k,
+        filters=filters,
+    )
+    sources = [RagSearchSource(**source) for source in ranked_sources]
+    return RagSearchResult(
+        query=query,
+        top_k=top_k,
+        sources=sources,
+        uncertainty=None if sources else "no_relevant_source",
     )

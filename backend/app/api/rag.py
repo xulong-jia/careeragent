@@ -9,6 +9,8 @@ from app.schemas.rag import (
     RagDocumentIndexRequest,
     RagDocumentIndexResult,
     RagDocumentRecord,
+    RagSearchRequest,
+    RagSearchResult,
 )
 from app.services import rag_service
 
@@ -84,3 +86,13 @@ async def list_rag_chunks(
         "data": ListResponse(items=chunks, total=len(chunks)),
         "request_id": request.state.request_id,
     }
+
+
+@router.post("/search", response_model=ApiResponse[RagSearchResult])
+async def search_rag_documents(
+    request: Request,
+    payload: RagSearchRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    result = rag_service.search_documents(db, payload)
+    return {"data": result, "request_id": request.state.request_id}
