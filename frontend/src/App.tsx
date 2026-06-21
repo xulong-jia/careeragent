@@ -54,6 +54,15 @@ export default function App() {
       setResumes(resumeList.items);
       setJobs(jobList.items);
       setMatches(matchList.items);
+      setLatestResume(
+        (current) => current ?? resumeList.items[resumeList.items.length - 1] ?? null,
+      );
+      setLatestJob(
+        (current) => current ?? jobList.items[jobList.items.length - 1] ?? null,
+      );
+      setLatestMatch(
+        (current) => current ?? matchList.items[matchList.items.length - 1] ?? null,
+      );
       setLoadError(null);
     } catch (error) {
       setLoadError(

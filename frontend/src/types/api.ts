@@ -45,6 +45,30 @@ export type ResumeRecord = {
   risk_flags: Record<string, unknown>[];
 };
 
+export type ResumeVersionRecord = {
+  resume_version_id: string;
+  resume_id: string;
+  version_name: string;
+  version_number: number;
+  target_role: string | null;
+  raw_text: string;
+  raw_text_preview: string;
+  structured_resume: StructuredResume;
+  extraction_status: string;
+  extraction_method: string;
+  extraction_warnings: string[];
+  risk_flags: Record<string, unknown>[];
+  status: string;
+  is_archived: boolean;
+  created_at: string;
+  archived_at: string | null;
+};
+
+export type ResumeVersionClonePayload = {
+  version_name: string | null;
+  target_role: string | null;
+};
+
 export type JobCreatePayload = {
   company: string;
   job_title: string;
@@ -86,7 +110,9 @@ export type MatchEvidence = {
 export type MatchReport = {
   match_report_id: string;
   resume_id: string;
+  resume_version_id?: string | null;
   jd_id: string;
+  job_profile_id?: string | null;
   total_score: number;
   dimension_scores: Record<string, number>;
   evidence: MatchEvidence[];
@@ -94,6 +120,7 @@ export type MatchReport = {
   gaps: string[];
   rewrite_priorities: string[];
   risk_flags: Record<string, unknown>[];
+  created_at?: string | null;
 };
 
 export type WorkbenchState = {

@@ -2,7 +2,7 @@
 
 CareerAgent 是面向校招学生和留学生回国求职场景的 AI 求职工作台。项目目标是把用户画像、简历版本、JD 理解、匹配评分、项目优化、面试准备、学习计划、投递管理、RAG 知识库、Agent Workflow、Bad Case 和评测体系组织成可运行、可追踪、可复查的工程链路。
 
-CareerAgent 不是简历润色器，也不是 ChatGPT 套壳。本仓库当前处于阶段 2E，已在 SQLite + SQLAlchemy 基础上支持 Resume / JD 持久化、Resume Version 历史管理和 Match Report 持久化历史查询。不接入真实 LLM、RAG 或 Agent。
+CareerAgent 不是简历润色器，也不是 ChatGPT 套壳。本仓库当前处于阶段 2F，已在 SQLite + SQLAlchemy 基础上支持 Resume / JD 持久化、Resume Version 历史管理、Match Report 持久化历史查询，并在前端展示这些持久化能力。不接入真实 LLM、RAG 或 Agent。
 
 ## 技术栈
 
@@ -103,7 +103,8 @@ cp .env.example .env
 - 2C：Resume / JD 主路径已切换为 SQLite 持久化，创建 Resume 时生成 initial resume version，创建 JD 时生成 job profile。
 - 2D：新增 Resume Version 后端 API，支持版本历史、详情、clone 和 archive；archive 是软归档，不删除历史内容。
 - 2E：Match Report 主路径已切换为 SQLite 持久化，报告绑定 `resume_version_id + jd_id`，`GET /api/matches` 返回 DB 历史报告。
-- 当前复杂 Resume Version 选择 UI、多版本对比和历史报告对比页面留到阶段 2F。
+- 2F：前端展示 DB-backed Resume / JD / Match 历史；Resume Center 支持 versions 查看、clone 和 archive；Match Report 支持历史查看。
+- 当前复杂 diff、多版本对比图表、同一 JD 多版本对比页面仍未实现，留到后续阶段。
 
 ## API
 
@@ -182,7 +183,8 @@ Markdown / txt 返回结果会包含：
 - SQLite 持久化：Resume / JD 数据默认保存到 `DATABASE_URL` 指定位置，默认 `local_data/careeragent.db`。
 - Match Report 持久化：报告默认绑定 `resume_version_id + jd_id`，并保存到 SQLite。
 - 版本管理：Resume Version 已支持历史查询、详情、clone 和 archive；archive 是软归档，不删除历史内容。
-- 版本边界：复杂版本选择、版本 diff / compare UI、同一 JD 多版本对比页面仍未实现，留到阶段 2F 或后续阶段。
+- 前端展示：Resume Center 可查看 versions、clone、archive；Match Report 可查看 DB 历史和详情。
+- 版本边界：复杂版本 diff / compare UI、同一 JD 多版本对比页面仍未实现，留到后续阶段。
 - 无真实 LLM：没有 OpenAI、DeepSeek、Qwen 或其他模型调用。
 - 无 RAG：没有 embedding、vector index、retriever 或引用生成。
 - 无 Agent：没有 Agent Workflow、agent runs 或 agent steps。

@@ -51,7 +51,7 @@ export function JDCenterPage({
       <div className="page-heading">
         <p className="eyebrow">Job Description</p>
         <h2 id="jd-title">JD Center</h2>
-        <p>提交 JD 后返回 deterministic Mock job profile，不调用真实 LLM；内存数据重启会丢失。</p>
+        <p>提交 JD 后生成 deterministic job profile，并通过 DB-backed API 保留历史记录。不调用真实 LLM。</p>
       </div>
 
       <div className="two-column wide-left">
@@ -104,7 +104,7 @@ export function JDCenterPage({
               onClick={handleCreate}
               type="button"
             >
-              {isSubmitting ? "Creating..." : "Create mock JD"}
+              {isSubmitting ? "Creating..." : "Create JD"}
             </button>
             {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
           </div>
@@ -147,7 +147,7 @@ export function JDCenterPage({
           ) : (
             <div className="empty-state">
               <strong>暂无 JD</strong>
-              <span>创建后会显示 mock job profile。</span>
+              <span>创建后会显示 job profile 摘要。</span>
             </div>
           )}
         </article>
@@ -162,8 +162,15 @@ export function JDCenterPage({
           <ul className="activity-list">
             {jobs.map((job) => (
               <li key={job.jd_id}>
-                <strong>{job.job_title}</strong>
+                <div>
+                  <strong>{job.job_title}</strong>
+                  <small>{job.company}</small>
+                </div>
                 <span>{job.jd_id}</span>
+                <span>{job.job_profile.role_category}</span>
+                <small>
+                  Required: {job.job_profile.required_skills.join(", ") || "[]"}
+                </small>
               </li>
             ))}
           </ul>
@@ -171,6 +178,40 @@ export function JDCenterPage({
           <div className="empty-state">
             <strong>暂无 JD 记录</strong>
             <span>创建 JD 后会出现在这里。</span>
+          </div>
+        )}
+      </article>
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>JD Profile Summary</h3>
+          <span className="status-pill muted">DB-backed</span>
+        </div>
+        {jobs.length ? (
+          <div className="profile-grid">
+            {jobs.map((job) => (
+              <div className="profile-card" key={`${job.jd_id}-profile`}>
+                <strong>{job.job_title}</strong>
+                <span>{job.job_profile.role_category}</span>
+                <small>
+                  Required: {job.job_profile.required_skills.join(", ") || "[]"}
+                </small>
+                <small>
+                  Preferred: {job.job_profile.preferred_skills.join(", ") || "[]"}
+                </small>
+                <small>
+                  Responsibilities: {job.job_profile.responsibilities.length}
+                </small>
+                <small>
+                  Interview Focus: {job.job_profile.interview_focus.join(", ") || "[]"}
+                </small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <strong>暂无岗位画像</strong>
+            <span>创建 JD 后会展示 role category 和技能摘要。</span>
           </div>
         )}
       </article>

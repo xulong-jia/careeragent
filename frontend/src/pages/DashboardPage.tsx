@@ -9,8 +9,9 @@ type DashboardPageProps = {
 
 const workflow = [
   "Resume Upload",
+  "Version History",
   "JD Create",
-  "Match Report",
+  "Match History",
   "Frontend Display",
 ];
 
@@ -55,7 +56,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>阶段 1C 展示内存 Mock 状态；刷新页面或重启后端会丢失数据。</p>
+        <p>阶段 2F 展示 SQLite 持久化工作台状态，Resume、JD 和 Match Report 会从 DB-backed API 读取。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -77,10 +78,10 @@ export function DashboardPage({
       <div className="two-column">
         <article className="panel">
           <div className="panel-header">
-            <h3>Mock 闭环</h3>
-            <span className="status-pill">Phase 1C</span>
+            <h3>持久化闭环</h3>
+            <span className="status-pill">Phase 2F</span>
           </div>
-          <div className="workflow-rail" aria-label="阶段 1C Mock 流程">
+          <div className="workflow-rail" aria-label="阶段 2F 持久化流程">
             {workflow.map((step) => (
               <div className="workflow-step" key={step}>
                 <span aria-hidden="true" />
@@ -93,7 +94,7 @@ export function DashboardPage({
         <article className="panel">
           <div className="panel-header">
             <h3>当前对象</h3>
-            <span className="status-pill muted">In memory</span>
+            <span className="status-pill muted">SQLite-backed</span>
           </div>
           <ul className="activity-list">
             <li>

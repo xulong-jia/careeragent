@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { runMatch } from "../api/matches";
+import { getMatch, runMatch } from "../api/matches";
 import type { JobRecord, MatchReport, ResumeRecord } from "../types/api";
 
 type MatchReportPageProps = {
@@ -34,9 +34,18 @@ export function MatchReportPage({
   resumes,
 }: MatchReportPageProps) {
   const [isRunning, setIsRunning] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<MatchReport | null>(
+    latestMatch,
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const canRun = Boolean(latestResume && latestJob);
+
+  useEffect(() => {
+    if (latestMatch) {
+      setSelectedReport(latestMatch);
+    }
+  }, [latestMatch]);
 
   const handleRun = async () => {
     if (!latestResume || !latestJob) {
@@ -48,6 +57,7 @@ export function MatchReportPage({
     try {
       const report = await runMatch(latestResume.resume_id, latestJob.jd_id);
       onMatchRun(report);
+      setSelectedReport(report);
       await onRefresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "匹配失败。");
@@ -59,13 +69,28 @@ export function MatchReportPage({
   const scoreRows = latestMatch
     ? Object.entries(latestMatch.dimension_scores)
     : [];
+  const detailReport = selectedReport ?? latestMatch;
+  const detailScoreRows = detailReport
+    ? Object.entries(detailReport.dimension_scores)
+    : [];
+
+  const handleSelectReport = async (matchReportId: string) => {
+    setErrorMessage(null);
+    try {
+      const report = await getMatch(matchReportId);
+      setSelectedReport(report);
+      onMatchRun(report);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "加载报告失败。");
+    }
+  };
 
   return (
     <section className="page-stack" aria-labelledby="match-title">
       <div className="page-heading">
         <p className="eyebrow">Report</p>
         <h2 id="match-title">Match Report</h2>
-        <p>使用最近的 resume_id 和 jd_id 生成 deterministic Mock match report。</p>
+        <p>使用最近的 resume_id 和 jd_id 生成 deterministic match report，并从 DB-backed API 展示历史报告。</p>
       </div>
 
       <article className="panel">
@@ -82,7 +107,7 @@ export function MatchReportPage({
             onClick={handleRun}
             type="button"
           >
-            {isRunning ? "Running..." : "Run mock match"}
+            {isRunning ? "Running..." : "Run match"}
           </button>
         </div>
         {!canRun ? (
@@ -101,7 +126,7 @@ export function MatchReportPage({
           </div>
           <div className="score-dial">
             <strong>{latestMatch ? latestMatch.total_score : "--"}</strong>
-            <span>{latestMatch ? "Mock score" : "等待匹配评分"}</span>
+            <span>{latestMatch ? "Deterministic score" : "等待匹配评分"}</span>
           </div>
         </article>
 
@@ -157,24 +182,133 @@ export function MatchReportPage({
 
       <article className="panel">
         <div className="panel-header">
-          <h3>Match 列表</h3>
+          <h3>Match History</h3>
           <span className="status-pill">{matches.length} items</span>
         </div>
         {matches.length ? (
-          <ul className="activity-list">
+          <ul className="activity-list report-list">
             {matches.map((match) => (
-              <li key={match.match_report_id}>
-                <strong>{match.match_report_id}</strong>
+              <li
+                className={
+                  detailReport?.match_report_id === match.match_report_id
+                    ? "selected-row"
+                    : undefined
+                }
+                key={match.match_report_id}
+              >
+                <div>
+                  <strong>{match.match_report_id}</strong>
+                  <small>
+                    Resume Version: {match.resume_version_id ?? "unknown"}
+                  </small>
+                </div>
+                <span>JD: {match.jd_id}</span>
                 <span>score {match.total_score}</span>
+                <span>
+                  {match.created_at
+                    ? new Date(match.created_at).toLocaleString()
+                    : "No date"}
+                </span>
+                <button
+                  className="ghost-action"
+                  onClick={() => void handleSelectReport(match.match_report_id)}
+                  type="button"
+                >
+                  Detail
+                </button>
               </li>
             ))}
           </ul>
         ) : (
           <div className="empty-state">
             <strong>暂无 Match Report</strong>
-            <span>运行 Mock Match 后会出现在这里。</span>
+            <span>运行 Match 后会保存到 DB 并出现在这里。</span>
           </div>
         )}
+      </article>
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Report Detail</h3>
+          <span className="status-pill muted">
+            {detailReport?.match_report_id ?? "None"}
+          </span>
+        </div>
+        {detailReport ? (
+          <>
+            <ul className="activity-list">
+              <li>
+                <strong>Resume Version</strong>
+                <span>{detailReport.resume_version_id ?? "unknown"}</span>
+              </li>
+              <li>
+                <strong>JD</strong>
+                <span>{detailReport.jd_id}</span>
+              </li>
+              <li>
+                <strong>Created</strong>
+                <span>
+                  {detailReport.created_at
+                    ? new Date(detailReport.created_at).toLocaleString()
+                    : "No date"}
+                </span>
+              </li>
+            </ul>
+            <div className="score-list">
+              {detailScoreRows.map(([key, value]) => (
+                <div className="score-row" key={`detail-${key}`}>
+                  <span>{dimensionLabels[key] ?? key}</span>
+                  <div className="score-track" aria-label={`${key} score ${value}`}>
+                    <span style={{ width: `${value}%` }} />
+                  </div>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="three-column">
+              <div>
+                <h3>Strengths</h3>
+                <ul className="compact-list">
+                  {detailReport.strengths.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3>Gaps</h3>
+                <ul className="compact-list">
+                  {detailReport.gaps.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3>Priorities</h3>
+                <ul className="compact-list">
+                  {detailReport.rewrite_priorities.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <ul className="compact-list">
+              {detailReport.evidence.map((item) => (
+                <li key={`${item.dimension}-${item.jd_requirement}`}>
+                  {item.dimension}: {item.jd_requirement} /{" "}
+                  {item.resume_signal ?? "no resume signal"}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <div className="empty-state">
+            <strong>未选择报告</strong>
+            <span>运行或选择一条历史报告查看详情。</span>
+          </div>
+        )}
+        <p className="hint-text">
+          Resume version selector 和多版本对比页面留到后续阶段。
+        </p>
       </article>
     </section>
   );
