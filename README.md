@@ -220,6 +220,7 @@ git diff --check
    - 验收文档：[docs/phase-2-acceptance.md](docs/phase-2-acceptance.md)
    - Release notes：[docs/release-notes-v0.2.0-persistence.md](docs/release-notes-v0.2.0-persistence.md)
 3. 阶段三：RAG 知识库，建立文档解析、chunk、metadata、向量索引、检索和来源引用。
+   - 设计文档：[docs/rag-design.md](docs/rag-design.md)
 4. 阶段四：Agent Workflow，用状态机和工具调用串联 JD 解析、匹配、项目优化、面试准备和学习计划。
 5. 阶段五：投递管理与 Dashboard，绑定 JD、简历版本、状态、面试节点和复盘。
 6. 阶段六：评测体系与 Bad Case，沉淀 smoke set、regression set、失败样例和回归指标。
