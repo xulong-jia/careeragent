@@ -238,7 +238,7 @@ resume_versions + job_descriptions/job_profiles
 - 不在同一个提交里同时引入 DB、重写 API、重写前端。
 - 不让 `mock_store` 和 DB 在同一业务主路径中长期并存。
 
-当前状态：阶段 2F 已在阶段 2E 的 Match Report 持久化基础上补齐前端展示。Dashboard、Resume Center、JD Center 和 Match Report 页面读取 DB-backed API；Resume Center 支持 versions 查看、clone 和 archive；Match Report 支持历史列表和详情查看。复杂 diff、多版本对比图表和同一 JD 多版本对比页面仍留到后续阶段。
+当前状态：阶段 2G 已在阶段 2F 的前端持久化展示基础上补充阶段二验收文档、安全检查说明和 README 收口说明。Dashboard、Resume Center、JD Center 和 Match Report 页面读取 DB-backed API；Resume Center 支持 versions 查看、clone 和 archive；Match Report 支持历史列表和详情查看。复杂 diff、多版本对比图表和同一 JD 多版本对比页面仍留到后续阶段。
 
 ## 9. 测试策略
 
