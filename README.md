@@ -189,6 +189,7 @@ git status --short --ignored
 
 1. 阶段一：最小可运行闭环，跑通简历上传、JD 输入、解析、匹配评分和报告展示。
 2. 阶段二：数据持久化与版本管理，引入数据库、简历版本、JD 历史和匹配报告历史。
+   - 设计文档：[docs/phase-2-persistence-design.md](docs/phase-2-persistence-design.md)
 3. 阶段三：RAG 知识库，建立文档解析、chunk、metadata、向量索引、检索和来源引用。
 4. 阶段四：Agent Workflow，用状态机和工具调用串联 JD 解析、匹配、项目优化、面试准备和学习计划。
 5. 阶段五：投递管理与 Dashboard，绑定 JD、简历版本、状态、面试节点和复盘。
