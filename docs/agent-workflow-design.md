@@ -1,5 +1,7 @@
 # CareerAgent 阶段四：Agent Workflow 设计
 
+状态说明：阶段 4A-4E 已完成，包含 Agent Workflow 设计、`agent_runs` / `agent_steps` 数据模型、deterministic runner、Agent Runs API 和 AgentRunsPage 最小 UI。阶段 4F 用于阶段四验收文档、安全检查和 README 收口，不新增业务功能。
+
 ## 1. 阶段四目标
 
 阶段四目标是建立可审计、可追踪、可恢复的 Agent Workflow 基础设施。阶段四初期不是自由 Agent，也不是自动投递系统，而是通过 deterministic state machine 串联已有 Resume / JD / Match / RAG 能力。
