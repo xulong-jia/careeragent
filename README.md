@@ -2,7 +2,7 @@
 
 CareerAgent 是面向校招学生和留学生回国求职场景的 AI 求职工作台。项目目标是把用户画像、简历版本、JD 理解、匹配评分、项目优化、面试准备、学习计划、投递管理、RAG 知识库、Agent Workflow、Bad Case 和评测体系组织成可运行、可追踪、可复查的工程链路。
 
-CareerAgent 不是简历润色器，也不是 ChatGPT 套壳。本仓库当前处于阶段 2G，已在 SQLite + SQLAlchemy 基础上支持 Resume / JD 持久化、Resume Version 历史管理、Match Report 持久化历史查询，并在前端展示这些持久化能力。不接入真实 LLM、RAG 或 Agent。
+CareerAgent 不是简历润色器，也不是 ChatGPT 套壳。本仓库当前处于阶段 3G，已在 SQLite + SQLAlchemy 基础上支持 Resume / JD / Match Report 持久化、Resume Version 历史管理，以及 deterministic RAG knowledge base。当前 RAG 支持 document、chunking/indexing、lexical search、deterministic answer with citations 和 KnowledgeBasePage，但仍不接入真实 LLM、embedding、vector store 或 Agent。
 
 ## 技术栈
 
@@ -61,7 +61,7 @@ http://localhost:5173
 docker compose up
 ```
 
-Docker Compose 只用于本地开发启动前后端服务。当前阶段不启动数据库、不接入 LLM、不挂载真实简历、真实 JD、投递记录或面试复盘。
+Docker Compose 只用于本地开发启动前后端服务。当前阶段默认使用本地 SQLite，不接入 LLM、embedding、vector store，不挂载真实简历、真实 JD、真实文档、投递记录或面试复盘。
 
 ## 环境变量
 
@@ -109,9 +109,24 @@ cp .env.example .env
 
 阶段二验收文档：[docs/phase-2-acceptance.md](docs/phase-2-acceptance.md)
 
+阶段 3A / 3B / 3C / 3D / 3E / 3F / 3G 已完成：
+
+- 3A：完成 RAG 知识库设计文档与边界确认。
+- 3B：新增 `rag_documents` / `rag_chunks` ORM models、Alembic migration、schema skeleton 和 DB smoke tests。
+- 3C：新增 RAG document create / list / detail、deterministic chunking / indexing backend 和 chunks list API。
+- 3D：新增 deterministic lexical retrieval 和 `POST /api/rag/search`，返回 sources / score / snippet / metadata。
+- 3E：新增 deterministic RAG answer 和 `POST /api/rag/answer`，有来源时 grounded，无来源时返回 uncertainty。
+- 3F：新增 KnowledgeBasePage 最小 UI，支持创建 document、index、查看 chunks、search 和 answer with citations。
+- 3G：补充阶段三 RAG 验收文档、synthetic test set 示例、安全检查说明和 README 收口说明。
+- 当前不包含真实 LLM、embedding、vector store、Agent Workflow、复杂 RAG evaluation dashboard 或 Interview / Study Plan 正式集成。
+
+阶段三设计文档：[docs/rag-design.md](docs/rag-design.md)
+
+阶段三验收文档：[docs/phase-3-rag-acceptance.md](docs/phase-3-rag-acceptance.md)
+
 ## API
 
-当前开放的阶段二持久化工作台 API：
+当前开放的阶段三工作台 API：
 
 ```text
 GET /health
@@ -131,6 +146,13 @@ GET /api/matches
 GET /api/matches?jd_id={jd_id}
 GET /api/matches?resume_version_id={resume_version_id}
 GET /api/matches/{match_report_id}
+POST /api/rag/documents
+GET /api/rag/documents
+GET /api/rag/documents/{doc_id}
+POST /api/rag/documents/{doc_id}/index
+GET /api/rag/chunks
+POST /api/rag/search
+POST /api/rag/answer
 ```
 
 成功响应结构：
@@ -189,7 +211,8 @@ Markdown / txt 返回结果会包含：
 - 前端展示：Resume Center 可查看 versions、clone、archive；Match Report 可查看 DB 历史和详情。
 - 版本边界：复杂版本 diff / compare UI、同一 JD 多版本对比页面仍未实现，留到后续阶段。
 - 无真实 LLM：没有 OpenAI、DeepSeek、Qwen 或其他模型调用。
-- 无 RAG：没有 embedding、vector index、retriever 或引用生成。
+- RAG 知识库：支持 document 管理、deterministic chunking/indexing、lexical search、deterministic answer with citations 和 KnowledgeBasePage。
+- RAG 边界：没有真实 embedding、FAISS、pgvector、vector store、真实 LLM answer、reranker 或 RAG evaluation dashboard。
 - 无 Agent：没有 Agent Workflow、agent runs 或 agent steps。
 
 ## 安全与隐私
@@ -198,6 +221,7 @@ Markdown / txt 返回结果会包含：
 - 不提交真实简历、真实 JD、投递记录、面试复盘、上传文件、向量索引、导出文件、日志和缓存。
 - `local_data/` 仅用于本地运行数据，并已加入 `.gitignore`。
 - 开发执行手册只作为上下文使用，不复制、不移动、不提交到仓库。
+- RAG 测试和验收只使用 synthetic data；前端默认展示 preview / snippet，不默认展示完整 raw_text 或完整 chunk text。
 - 后续涉及日志、Agent step、RAG chunk 和评测样例时，需要默认脱敏并保留输入引用，避免保存完整隐私原文。
 
 ## 自查命令
@@ -219,8 +243,9 @@ git diff --check
    - 设计文档：[docs/phase-2-persistence-design.md](docs/phase-2-persistence-design.md)
    - 验收文档：[docs/phase-2-acceptance.md](docs/phase-2-acceptance.md)
    - Release notes：[docs/release-notes-v0.2.0-persistence.md](docs/release-notes-v0.2.0-persistence.md)
-3. 阶段三：RAG 知识库，建立文档解析、chunk、metadata、向量索引、检索和来源引用。
+3. 阶段三：RAG 知识库，建立 RAG document、chunk、metadata、lexical search、deterministic answer 和来源引用。
    - 设计文档：[docs/rag-design.md](docs/rag-design.md)
+   - 验收文档：[docs/phase-3-rag-acceptance.md](docs/phase-3-rag-acceptance.md)
 4. 阶段四：Agent Workflow，用状态机和工具调用串联 JD 解析、匹配、项目优化、面试准备和学习计划。
 5. 阶段五：投递管理与 Dashboard，绑定 JD、简历版本、状态、面试节点和复盘。
 6. 阶段六：评测体系与 Bad Case，沉淀 smoke set、regression set、失败样例和回归指标。

@@ -31,7 +31,7 @@
 
 ## 3. RAG 数据模型设计
 
-阶段 3A 只做设计，不新增表。阶段 3B 已新增 RAG ORM models、Alembic migration、schemas skeleton 和 DB smoke tests。阶段 3C 新增 document create/list/detail、deterministic chunking/indexing backend 和 chunk list API。阶段 3D 新增 lexical retrieval 和 `POST /api/rag/search`，返回 sources / score / snippet / metadata。阶段 3E 新增 deterministic RAG answer 和 `POST /api/rag/answer`，answer 复用 search sources 并在无来源时返回 uncertainty。阶段 3F 新增 KnowledgeBasePage 最小 UI，可创建 document、index、查看 chunks、search、answer with citations；LLM、embedding 和 vector store 仍留到后续阶段。
+阶段 3A 只做设计，不新增表。阶段 3B 已新增 RAG ORM models、Alembic migration、schemas skeleton 和 DB smoke tests。阶段 3C 新增 document create/list/detail、deterministic chunking/indexing backend 和 chunk list API。阶段 3D 新增 lexical retrieval 和 `POST /api/rag/search`，返回 sources / score / snippet / metadata。阶段 3E 新增 deterministic RAG answer 和 `POST /api/rag/answer`，answer 复用 search sources 并在无来源时返回 uncertainty。阶段 3F 新增 KnowledgeBasePage 最小 UI，可创建 document、index、查看 chunks、search、answer with citations。阶段 3G 补充阶段三验收文档、synthetic test set 示例、README 收口和安全检查清单；LLM、embedding 和 vector store 仍留到后续阶段。
 
 ### rag_documents
 
@@ -353,7 +353,7 @@ metadata filter 用途：
 - 3D：lexical retrieval + `POST /api/rag/search`。
 - 3E：deterministic RAG answer with citations + no-source behavior。
 - 3F：KnowledgeBasePage 最小 UI。
-- 3G：RAG synthetic test set、验收文档、安全检查、README 更新。
+- 3G：RAG synthetic test set、验收文档、安全检查、README 更新，作为阶段三收口。
 
 ## 13. 风险与规避
 
