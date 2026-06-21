@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 
 import { AppShell } from "./components/AppShell";
+import { listAgentRuns } from "./api/agents";
 import { listJobs } from "./api/jobs";
 import { listMatches } from "./api/matches";
 import { listRagDocuments } from "./api/rag";
 import { listResumes } from "./api/resumes";
+import { AgentRunsPage } from "./pages/AgentRunsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { JDCenterPage } from "./pages/JDCenterPage";
 import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { MatchReportPage } from "./pages/MatchReportPage";
 import { ResumeCenterPage } from "./pages/ResumeCenterPage";
 import type {
+  AgentRunRecord,
   JobRecord,
   MatchReport,
   RagDocumentRecord,
@@ -44,6 +47,11 @@ const navigation: NavigationItem[] = [
     label: "Knowledge Base",
     description: "RAG 知识库",
   },
+  {
+    key: "agents",
+    label: "Agent Runs",
+    description: "工作流状态机",
+  },
 ];
 
 export default function App() {
@@ -55,20 +63,24 @@ export default function App() {
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [matches, setMatches] = useState<MatchReport[]>([]);
   const [ragDocuments, setRagDocuments] = useState<RagDocumentRecord[]>([]);
+  const [agentRuns, setAgentRuns] = useState<AgentRunRecord[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const refreshWorkbench = async () => {
     try {
-      const [resumeList, jobList, matchList, ragDocumentList] = await Promise.all([
-        listResumes(),
-        listJobs(),
-        listMatches(),
-        listRagDocuments(),
-      ]);
+      const [resumeList, jobList, matchList, ragDocumentList, agentRunList] =
+        await Promise.all([
+          listResumes(),
+          listJobs(),
+          listMatches(),
+          listRagDocuments(),
+          listAgentRuns({ limit: 50 }),
+        ]);
       setResumes(resumeList.items);
       setJobs(jobList.items);
       setMatches(matchList.items);
       setRagDocuments(ragDocumentList.items);
+      setAgentRuns(agentRunList.items);
       setLatestResume(
         (current) => current ?? resumeList.items[resumeList.items.length - 1] ?? null,
       );
@@ -98,6 +110,7 @@ export default function App() {
     jobs,
     matches,
     ragDocuments,
+    agentRuns,
   };
 
   const renderPage = () => {
@@ -137,6 +150,14 @@ export default function App() {
     }
     if (activePage === "knowledge") {
       return <KnowledgeBasePage onDocumentsChanged={setRagDocuments} />;
+    }
+    if (activePage === "agents") {
+      return (
+        <AgentRunsPage
+          agentRuns={agentRuns}
+          onAgentRunsChanged={setAgentRuns}
+        />
+      );
     }
     return (
       <DashboardPage

@@ -13,6 +13,7 @@ const workflow = [
   "JD Create",
   "Match History",
   "RAG Search",
+  "Agent Run",
   "Frontend Display",
 ];
 
@@ -57,6 +58,13 @@ export function DashboardPage({
       tone: "blue",
       page: "knowledge" as const,
     },
+    {
+      label: "Agent",
+      value: String(state.agentRuns.length),
+      detail: "Deterministic runs",
+      tone: "green",
+      page: "agents" as const,
+    },
   ];
 
   return (
@@ -64,7 +72,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>阶段 3F 展示 SQLite 持久化工作台和 Knowledge Base，RAG documents、chunks、search 和 deterministic answer 会从 DB-backed API 读取。</p>
+        <p>阶段 4E 展示 SQLite 持久化工作台、Knowledge Base 和 deterministic Agent Runs。当前 Agent 是状态机工作流，不接真实 LLM，不自动投递。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -120,6 +128,10 @@ export function DashboardPage({
             <li>
               <strong>Knowledge</strong>
               <span>{state.ragDocuments.length} documents</span>
+            </li>
+            <li>
+              <strong>Agent Runs</strong>
+              <span>{state.agentRuns.length} deterministic runs</span>
             </li>
           </ul>
         </article>

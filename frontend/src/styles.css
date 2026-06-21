@@ -196,6 +196,32 @@ button:disabled {
   color: var(--muted);
 }
 
+.status-completed {
+  border-color: #b9cbbf;
+  background: #edf5ef;
+  color: var(--green);
+}
+
+.status-failed {
+  border-color: #e5b4b4;
+  background: #fff1f1;
+  color: var(--red);
+}
+
+.status-need-more-info,
+.status-skipped {
+  border-color: #e3c89f;
+  background: #fffaf1;
+  color: var(--amber);
+}
+
+.status-pending,
+.status-running {
+  border-color: #b9cdd4;
+  background: #eef7f9;
+  color: var(--blue);
+}
+
 .page-stack {
   display: flex;
   flex-direction: column;
@@ -441,6 +467,15 @@ button:disabled {
   outline: 3px solid rgba(45, 106, 79, 0.14);
 }
 
+.checkbox-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
 .primary-action {
   width: fit-content;
   border: 1px solid var(--green);
@@ -549,6 +584,88 @@ button:disabled {
 .rag-document-list li {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(90px, auto) minmax(100px, auto) minmax(100px, auto) auto;
+}
+
+.agent-run-list li {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(120px, auto) minmax(150px, auto) minmax(90px, auto) auto;
+}
+
+.agent-result,
+.state-callout,
+.refs-block,
+.agent-timeline,
+.timeline-step {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-result {
+  margin-top: 18px;
+}
+
+.state-callout {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.state-callout.success {
+  border-color: #b9cbbf;
+  background: #f3f8f4;
+}
+
+.state-callout.warning {
+  border-color: #e3c89f;
+  background: #fffaf1;
+}
+
+.state-callout.danger {
+  border-color: #e5b4b4;
+  background: #fff1f1;
+}
+
+.state-callout p,
+.state-callout span {
+  margin: 0;
+  color: var(--muted);
+}
+
+.refs-block {
+  margin-top: 14px;
+}
+
+.refs-block > strong {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.agent-timeline {
+  margin-top: 18px;
+}
+
+.timeline-step {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 14px;
+}
+
+.timeline-step-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.timeline-step-header div {
+  display: grid;
+  gap: 4px;
+}
+
+.timeline-step-header small {
+  color: var(--muted);
 }
 
 .source-list {

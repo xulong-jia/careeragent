@@ -217,6 +217,78 @@ export type RagAnswerResult = {
   answer_type: string;
 };
 
+export type AgentRunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "need_more_info";
+
+export type AgentStepStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "skipped"
+  | "need_more_info";
+
+export type AgentRunRecord = {
+  id: string;
+  user_id: string;
+  workflow_name: string;
+  status: AgentRunStatus;
+  input_refs: Record<string, unknown>;
+  output_refs: Record<string, unknown>;
+  missing_slots: Record<string, unknown>[] | null;
+  questions: Record<string, unknown>[] | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number | null;
+};
+
+export type AgentStepRecord = {
+  id: string;
+  run_id: string;
+  step_name: string;
+  step_order: number;
+  status: AgentStepStatus;
+  input_refs: Record<string, unknown>;
+  output_refs: Record<string, unknown>;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number | null;
+};
+
+export type AgentRunCreatePayload = {
+  workflow_name: string;
+  resume_id?: string | null;
+  resume_version_id?: string | null;
+  jd_id?: string | null;
+  use_rag?: boolean;
+  rag_query?: string | null;
+};
+
+export type AgentRunCreateResponse = {
+  run: AgentRunRecord;
+  steps_count: number | null;
+};
+
+export type AgentRunDetailResponse = {
+  run: AgentRunRecord;
+  steps_count: number | null;
+};
+
+export type AgentStepListResponse = {
+  steps: AgentStepRecord[];
+  total: number;
+};
+
 export type WorkbenchState = {
   latestResume: ResumeRecord | null;
   latestJob: JobRecord | null;
@@ -225,4 +297,5 @@ export type WorkbenchState = {
   jobs: JobRecord[];
   matches: MatchReport[];
   ragDocuments: RagDocumentRecord[];
+  agentRuns: AgentRunRecord[];
 };
