@@ -248,6 +248,7 @@ git diff --check
    - 验收文档：[docs/phase-3-rag-acceptance.md](docs/phase-3-rag-acceptance.md)
    - Release notes：[docs/release-notes-v0.3.0-rag.md](docs/release-notes-v0.3.0-rag.md)
 4. 阶段四：Agent Workflow，用状态机和工具调用串联 JD 解析、匹配、项目优化、面试准备和学习计划。
+   - 设计文档：[docs/agent-workflow-design.md](docs/agent-workflow-design.md)
 5. 阶段五：投递管理与 Dashboard，绑定 JD、简历版本、状态、面试节点和复盘。
 6. 阶段六：评测体系与 Bad Case，沉淀 smoke set、regression set、失败样例和回归指标。
 7. 阶段七：工程化交付，补齐 Docker、文档、演示材料、安全说明和最终验收记录。
