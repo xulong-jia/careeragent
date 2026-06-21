@@ -3,6 +3,15 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class AgentRunCreateRequest(BaseModel):
+    workflow_name: str
+    resume_id: str | None = None
+    resume_version_id: str | None = None
+    jd_id: str | None = None
+    use_rag: bool = False
+    rag_query: str | None = None
+
+
 class AgentRunRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -22,6 +31,16 @@ class AgentRunRecord(BaseModel):
     duration_ms: int | None = None
 
 
+class AgentRunCreateResponse(BaseModel):
+    run: AgentRunRecord
+    steps_count: int | None = None
+
+
+class AgentRunDetailResponse(BaseModel):
+    run: AgentRunRecord
+    steps_count: int | None = None
+
+
 class AgentStepRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -38,3 +57,8 @@ class AgentStepRecord(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     duration_ms: int | None = None
+
+
+class AgentStepListResponse(BaseModel):
+    steps: list[AgentStepRecord] = Field(default_factory=list)
+    total: int

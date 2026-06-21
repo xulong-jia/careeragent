@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.models.agent import AgentRun, AgentStep
@@ -61,8 +61,20 @@ def get_run(db: Session, run_id: str) -> AgentRunRecord | None:
     return _to_run_record(run) if run else None
 
 
-def list_runs(db: Session) -> list[AgentRunRecord]:
-    runs = db.scalars(select(AgentRun).order_by(AgentRun.created_at, AgentRun.id)).all()
+def list_runs(
+    db: Session,
+    *,
+    workflow_name: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+) -> list[AgentRunRecord]:
+    statement = select(AgentRun)
+    if workflow_name:
+        statement = statement.where(AgentRun.workflow_name == workflow_name)
+    if status:
+        statement = statement.where(AgentRun.status == status)
+    statement = statement.order_by(desc(AgentRun.created_at), desc(AgentRun.id)).limit(limit)
+    runs = db.scalars(statement).all()
     return [_to_run_record(run) for run in runs]
 
 
