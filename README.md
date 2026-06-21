@@ -271,6 +271,8 @@ git diff --check
    - 设计文档：[docs/agent-workflow-design.md](docs/agent-workflow-design.md)
    - 验收文档：[docs/phase-4-agent-workflow-acceptance.md](docs/phase-4-agent-workflow-acceptance.md)
    - Release notes：[docs/release-notes-v0.4.0-agent-workflow.md](docs/release-notes-v0.4.0-agent-workflow.md)
-5. 阶段五：投递管理与 Dashboard，绑定 JD、简历版本、状态、面试节点和复盘。
-6. 阶段六：评测体系与 Bad Case，沉淀 smoke set、regression set、失败样例和回归指标。
-7. 阶段七：工程化交付，补齐 Docker、文档、演示材料、安全说明和最终验收记录。
+5. 阶段五：Quality Review / Bad Case，先补质量复查和错误复盘闭环，再考虑真实 LLM 或投递管理。
+   - 设计文档：[docs/quality-review-design.md](docs/quality-review-design.md)
+6. 后续阶段：投递管理与 Dashboard，绑定 JD、简历版本、状态、面试节点和复盘。当前优先级后移，避免在缺少质量闭环时过早进入自动化投递相关能力。
+7. 后续阶段：评测体系扩展，沉淀 evaluation run、evaluation item、smoke set、regression set、失败样例和回归指标。
+8. 阶段七：工程化交付，补齐 Docker、文档、演示材料、安全说明和最终验收记录。
