@@ -5,6 +5,8 @@ from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
 from app.schemas.rag import (
     RagChunkRecord,
+    RagAnswerRequest,
+    RagAnswerResult,
     RagDocumentCreateRequest,
     RagDocumentIndexRequest,
     RagDocumentIndexResult,
@@ -95,4 +97,14 @@ async def search_rag_documents(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     result = rag_service.search_documents(db, payload)
+    return {"data": result, "request_id": request.state.request_id}
+
+
+@router.post("/answer", response_model=ApiResponse[RagAnswerResult])
+async def answer_rag_question(
+    request: Request,
+    payload: RagAnswerRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    result = rag_service.answer_question(db, payload)
     return {"data": result, "request_id": request.state.request_id}

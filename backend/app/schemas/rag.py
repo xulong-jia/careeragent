@@ -32,6 +32,12 @@ class RagSearchRequest(BaseModel):
     filters: RagSearchFilters | None = None
 
 
+class RagAnswerRequest(BaseModel):
+    question: str
+    top_k: int = 5
+    filters: RagSearchFilters | None = None
+
+
 class RagDocumentRecord(BaseModel):
     doc_id: str
     title: str
@@ -80,3 +86,12 @@ class RagSearchResult(BaseModel):
     top_k: int
     sources: list[RagSearchSource] = Field(default_factory=list)
     uncertainty: str | None = None
+
+
+class RagAnswerResult(BaseModel):
+    question: str
+    answer: str
+    sources: list[RagSearchSource] = Field(default_factory=list)
+    uncertainty: str | None = None
+    grounded: bool
+    answer_type: str = "deterministic_summary"

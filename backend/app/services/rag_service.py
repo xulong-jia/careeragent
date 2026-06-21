@@ -1,11 +1,14 @@
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.rag.answering import build_deterministic_answer
 from app.rag.chunking import chunk_document_text
 from app.rag.retriever import rank_chunks
 from app.repositories import rag_repository
 from app.schemas.rag import (
     RagChunkRecord,
+    RagAnswerRequest,
+    RagAnswerResult,
     RagDocumentCreateRequest,
     RagDocumentIndexRequest,
     RagDocumentIndexResult,
@@ -201,3 +204,25 @@ def search_documents(db: Session, payload: RagSearchRequest) -> RagSearchResult:
         sources=sources,
         uncertainty=None if sources else "no_relevant_source",
     )
+
+
+def answer_question(db: Session, payload: RagAnswerRequest) -> RagAnswerResult:
+    question = payload.question.strip()
+    if not question:
+        raise AppError(
+            code="rag_answer_validation_error",
+            message="RAG answer question is required.",
+            status_code=400,
+            details={"field": "question"},
+        )
+
+    search_result = search_documents(
+        db,
+        RagSearchRequest(
+            query=question,
+            top_k=payload.top_k,
+            filters=payload.filters,
+        ),
+    )
+    answer_payload = build_deterministic_answer(question, search_result.sources)
+    return RagAnswerResult(**answer_payload)
