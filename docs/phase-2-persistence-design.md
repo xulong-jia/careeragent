@@ -238,6 +238,8 @@ resume_versions + job_descriptions/job_profiles
 - 不在同一个提交里同时引入 DB、重写 API、重写前端。
 - 不让 `mock_store` 和 DB 在同一业务主路径中长期并存。
 
+当前状态：阶段 2C 已将 Resume / JD 主路径切换到 DB repository。Resume 创建时写入 `resumes` 和 initial `resume_versions`；JD 创建时写入 `job_descriptions` 和 `job_profiles`。Match Report 仍未持久化，留到阶段 2E。
+
 ## 9. 测试策略
 
 - 使用 SQLite test database，建议每个测试或测试模块使用独立数据库文件或事务隔离。

@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Request, UploadFile, status
+from fastapi import APIRouter, Depends, Request, UploadFile, status
+from sqlalchemy.orm import Session
 
+from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
 from app.schemas.resumes import ResumeRecord
 from app.services.resume_service import (
-    create_mock_resume,
-    get_mock_resume,
-    list_mock_resumes,
+    create_resume,
+    get_resume as get_resume_record,
+    list_resumes,
 )
 
 
@@ -17,15 +19,19 @@ router = APIRouter(prefix="/api/resumes", tags=["resumes"])
     response_model=ApiResponse[ResumeRecord],
     status_code=status.HTTP_201_CREATED,
 )
-async def upload_resume(request: Request, file: UploadFile) -> dict[str, object]:
+async def upload_resume(
+    request: Request, file: UploadFile, db: Session = Depends(get_db)
+) -> dict[str, object]:
     content = await file.read()
-    resume = create_mock_resume(file.filename or "", file.content_type, content)
+    resume = create_resume(db, file.filename or "", file.content_type, content)
     return {"data": resume, "request_id": request.state.request_id}
 
 
 @router.get("", response_model=ApiResponse[ListResponse[ResumeRecord]])
-async def list_resumes(request: Request) -> dict[str, object]:
-    items = list_mock_resumes()
+async def list_resume_records(
+    request: Request, db: Session = Depends(get_db)
+) -> dict[str, object]:
+    items = list_resumes(db)
     return {
         "data": ListResponse(items=items, total=len(items)),
         "request_id": request.state.request_id,
@@ -33,6 +39,8 @@ async def list_resumes(request: Request) -> dict[str, object]:
 
 
 @router.get("/{resume_id}", response_model=ApiResponse[ResumeRecord])
-async def get_resume(request: Request, resume_id: str) -> dict[str, object]:
-    resume = get_mock_resume(resume_id)
+async def get_resume_detail(
+    request: Request, resume_id: str, db: Session = Depends(get_db)
+) -> dict[str, object]:
+    resume = get_resume_record(db, resume_id)
     return {"data": resume, "request_id": request.state.request_id}

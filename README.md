@@ -96,11 +96,12 @@ cp .env.example .env
 - Parser placeholder：`.pdf`、`.docx` 返回明确 placeholder、extraction status、method 和 warnings，不假装真实解析成功。
 - 安全边界：不保存真实上传文件到 Git，不调用真实 LLM/RAG/Agent。
 
-阶段 2A / 2B 已开始：
+阶段 2A / 2B / 2C 已开始：
 
 - 2A：完成阶段二持久化与版本管理设计文档。
 - 2B：新增 SQLite + SQLAlchemy + Alembic 基础设施、ORM skeleton、初始 migration 和 DB health check。
-- 当前 Resume / JD / Match API 主路径仍保持阶段一 Mock 行为，后续 2C 才开始替换为 DB repository。
+- 2C：Resume / JD 主路径已切换为 SQLite 持久化，创建 Resume 时生成 initial resume version，创建 JD 时生成 job profile。
+- 当前 Match Report 仍未持久化，继续使用 deterministic mock report；Match Report 历史留到阶段 2E。
 
 ## API
 
@@ -170,8 +171,9 @@ Markdown / txt 返回结果会包含：
 当前阶段说明：
 
 - Mock：结构化简历、JD 解析和匹配评分仍是 deterministic mock 规则。
-- 内存存储：刷新页面会重新拉取后端内存数据；重启后端会丢失数据。
-- 无数据库：没有 SQLAlchemy、Alembic、PostgreSQL 或持久化表。
+- SQLite 持久化：Resume / JD 数据默认保存到 `DATABASE_URL` 指定位置，默认 `local_data/careeragent.db`。
+- 局部 Mock：Match Report 仍是内存 deterministic mock，重启后会丢失，持久化留到阶段 2E。
+- 版本边界：Resume Version 当前只创建 initial version，复制、归档和对比留到阶段 2D。
 - 无真实 LLM：没有 OpenAI、DeepSeek、Qwen 或其他模型调用。
 - 无 RAG：没有 embedding、vector index、retriever 或引用生成。
 - 无 Agent：没有 Agent Workflow、agent runs 或 agent steps。

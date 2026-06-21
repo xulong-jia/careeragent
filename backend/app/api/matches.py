@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, Request, status
+from sqlalchemy.orm import Session
 
+from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
 from app.schemas.matches import MatchReport, MatchRunRequest
 from app.services.match_service import (
@@ -18,9 +20,9 @@ router = APIRouter(prefix="/api/matches", tags=["matches"])
     status_code=status.HTTP_201_CREATED,
 )
 async def run_match(
-    request: Request, payload: MatchRunRequest
+    request: Request, payload: MatchRunRequest, db: Session = Depends(get_db)
 ) -> dict[str, object]:
-    report = build_mock_report(payload)
+    report = build_mock_report(db, payload)
     return {"data": report, "request_id": request.state.request_id}
 
 

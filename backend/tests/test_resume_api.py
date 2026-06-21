@@ -1,4 +1,5 @@
 from conftest import get_data, get_error, make_client
+from app.models.resume import Resume, ResumeVersion
 
 
 def test_resume_upload_accepts_supported_file_and_returns_mock_result():
@@ -195,3 +196,31 @@ def test_resume_list_and_detail_return_uploaded_resume():
     assert any(item["resume_id"] == resume_id for item in get_data(list_response)["items"])
     assert detail_response.status_code == 200
     assert get_data(detail_response)["resume_id"] == resume_id
+
+
+def test_resume_upload_persists_resume_and_initial_version(db_session):
+    client = make_client()
+    upload = client.post(
+        "/api/resumes/upload",
+        files={
+            "file": (
+                "candidate.md",
+                b"Python FastAPI persistent resume.",
+                "text/markdown",
+            )
+        },
+    )
+    resume_id = get_data(upload)["resume_id"]
+
+    resume = db_session.get(Resume, resume_id)
+    versions = (
+        db_session.query(ResumeVersion)
+        .filter(ResumeVersion.resume_id == resume_id)
+        .all()
+    )
+
+    assert resume is not None
+    assert resume.original_filename == "candidate.md"
+    assert len(versions) == 1
+    assert versions[0].version_number == 1
+    assert "Python FastAPI" in versions[0].raw_text

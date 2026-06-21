@@ -1,6 +1,8 @@
+from sqlalchemy.orm import Session
+
 from app.core.errors import AppError
+from app.repositories import job_repository
 from app.schemas.jobs import JobCreateRequest, JobProfile, JobRecord
-from app.services.mock_store import store
 
 
 MIN_JD_TEXT_LENGTH = 20
@@ -82,34 +84,15 @@ def build_mock_job_profile(jd_id: str, payload: JobCreateRequest) -> JobProfile:
     )
 
 
-def create_mock_job(payload: JobCreateRequest) -> JobRecord:
+def create_job(db: Session, payload: JobCreateRequest) -> JobRecord:
     validate_job_description(payload.raw_text)
-    jd_id = store.next_id("jd", len(store.jobs))
-    profile = build_mock_job_profile(jd_id, payload)
-    job = JobRecord(
-        jd_id=jd_id,
-        company=payload.company,
-        job_title=payload.job_title,
-        location=payload.location,
-        raw_text=payload.raw_text,
-        source_url=str(payload.source_url) if payload.source_url else None,
-        job_profile=profile,
-    )
-    store.jobs[job.jd_id] = job
-    return job
+    profile = build_mock_job_profile("pending", payload)
+    return job_repository.create_job_with_profile(db, payload=payload, profile=profile)
 
 
-def list_mock_jobs() -> list[JobRecord]:
-    return list(store.jobs.values())
+def list_jobs(db: Session) -> list[JobRecord]:
+    return job_repository.list_jobs(db)
 
 
-def get_mock_job(jd_id: str) -> JobRecord:
-    job = store.jobs.get(jd_id)
-    if not job:
-        raise AppError(
-            code="job_not_found",
-            message="JD was not found in the Phase 1 mock store.",
-            status_code=404,
-            details={"jd_id": jd_id},
-        )
-    return job
+def get_job(db: Session, jd_id: str) -> JobRecord:
+    return job_repository.get_job(db, jd_id)

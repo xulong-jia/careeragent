@@ -1,8 +1,10 @@
+from sqlalchemy.orm import Session
+
+from app.repositories.job_repository import get_job
+from app.repositories.resume_repository import get_resume
 from app.schemas.matches import MatchEvidence, MatchReport, MatchRunRequest
 from app.schemas.resumes import ResumeRecord
-from app.services.job_service import get_mock_job
 from app.services.mock_store import store
-from app.services.resume_service import get_mock_resume
 
 
 def flatten_resume_skills(resume: ResumeRecord) -> set[str]:
@@ -12,9 +14,9 @@ def flatten_resume_skills(resume: ResumeRecord) -> set[str]:
     return flattened
 
 
-def build_mock_report(payload: MatchRunRequest) -> MatchReport:
-    resume = get_mock_resume(payload.resume_id)
-    job = get_mock_job(payload.jd_id)
+def build_mock_report(db: Session, payload: MatchRunRequest) -> MatchReport:
+    resume = get_resume(db, payload.resume_id)
+    job = get_job(db, payload.jd_id)
     resume_skills = flatten_resume_skills(resume)
     required_skills = set(job.job_profile.required_skills)
     matched_skills = sorted(required_skills & resume_skills)

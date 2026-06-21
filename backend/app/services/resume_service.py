@@ -1,9 +1,11 @@
 from hashlib import sha256
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 from app.core.errors import AppError
-from app.schemas.resumes import ResumeRecord, SourceFile, StructuredResume
-from app.services.mock_store import store
+from app.repositories import resume_repository
+from app.schemas.resumes import ResumeRecord, StructuredResume
 from app.services.text_extraction_service import extract_resume_text
 
 
@@ -98,50 +100,34 @@ def extract_mock_skills(text: str) -> dict[str, list[str]]:
     return skills
 
 
-def create_mock_resume(
-    filename: str, content_type: str | None, content: bytes
+def create_resume(
+    db: Session, filename: str, content_type: str | None, content: bytes
 ) -> ResumeRecord:
     file_type = validate_resume_upload(filename, content_type, content)
-    resume_id = store.next_id("resume", len(store.resumes))
     extraction = extract_resume_text(filename, file_type, content_type, content)
     raw_text = extraction.raw_text
     structured_resume = StructuredResume(
         basic_info={"name": None, "email": None, "phone": None, "location": None},
         skills=extract_mock_skills(raw_text),
     )
-    resume = ResumeRecord(
-        resume_id=resume_id,
+    return resume_repository.create_resume_with_initial_version(
+        db,
         filename=filename,
         file_type=file_type,
-        parse_status="mock_parsed",
+        text_hash=sha256(content).hexdigest(),
         raw_text=raw_text,
         raw_text_preview=raw_text[:500],
+        structured_resume=structured_resume,
         extraction_status=extraction.extraction_status,
         extraction_method=extraction.extraction_method,
         extraction_warnings=extraction.warnings,
-        structured_resume=structured_resume,
-        source_file=SourceFile(
-            filename=filename,
-            file_type=file_type,
-            text_hash=sha256(content).hexdigest(),
-        ),
         risk_flags=[],
     )
-    store.resumes[resume.resume_id] = resume
-    return resume
 
 
-def list_mock_resumes() -> list[ResumeRecord]:
-    return list(store.resumes.values())
+def list_resumes(db: Session) -> list[ResumeRecord]:
+    return resume_repository.list_resumes(db)
 
 
-def get_mock_resume(resume_id: str) -> ResumeRecord:
-    resume = store.resumes.get(resume_id)
-    if not resume:
-        raise AppError(
-            code="resume_not_found",
-            message="Resume was not found in the Phase 1 mock store.",
-            status_code=404,
-            details={"resume_id": resume_id},
-        )
-    return resume
+def get_resume(db: Session, resume_id: str) -> ResumeRecord:
+    return resume_repository.get_resume(db, resume_id)
