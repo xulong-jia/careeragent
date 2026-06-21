@@ -123,6 +123,100 @@ export type MatchReport = {
   created_at?: string | null;
 };
 
+export type RagDocumentRecord = {
+  doc_id: string;
+  title: string;
+  source_type: string;
+  source_uri: string | null;
+  raw_text_preview: string;
+  metadata: Record<string, unknown>;
+  index_status: string;
+  chunk_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RagChunkRecord = {
+  chunk_id: string;
+  doc_id: string;
+  chunk_index: number;
+  section: string | null;
+  text_preview: string;
+  token_count: number;
+  metadata: Record<string, unknown>;
+  embedding_id: string | null;
+  created_at: string;
+};
+
+export type RagDocumentCreatePayload = {
+  title: string;
+  source_type: string;
+  source_uri: string | null;
+  raw_text: string;
+  metadata: Record<string, unknown>;
+};
+
+export type RagDocumentIndexPayload = {
+  max_chars: number;
+  overlap_chars: number;
+};
+
+export type RagDocumentIndexResult = {
+  doc_id: string;
+  index_status: string;
+  chunk_count: number;
+  chunks: RagChunkRecord[];
+};
+
+export type RagSearchFilters = {
+  source_type?: string | null;
+  doc_id?: string | null;
+  tags?: string[] | null;
+  role_category?: string | null;
+  company?: string | null;
+  topic?: string | null;
+  domain?: string | null;
+};
+
+export type RagSearchRequest = {
+  query: string;
+  top_k: number;
+  filters?: RagSearchFilters | null;
+};
+
+export type RagSearchSource = {
+  doc_id: string;
+  chunk_id: string;
+  title: string;
+  source_type: string;
+  section: string | null;
+  snippet: string;
+  score: number;
+  metadata: Record<string, unknown>;
+};
+
+export type RagSearchResult = {
+  query: string;
+  top_k: number;
+  sources: RagSearchSource[];
+  uncertainty: string | null;
+};
+
+export type RagAnswerRequest = {
+  question: string;
+  top_k: number;
+  filters?: RagSearchFilters | null;
+};
+
+export type RagAnswerResult = {
+  question: string;
+  answer: string;
+  sources: RagSearchSource[];
+  uncertainty: string | null;
+  grounded: boolean;
+  answer_type: string;
+};
+
 export type WorkbenchState = {
   latestResume: ResumeRecord | null;
   latestJob: JobRecord | null;
@@ -130,4 +224,5 @@ export type WorkbenchState = {
   resumes: ResumeRecord[];
   jobs: JobRecord[];
   matches: MatchReport[];
+  ragDocuments: RagDocumentRecord[];
 };

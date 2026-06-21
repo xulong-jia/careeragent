@@ -36,7 +36,8 @@ body {
 
 button,
 textarea,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -424,15 +425,18 @@ button:disabled {
   font-weight: 750;
 }
 
-.form-stack input {
+.form-stack input,
+.form-stack select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
+  background: #ffffff;
   color: var(--ink);
   padding: 10px 12px;
 }
 
-.form-stack input:focus {
+.form-stack input:focus,
+.form-stack select:focus {
   border-color: var(--green);
   outline: 3px solid rgba(45, 106, 79, 0.14);
 }
@@ -501,9 +505,83 @@ button:disabled {
   padding: 14px;
 }
 
+.json-preview.compact {
+  max-height: 180px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
 .text-preview {
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.metadata-textarea {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 14px;
+}
+
+.metadata-textarea:focus {
+  border-color: var(--green);
+  outline: 3px solid rgba(45, 106, 79, 0.14);
+}
+
+.warning-panel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-color: #e3c89f;
+  background: #fffaf1;
+}
+
+.warning-panel p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.rag-document-list li {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(90px, auto) minmax(100px, auto) minmax(100px, auto) auto;
+}
+
+.source-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.source-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 14px;
+}
+
+.source-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.snippet-text {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.65;
+}
+
+.empty-state.compact {
+  min-height: 110px;
+  margin-top: 12px;
 }
 
 .run-row {
@@ -637,7 +715,8 @@ button:disabled {
   }
 
   .version-list li,
-  .report-list li {
+  .report-list li,
+  .rag-document-list li {
     grid-template-columns: 1fr;
     align-items: flex-start;
   }

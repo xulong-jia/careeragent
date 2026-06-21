@@ -3,12 +3,19 @@ import { useEffect, useState } from "react";
 import { AppShell } from "./components/AppShell";
 import { listJobs } from "./api/jobs";
 import { listMatches } from "./api/matches";
+import { listRagDocuments } from "./api/rag";
 import { listResumes } from "./api/resumes";
 import { DashboardPage } from "./pages/DashboardPage";
 import { JDCenterPage } from "./pages/JDCenterPage";
+import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { MatchReportPage } from "./pages/MatchReportPage";
 import { ResumeCenterPage } from "./pages/ResumeCenterPage";
-import type { JobRecord, MatchReport, ResumeRecord } from "./types/api";
+import type {
+  JobRecord,
+  MatchReport,
+  RagDocumentRecord,
+  ResumeRecord,
+} from "./types/api";
 import type { NavigationItem, PageKey } from "./types/navigation";
 
 const navigation: NavigationItem[] = [
@@ -32,6 +39,11 @@ const navigation: NavigationItem[] = [
     label: "Match Report",
     description: "匹配报告",
   },
+  {
+    key: "knowledge",
+    label: "Knowledge Base",
+    description: "RAG 知识库",
+  },
 ];
 
 export default function App() {
@@ -42,18 +54,21 @@ export default function App() {
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [matches, setMatches] = useState<MatchReport[]>([]);
+  const [ragDocuments, setRagDocuments] = useState<RagDocumentRecord[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const refreshWorkbench = async () => {
     try {
-      const [resumeList, jobList, matchList] = await Promise.all([
+      const [resumeList, jobList, matchList, ragDocumentList] = await Promise.all([
         listResumes(),
         listJobs(),
         listMatches(),
+        listRagDocuments(),
       ]);
       setResumes(resumeList.items);
       setJobs(jobList.items);
       setMatches(matchList.items);
+      setRagDocuments(ragDocumentList.items);
       setLatestResume(
         (current) => current ?? resumeList.items[resumeList.items.length - 1] ?? null,
       );
@@ -82,6 +97,7 @@ export default function App() {
     resumes,
     jobs,
     matches,
+    ragDocuments,
   };
 
   const renderPage = () => {
@@ -118,6 +134,9 @@ export default function App() {
           resumes={resumes}
         />
       );
+    }
+    if (activePage === "knowledge") {
+      return <KnowledgeBasePage onDocumentsChanged={setRagDocuments} />;
     }
     return (
       <DashboardPage

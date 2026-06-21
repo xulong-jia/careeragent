@@ -1,4 +1,4 @@
-export type PageKey = "dashboard" | "resume" | "jd" | "match";
+export type PageKey = "dashboard" | "resume" | "jd" | "match" | "knowledge";
 
 export type NavigationItem = {
   key: PageKey;

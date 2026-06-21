@@ -12,6 +12,7 @@ const workflow = [
   "Version History",
   "JD Create",
   "Match History",
+  "RAG Search",
   "Frontend Display",
 ];
 
@@ -49,6 +50,13 @@ export function DashboardPage({
       tone: "red",
       page: "match" as const,
     },
+    {
+      label: "Knowledge",
+      value: String(state.ragDocuments.length),
+      detail: "RAG documents",
+      tone: "blue",
+      page: "knowledge" as const,
+    },
   ];
 
   return (
@@ -56,7 +64,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>阶段 2F 展示 SQLite 持久化工作台状态，Resume、JD 和 Match Report 会从 DB-backed API 读取。</p>
+        <p>阶段 3F 展示 SQLite 持久化工作台和 Knowledge Base，RAG documents、chunks、search 和 deterministic answer 会从 DB-backed API 读取。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -79,7 +87,7 @@ export function DashboardPage({
         <article className="panel">
           <div className="panel-header">
             <h3>持久化闭环</h3>
-            <span className="status-pill">Phase 2F</span>
+            <span className="status-pill">Phase 3F</span>
           </div>
           <div className="workflow-rail" aria-label="阶段 2F 持久化流程">
             {workflow.map((step) => (
@@ -108,6 +116,10 @@ export function DashboardPage({
             <li>
               <strong>Match</strong>
               <span>{state.latestMatch?.match_report_id ?? "未运行"}</span>
+            </li>
+            <li>
+              <strong>Knowledge</strong>
+              <span>{state.ragDocuments.length} documents</span>
             </li>
           </ul>
         </article>
