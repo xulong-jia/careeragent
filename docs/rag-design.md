@@ -31,7 +31,7 @@
 
 ## 3. RAG 数据模型设计
 
-阶段 3A 只做设计，不新增表。阶段 3B 再新增 Alembic migration。
+阶段 3A 只做设计，不新增表。阶段 3B 将新增 RAG ORM models、Alembic migration、schemas skeleton 和 DB smoke tests，但仍不实现 repository、API、chunking、retrieval 或 answer。
 
 ### rag_documents
 
