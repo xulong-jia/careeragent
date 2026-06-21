@@ -5,9 +5,9 @@ from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
 from app.schemas.matches import MatchReport, MatchRunRequest
 from app.services.match_service import (
-    build_mock_report,
-    get_mock_match,
-    list_mock_matches,
+    get_match_report,
+    list_match_reports,
+    run_match_report,
 )
 
 
@@ -22,13 +22,22 @@ router = APIRouter(prefix="/api/matches", tags=["matches"])
 async def run_match(
     request: Request, payload: MatchRunRequest, db: Session = Depends(get_db)
 ) -> dict[str, object]:
-    report = build_mock_report(db, payload)
+    report = run_match_report(db, payload)
     return {"data": report, "request_id": request.state.request_id}
 
 
 @router.get("", response_model=ApiResponse[ListResponse[MatchReport]])
-async def list_matches(request: Request) -> dict[str, object]:
-    items = list_mock_matches()
+async def list_matches(
+    request: Request,
+    jd_id: str | None = None,
+    resume_version_id: str | None = None,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    items = list_match_reports(
+        db,
+        jd_id=jd_id,
+        resume_version_id=resume_version_id,
+    )
     return {
         "data": ListResponse(items=items, total=len(items)),
         "request_id": request.state.request_id,
@@ -37,7 +46,7 @@ async def list_matches(request: Request) -> dict[str, object]:
 
 @router.get("/{match_report_id}", response_model=ApiResponse[MatchReport])
 async def get_match(
-    request: Request, match_report_id: str
+    request: Request, match_report_id: str, db: Session = Depends(get_db)
 ) -> dict[str, object]:
-    report = get_mock_match(match_report_id)
+    report = get_match_report(db, match_report_id)
     return {"data": report, "request_id": request.state.request_id}

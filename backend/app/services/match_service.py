@@ -1,24 +1,123 @@
 from sqlalchemy.orm import Session
 
-from app.repositories.job_repository import get_job
-from app.repositories.resume_repository import get_resume
+from app.core.errors import AppError
+from app.models.job import JobDescription, JobProfile
+from app.models.resume import Resume, ResumeVersion
+from app.repositories import match_repository
 from app.schemas.matches import MatchEvidence, MatchReport, MatchRunRequest
-from app.schemas.resumes import ResumeRecord
-from app.services.mock_store import store
 
 
-def flatten_resume_skills(resume: ResumeRecord) -> set[str]:
+def flatten_resume_skills(structured_resume: dict[str, object]) -> set[str]:
     flattened: set[str] = set()
-    for values in resume.structured_resume.skills.values():
-        flattened.update(values)
+    skills = structured_resume.get("skills")
+    if not isinstance(skills, dict):
+        return flattened
+    for values in skills.values():
+        if isinstance(values, list):
+            flattened.update(str(value) for value in values)
     return flattened
 
 
-def build_mock_report(db: Session, payload: MatchRunRequest) -> MatchReport:
-    resume = get_resume(db, payload.resume_id)
-    job = get_job(db, payload.jd_id)
-    resume_skills = flatten_resume_skills(resume)
-    required_skills = set(job.job_profile.required_skills)
+def _get_resume(db: Session, resume_id: str) -> Resume:
+    resume = db.get(Resume, resume_id)
+    if not resume or resume.status != "active":
+        raise AppError(
+            code="resume_not_found",
+            message="Resume was not found.",
+            status_code=404,
+            details={"resume_id": resume_id},
+        )
+    return resume
+
+
+def _get_resume_version(db: Session, resume_version_id: str) -> ResumeVersion:
+    version = db.get(ResumeVersion, resume_version_id)
+    if not version:
+        raise AppError(
+            code="resume_version_not_found",
+            message="Resume version was not found.",
+            status_code=404,
+            details={"resume_version_id": resume_version_id},
+        )
+    return version
+
+
+def _latest_active_resume_version(db: Session, resume_id: str) -> ResumeVersion:
+    _get_resume(db, resume_id)
+    version = (
+        db.query(ResumeVersion)
+        .filter(ResumeVersion.resume_id == resume_id)
+        .filter(ResumeVersion.status == "active")
+        .order_by(ResumeVersion.version_number.desc(), ResumeVersion.created_at.desc())
+        .first()
+    )
+    if not version:
+        raise AppError(
+            code="resume_version_not_found",
+            message="Active resume version was not found.",
+            status_code=404,
+            details={"resume_id": resume_id},
+        )
+    return version
+
+
+def _resolve_resume_version(db: Session, payload: MatchRunRequest) -> ResumeVersion:
+    if payload.resume_version_id:
+        version = _get_resume_version(db, payload.resume_version_id)
+        if payload.resume_id:
+            _get_resume(db, payload.resume_id)
+            if version.resume_id != payload.resume_id:
+                raise AppError(
+                    code="resume_version_mismatch",
+                    message="Resume version does not belong to the given resume.",
+                    status_code=400,
+                    details={
+                        "resume_id": payload.resume_id,
+                        "resume_version_id": payload.resume_version_id,
+                    },
+                )
+        return version
+
+    if not payload.resume_id:
+        raise AppError(
+            code="validation_error",
+            message="Either resume_id or resume_version_id is required.",
+            status_code=422,
+            details={"fields": ["resume_id", "resume_version_id"]},
+        )
+    return _latest_active_resume_version(db, payload.resume_id)
+
+
+def _latest_job_profile(db: Session, jd_id: str) -> tuple[JobDescription, JobProfile]:
+    job = db.get(JobDescription, jd_id)
+    if not job or job.status != "active":
+        raise AppError(
+            code="job_not_found",
+            message="JD was not found.",
+            status_code=404,
+            details={"jd_id": jd_id},
+        )
+    profile = (
+        db.query(JobProfile)
+        .filter(JobProfile.jd_id == jd_id)
+        .order_by(JobProfile.profile_version.desc(), JobProfile.created_at.desc())
+        .first()
+    )
+    if not profile:
+        raise AppError(
+            code="job_not_found",
+            message="JD profile was not found.",
+            status_code=404,
+            details={"jd_id": jd_id},
+        )
+    return job, profile
+
+
+def run_match_report(db: Session, payload: MatchRunRequest) -> MatchReport:
+    resume_version = _resolve_resume_version(db, payload)
+    _, job_profile = _latest_job_profile(db, payload.jd_id)
+    resume_skills = flatten_resume_skills(resume_version.structured_resume)
+    required_skills = set(job_profile.required_skills or [])
     matched_skills = sorted(required_skills & resume_skills)
     missing_skills = sorted(required_skills - resume_skills)
     coverage = len(matched_skills) / len(required_skills) if required_skills else 0
@@ -33,11 +132,12 @@ def build_mock_report(db: Session, payload: MatchRunRequest) -> MatchReport:
         "risk_control": 80,
     }
     total_score = round(sum(dimension_scores.values()) / len(dimension_scores))
-    match_report_id = store.next_id("match", len(store.matches))
-    report = MatchReport(
-        match_report_id=match_report_id,
-        resume_id=payload.resume_id,
+
+    return match_repository.create_match_report(
+        db,
+        resume_version_id=resume_version.id,
         jd_id=payload.jd_id,
+        job_profile_id=job_profile.id,
         total_score=total_score,
         dimension_scores=dimension_scores,
         evidence=[
@@ -63,23 +163,20 @@ def build_mock_report(db: Session, payload: MatchRunRequest) -> MatchReport:
         ],
         risk_flags=[],
     )
-    store.matches[report.match_report_id] = report
-    return report
 
 
-def list_mock_matches() -> list[MatchReport]:
-    return list(store.matches.values())
+def list_match_reports(
+    db: Session,
+    *,
+    jd_id: str | None = None,
+    resume_version_id: str | None = None,
+) -> list[MatchReport]:
+    return match_repository.list_match_reports(
+        db,
+        jd_id=jd_id,
+        resume_version_id=resume_version_id,
+    )
 
 
-def get_mock_match(match_report_id: str) -> MatchReport:
-    report = store.matches.get(match_report_id)
-    if not report:
-        from app.core.errors import AppError
-
-        raise AppError(
-            code="match_report_not_found",
-            message="Match report was not found in the Phase 1 mock store.",
-            status_code=404,
-            details={"match_report_id": match_report_id},
-        )
-    return report
+def get_match_report(db: Session, match_report_id: str) -> MatchReport:
+    return match_repository.get_match_report(db, match_report_id)
