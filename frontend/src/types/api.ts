@@ -289,6 +289,84 @@ export type AgentStepListResponse = {
   total: number;
 };
 
+export type BadCaseSourceType =
+  | "match_report"
+  | "rag_answer"
+  | "rag_document"
+  | "agent_run"
+  | "agent_step"
+  | "resume_version"
+  | "job_description"
+  | "ui_flow"
+  | "data_persistence"
+  | "other";
+
+export type BadCaseCategory =
+  | "match_score_inaccurate"
+  | "missing_skill_extraction"
+  | "irrelevant_rag_source"
+  | "unsupported_answer"
+  | "hallucination_risk"
+  | "agent_step_failed"
+  | "need_more_info_wrong"
+  | "privacy_risk"
+  | "ui_confusing"
+  | "data_persistence_issue"
+  | "other";
+
+export type BadCaseSeverity = "low" | "medium" | "high" | "critical";
+
+export type BadCaseStatus = "open" | "reviewing" | "fixed" | "wont_fix";
+
+export type BadCaseRecord = {
+  id: string;
+  user_id: string;
+  source_type: BadCaseSourceType;
+  source_id: string;
+  category: BadCaseCategory;
+  severity: BadCaseSeverity;
+  title: string;
+  description: string;
+  expected_behavior: string | null;
+  actual_behavior: string | null;
+  suggested_fix: string | null;
+  status: BadCaseStatus;
+  created_at: string;
+  resolved_at: string | null;
+};
+
+export type BadCaseCreatePayload = {
+  source_type: BadCaseSourceType;
+  source_id: string;
+  category: BadCaseCategory;
+  severity?: BadCaseSeverity;
+  title: string;
+  description: string;
+  expected_behavior?: string | null;
+  actual_behavior?: string | null;
+  suggested_fix?: string | null;
+};
+
+export type BadCaseUpdatePayload = {
+  status?: BadCaseStatus;
+  severity?: BadCaseSeverity;
+  title?: string;
+  description?: string;
+  expected_behavior?: string | null;
+  actual_behavior?: string | null;
+  suggested_fix?: string | null;
+  category?: BadCaseCategory;
+};
+
+export type BadCaseFilters = {
+  sourceType?: BadCaseSourceType | "";
+  sourceId?: string;
+  category?: BadCaseCategory | "";
+  severity?: BadCaseSeverity | "";
+  status?: BadCaseStatus | "";
+  limit?: number;
+};
+
 export type WorkbenchState = {
   latestResume: ResumeRecord | null;
   latestJob: JobRecord | null;
@@ -298,4 +376,5 @@ export type WorkbenchState = {
   matches: MatchReport[];
   ragDocuments: RagDocumentRecord[];
   agentRuns: AgentRunRecord[];
+  badCases: BadCaseRecord[];
 };

@@ -4,7 +4,8 @@ export type PageKey =
   | "jd"
   | "match"
   | "knowledge"
-  | "agents";
+  | "agents"
+  | "quality";
 
 export type NavigationItem = {
   key: PageKey;

@@ -65,6 +65,13 @@ export function DashboardPage({
       tone: "green",
       page: "agents" as const,
     },
+    {
+      label: "Quality",
+      value: String(state.badCases.length),
+      detail: "Manual bad cases",
+      tone: "red",
+      page: "quality" as const,
+    },
   ];
 
   return (
@@ -72,7 +79,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>阶段 4E 展示 SQLite 持久化工作台、Knowledge Base 和 deterministic Agent Runs。当前 Agent 是状态机工作流，不接真实 LLM，不自动投递。</p>
+        <p>阶段 5D 展示 SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs 和人工 Quality Review。当前不接真实 LLM，不做自动评估，不自动投递。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -132,6 +139,10 @@ export function DashboardPage({
             <li>
               <strong>Agent Runs</strong>
               <span>{state.agentRuns.length} deterministic runs</span>
+            </li>
+            <li>
+              <strong>Quality Review</strong>
+              <span>{state.badCases.length} manual bad cases</span>
             </li>
           </ul>
         </article>

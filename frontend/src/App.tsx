@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { AppShell } from "./components/AppShell";
 import { listAgentRuns } from "./api/agents";
+import { listBadCases } from "./api/evaluations";
 import { listJobs } from "./api/jobs";
 import { listMatches } from "./api/matches";
 import { listRagDocuments } from "./api/rag";
@@ -11,9 +12,11 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { JDCenterPage } from "./pages/JDCenterPage";
 import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { MatchReportPage } from "./pages/MatchReportPage";
+import { QualityReviewPage } from "./pages/QualityReviewPage";
 import { ResumeCenterPage } from "./pages/ResumeCenterPage";
 import type {
   AgentRunRecord,
+  BadCaseRecord,
   JobRecord,
   MatchReport,
   RagDocumentRecord,
@@ -52,6 +55,11 @@ const navigation: NavigationItem[] = [
     label: "Agent Runs",
     description: "工作流状态机",
   },
+  {
+    key: "quality",
+    label: "Quality Review",
+    description: "Bad Case 复盘",
+  },
 ];
 
 export default function App() {
@@ -64,23 +72,32 @@ export default function App() {
   const [matches, setMatches] = useState<MatchReport[]>([]);
   const [ragDocuments, setRagDocuments] = useState<RagDocumentRecord[]>([]);
   const [agentRuns, setAgentRuns] = useState<AgentRunRecord[]>([]);
+  const [badCases, setBadCases] = useState<BadCaseRecord[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const refreshWorkbench = async () => {
     try {
-      const [resumeList, jobList, matchList, ragDocumentList, agentRunList] =
-        await Promise.all([
+      const [
+        resumeList,
+        jobList,
+        matchList,
+        ragDocumentList,
+        agentRunList,
+        badCaseList,
+      ] = await Promise.all([
           listResumes(),
           listJobs(),
           listMatches(),
           listRagDocuments(),
           listAgentRuns({ limit: 50 }),
+          listBadCases({ limit: 50 }),
         ]);
       setResumes(resumeList.items);
       setJobs(jobList.items);
       setMatches(matchList.items);
       setRagDocuments(ragDocumentList.items);
       setAgentRuns(agentRunList.items);
+      setBadCases(badCaseList.items);
       setLatestResume(
         (current) => current ?? resumeList.items[resumeList.items.length - 1] ?? null,
       );
@@ -111,6 +128,7 @@ export default function App() {
     matches,
     ragDocuments,
     agentRuns,
+    badCases,
   };
 
   const renderPage = () => {
@@ -156,6 +174,14 @@ export default function App() {
         <AgentRunsPage
           agentRuns={agentRuns}
           onAgentRunsChanged={setAgentRuns}
+        />
+      );
+    }
+    if (activePage === "quality") {
+      return (
+        <QualityReviewPage
+          badCases={badCases}
+          onBadCasesChanged={setBadCases}
         />
       );
     }
