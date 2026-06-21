@@ -1,0 +1,86 @@
+from fastapi import APIRouter, Depends, Query, Request, status
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.schemas.common import ApiResponse, ListResponse
+from app.schemas.rag import (
+    RagChunkRecord,
+    RagDocumentCreateRequest,
+    RagDocumentIndexRequest,
+    RagDocumentIndexResult,
+    RagDocumentRecord,
+)
+from app.services import rag_service
+
+
+router = APIRouter(prefix="/api/rag", tags=["rag"])
+
+
+@router.post(
+    "/documents",
+    response_model=ApiResponse[RagDocumentRecord],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_rag_document(
+    request: Request,
+    payload: RagDocumentCreateRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    document = rag_service.create_document(db, payload)
+    return {"data": document, "request_id": request.state.request_id}
+
+
+@router.get("/documents", response_model=ApiResponse[ListResponse[RagDocumentRecord]])
+async def list_rag_documents(
+    request: Request,
+    source_type: str | None = Query(default=None),
+    index_status: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    documents = rag_service.list_documents(
+        db,
+        source_type=source_type,
+        index_status=index_status,
+    )
+    return {
+        "data": ListResponse(items=documents, total=len(documents)),
+        "request_id": request.state.request_id,
+    }
+
+
+@router.get("/documents/{doc_id}", response_model=ApiResponse[RagDocumentRecord])
+async def get_rag_document(
+    request: Request,
+    doc_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    document = rag_service.get_document(db, doc_id)
+    return {"data": document, "request_id": request.state.request_id}
+
+
+@router.post(
+    "/documents/{doc_id}/index",
+    response_model=ApiResponse[RagDocumentIndexResult],
+)
+async def index_rag_document(
+    request: Request,
+    doc_id: str,
+    payload: RagDocumentIndexRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    result = rag_service.index_document(db, doc_id, payload)
+    return {"data": result, "request_id": request.state.request_id}
+
+
+@router.get("/chunks", response_model=ApiResponse[ListResponse[RagChunkRecord]])
+async def list_rag_chunks(
+    request: Request,
+    doc_id: str | None = Query(default=None),
+    source_type: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    chunks = rag_service.list_chunks(db, doc_id=doc_id, source_type=source_type)
+    return {
+        "data": ListResponse(items=chunks, total=len(chunks)),
+        "request_id": request.state.request_id,
+    }

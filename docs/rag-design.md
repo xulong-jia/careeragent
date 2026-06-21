@@ -31,7 +31,7 @@
 
 ## 3. RAG 数据模型设计
 
-阶段 3A 只做设计，不新增表。阶段 3B 将新增 RAG ORM models、Alembic migration、schemas skeleton 和 DB smoke tests，但仍不实现 repository、API、chunking、retrieval 或 answer。
+阶段 3A 只做设计，不新增表。阶段 3B 已新增 RAG ORM models、Alembic migration、schemas skeleton 和 DB smoke tests，但未实现 repository、API、chunking、retrieval 或 answer。阶段 3C 新增 document create/list/detail、deterministic chunking/indexing backend 和 chunk list API；search、answer、embedding 和 vector store 仍留到后续阶段。
 
 ### rag_documents
 
@@ -349,7 +349,7 @@ metadata filter 用途：
 
 - 3A：RAG 设计文档与边界确认。
 - 3B：`rag_documents` / `rag_chunks` models + Alembic migration + DB smoke tests。
-- 3C：document create/list/detail + chunking/indexing backend。
+- 3C：document create/list/detail + chunking/indexing backend + chunk list API。
 - 3D：lexical retrieval + `POST /api/rag/search`。
 - 3E：deterministic RAG answer with citations + no-source behavior。
 - 3F：KnowledgeBasePage 最小 UI。
