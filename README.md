@@ -96,12 +96,19 @@ cp .env.example .env
 - Parser placeholder：`.pdf`、`.docx` 返回明确 placeholder、extraction status、method 和 warnings，不假装真实解析成功。
 - 安全边界：不保存真实上传文件到 Git，不调用真实 LLM/RAG/Agent。
 
+阶段 2A / 2B 已开始：
+
+- 2A：完成阶段二持久化与版本管理设计文档。
+- 2B：新增 SQLite + SQLAlchemy + Alembic 基础设施、ORM skeleton、初始 migration 和 DB health check。
+- 当前 Resume / JD / Match API 主路径仍保持阶段一 Mock 行为，后续 2C 才开始替换为 DB repository。
+
 ## API
 
 当前开放的最小 Mock API：
 
 ```text
 GET /health
+GET /api/db/health
 POST /api/resumes/upload
 GET /api/resumes
 GET /api/resumes/{resume_id}

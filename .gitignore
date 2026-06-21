@@ -26,6 +26,9 @@ build/
 
 # Local private data
 local_data/
+*.db
+*.sqlite
+*.sqlite3
 uploads/
 **/uploads/
 vector_index/

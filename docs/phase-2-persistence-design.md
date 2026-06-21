@@ -262,6 +262,8 @@ resume_versions + job_descriptions/job_profiles
 
 阶段 2B 只应该做数据库基础设施初始化，不替换现有 API 主路径。
 
+当前状态：阶段 2B 已按 SQLite first 方案加入 DB 基础设施、ORM skeleton、Alembic 初始 migration 和 `GET /api/db/health`。Resume / JD / Match API 主路径仍保持阶段一 Mock store 行为，持久化替换留给阶段 2C。
+
 应该做：
 
 - 添加 SQLAlchemy / Alembic 依赖。

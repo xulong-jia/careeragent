@@ -16,6 +16,7 @@ class Settings:
     backend_host: str
     backend_port: int
     cors_origins: tuple[str, ...]
+    database_url: str
 
 
 @lru_cache
@@ -26,4 +27,5 @@ def get_settings() -> Settings:
         backend_host=os.getenv("BACKEND_HOST", "0.0.0.0"),
         backend_port=int(os.getenv("BACKEND_PORT", "8000")),
         cors_origins=_csv_env("BACKEND_CORS_ORIGINS", "http://localhost:5173"),
+        database_url=os.getenv("DATABASE_URL", "sqlite:///./local_data/careeragent.db"),
     )
