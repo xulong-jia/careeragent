@@ -270,6 +270,7 @@ git diff --check
 4. 阶段四：Agent Workflow，用 deterministic state machine 串联 Resume / JD / Match / RAG，并提供 Agent Runs API 和 AgentRunsPage。
    - 设计文档：[docs/agent-workflow-design.md](docs/agent-workflow-design.md)
    - 验收文档：[docs/phase-4-agent-workflow-acceptance.md](docs/phase-4-agent-workflow-acceptance.md)
+   - Release notes：[docs/release-notes-v0.4.0-agent-workflow.md](docs/release-notes-v0.4.0-agent-workflow.md)
 5. 阶段五：投递管理与 Dashboard，绑定 JD、简历版本、状态、面试节点和复盘。
 6. 阶段六：评测体系与 Bad Case，沉淀 smoke set、regression set、失败样例和回归指标。
 7. 阶段七：工程化交付，补齐 Docker、文档、演示材料、安全说明和最终验收记录。
