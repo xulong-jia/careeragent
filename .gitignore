@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local private data
+local_data/
+uploads/
+**/uploads/
+vector_index/
+**/vector_index/
+exports/
+**/exports/
+logs/
+**/logs/
+cache/
+**/cache/
+
+# Private project materials
+CareerAgent_最终版项目开发执行手册.md
+private_data/
+personal_data/
+raw_private/
+投递记录/
+面试复盘/
+真实简历/
+真实JD/
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
