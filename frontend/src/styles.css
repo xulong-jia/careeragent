@@ -35,12 +35,18 @@ body {
 }
 
 button,
-textarea {
+textarea,
+input {
   font: inherit;
 }
 
 button {
   cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .app-shell {
@@ -230,6 +236,7 @@ button {
   display: grid;
   gap: 8px;
   padding: 18px;
+  text-align: left;
 }
 
 .metric-card span,
@@ -378,8 +385,7 @@ button {
 
 .jd-textarea {
   width: 100%;
-  min-height: 320px;
-  margin-top: 18px;
+  min-height: 220px;
   resize: vertical;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -390,6 +396,85 @@ button {
 .jd-textarea:focus {
   border-color: var(--green);
   outline: 3px solid rgba(45, 106, 79, 0.14);
+}
+
+.form-stack {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.form-stack label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.form-stack input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 10px 12px;
+}
+
+.form-stack input:focus {
+  border-color: var(--green);
+  outline: 3px solid rgba(45, 106, 79, 0.14);
+}
+
+.primary-action {
+  width: fit-content;
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  background: var(--green);
+  color: #ffffff;
+  font-weight: 800;
+  padding: 10px 14px;
+}
+
+.error-text {
+  margin: 0;
+  color: var(--red);
+  font-weight: 700;
+}
+
+.json-preview {
+  overflow: auto;
+  max-height: 320px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f8f6;
+  color: var(--ink);
+  margin: 18px 0 0;
+  padding: 14px;
+}
+
+.run-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.run-row span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f8f6;
+  color: var(--muted);
+  padding: 9px 11px;
+}
+
+.compact-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .score-panel {

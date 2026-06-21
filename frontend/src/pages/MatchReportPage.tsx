@@ -1,48 +1,115 @@
-const scoreRows = [
-  ["Skill Match", 0],
-  ["Project Relevance", 0],
-  ["Business Understanding", 0],
-  ["Expression Quality", 0],
-  ["Education Fit", 0],
-  ["Risk Control", 0],
-] as const;
+import { useState } from "react";
 
-export function MatchReportPage() {
+import { runMatch } from "../api/matches";
+import type { JobRecord, MatchReport, ResumeRecord } from "../types/api";
+
+type MatchReportPageProps = {
+  latestResume: ResumeRecord | null;
+  latestJob: JobRecord | null;
+  latestMatch: MatchReport | null;
+  onMatchRun: (report: MatchReport) => void;
+};
+
+const dimensionLabels: Record<string, string> = {
+  skill_match: "Skill Match",
+  project_relevance: "Project Relevance",
+  business_understanding: "Business Understanding",
+  expression_quality: "Expression Quality",
+  education_fit: "Education Fit",
+  risk_control: "Risk Control",
+};
+
+export function MatchReportPage({
+  latestResume,
+  latestJob,
+  latestMatch,
+  onMatchRun,
+}: MatchReportPageProps) {
+  const [isRunning, setIsRunning] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const canRun = Boolean(latestResume && latestJob);
+
+  const handleRun = async () => {
+    if (!latestResume || !latestJob) {
+      setErrorMessage("请先上传 Resume 并创建 JD。");
+      return;
+    }
+    setIsRunning(true);
+    setErrorMessage(null);
+    try {
+      const report = await runMatch(latestResume.resume_id, latestJob.jd_id);
+      onMatchRun(report);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "匹配失败。");
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const scoreRows = latestMatch
+    ? Object.entries(latestMatch.dimension_scores)
+    : [];
+
   return (
     <section className="page-stack" aria-labelledby="match-title">
       <div className="page-heading">
         <p className="eyebrow">Report</p>
         <h2 id="match-title">Match Report</h2>
-        <p>预留总分、分维度评分、证据、差距、风险和修改优先级展示。</p>
+        <p>使用最近的 resume_id 和 jd_id 生成 Mock match report。</p>
       </div>
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>运行匹配</h3>
+          <span className="status-pill muted">POST /api/matches/run</span>
+        </div>
+        <div className="run-row">
+          <span>Resume: {latestResume?.resume_id ?? "未上传"}</span>
+          <span>JD: {latestJob?.jd_id ?? "未创建"}</span>
+          <button
+            className="primary-action"
+            disabled={!canRun || isRunning}
+            onClick={handleRun}
+            type="button"
+          >
+            {isRunning ? "Running..." : "Run mock match"}
+          </button>
+        </div>
+        {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
+      </article>
 
       <div className="two-column">
         <article className="panel score-panel">
           <div className="panel-header">
             <h3>总分</h3>
-            <span className="status-pill muted">No run</span>
+            <span className="status-pill">
+              {latestMatch ? latestMatch.match_report_id : "No run"}
+            </span>
           </div>
           <div className="score-dial">
-            <strong>--</strong>
-            <span>等待匹配评分引擎</span>
+            <strong>{latestMatch ? latestMatch.total_score : "--"}</strong>
+            <span>{latestMatch ? "Mock score" : "等待匹配评分"}</span>
           </div>
         </article>
 
         <article className="panel">
           <div className="panel-header">
             <h3>维度评分</h3>
-            <span className="status-pill">0 dimensions</span>
+            <span className="status-pill">{scoreRows.length} dimensions</span>
           </div>
           <div className="score-list">
-            {scoreRows.map(([label, value]) => (
-              <div className="score-row" key={label}>
-                <span>{label}</span>
-                <div className="score-track" aria-label={`${label} score ${value}`}>
-                  <span style={{ width: `${value}%` }} />
+            {(scoreRows.length ? scoreRows : [["skill_match", 0]]).map(
+              ([key, value]) => (
+                <div className="score-row" key={key}>
+                  <span>{dimensionLabels[key] ?? key}</span>
+                  <div className="score-track" aria-label={`${key} score ${value}`}>
+                    <span style={{ width: `${value}%` }} />
+                  </div>
+                  <strong>{value}</strong>
                 </div>
-                <strong>{value}</strong>
-              </div>
-            ))}
+              ),
+            )}
           </div>
         </article>
       </div>
@@ -50,15 +117,29 @@ export function MatchReportPage() {
       <div className="three-column">
         <article className="panel mini-panel">
           <h3>Evidence</h3>
-          <p>证据列表将在匹配报告生成后展示。</p>
+          <ul className="compact-list">
+            {latestMatch?.evidence.map((item) => (
+              <li key={`${item.dimension}-${item.jd_requirement}`}>
+                {item.dimension}: {item.jd_requirement}
+              </li>
+            )) ?? <li>暂无证据</li>}
+          </ul>
         </article>
         <article className="panel mini-panel">
           <h3>Gaps</h3>
-          <p>技能、项目和表达差距将在后续阶段接入。</p>
+          <ul className="compact-list">
+            {latestMatch?.gaps.map((gap) => <li key={gap}>{gap}</li>) ?? (
+              <li>暂无差距</li>
+            )}
+          </ul>
         </article>
         <article className="panel mini-panel">
-          <h3>Risks</h3>
-          <p>编造、夸大和证据不足风险保持独立展示。</p>
+          <h3>Rewrite Priorities</h3>
+          <ul className="compact-list">
+            {latestMatch?.rewrite_priorities.map((priority) => (
+              <li key={priority}>{priority}</li>
+            )) ?? <li>暂无建议</li>}
+          </ul>
         </article>
       </div>
     </section>

@@ -1,72 +1,80 @@
-type Metric = {
-  label: string;
-  value: string;
-  detail: string;
-  tone: "green" | "blue" | "amber" | "red";
+import type { PageKey } from "../types/navigation";
+import type { WorkbenchState } from "../types/api";
+
+type DashboardPageProps = {
+  state: WorkbenchState;
+  onNavigate: (page: PageKey) => void;
 };
 
-const metrics: Metric[] = [
-  {
-    label: "简历版本",
-    value: "0",
-    detail: "等待解析模块接入",
-    tone: "green",
-  },
-  {
-    label: "JD 记录",
-    value: "0",
-    detail: "岗位中心已占位",
-    tone: "blue",
-  },
-  {
-    label: "匹配报告",
-    value: "0",
-    detail: "评分引擎未启用",
-    tone: "amber",
-  },
-  {
-    label: "风险项",
-    value: "0",
-    detail: "Bad Case 后续接入",
-    tone: "red",
-  },
-];
-
 const workflow = [
-  "Profile",
-  "Resume Parsing",
-  "JD Parsing",
-  "Match Scoring",
-  "Interview Prep",
-  "Application Review",
+  "Resume Upload",
+  "JD Create",
+  "Match Report",
+  "Frontend Display",
 ];
 
-export function DashboardPage() {
+export function DashboardPage({ state, onNavigate }: DashboardPageProps) {
+  const metrics = [
+    {
+      label: "Resume",
+      value: state.latestResume ? "1" : "0",
+      detail: state.latestResume?.resume_id ?? "等待上传",
+      tone: "green",
+      page: "resume" as const,
+    },
+    {
+      label: "JD",
+      value: state.latestJob ? "1" : "0",
+      detail: state.latestJob?.jd_id ?? "等待创建",
+      tone: "blue",
+      page: "jd" as const,
+    },
+    {
+      label: "Match",
+      value: state.latestMatch ? String(state.latestMatch.total_score) : "0",
+      detail: state.latestMatch?.match_report_id ?? "等待运行",
+      tone: "amber",
+      page: "match" as const,
+    },
+    {
+      label: "Risk",
+      value: String(state.latestMatch?.risk_flags.length ?? 0),
+      detail: "Mock risk flags",
+      tone: "red",
+      page: "match" as const,
+    },
+  ];
+
   return (
     <section className="page-stack" aria-labelledby="dashboard-title">
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>阶段 0 只展示工作台结构，不执行解析、匹配、RAG 或 Agent 工作流。</p>
+        <p>阶段 1A 跑通 Resume Upload、JD Create、Match Report 的 Mock 闭环。</p>
       </div>
 
       <div className="metric-grid">
         {metrics.map((metric) => (
-          <article className={`metric-card ${metric.tone}`} key={metric.label}>
+          <button
+            className={`metric-card ${metric.tone}`}
+            key={metric.label}
+            onClick={() => onNavigate(metric.page)}
+            type="button"
+          >
             <span>{metric.label}</span>
             <strong>{metric.value}</strong>
             <small>{metric.detail}</small>
-          </article>
+          </button>
         ))}
       </div>
 
       <div className="two-column">
         <article className="panel">
           <div className="panel-header">
-            <h3>求职闭环</h3>
-            <span className="status-pill">Skeleton</span>
+            <h3>Mock 闭环</h3>
+            <span className="status-pill">Phase 1A</span>
           </div>
-          <div className="workflow-rail" aria-label="求职闭环流程">
+          <div className="workflow-rail" aria-label="阶段 1A Mock 流程">
             {workflow.map((step) => (
               <div className="workflow-step" key={step}>
                 <span aria-hidden="true" />
@@ -78,21 +86,21 @@ export function DashboardPage() {
 
         <article className="panel">
           <div className="panel-header">
-            <h3>近期工作</h3>
-            <span className="status-pill muted">Phase 0</span>
+            <h3>当前对象</h3>
+            <span className="status-pill muted">In memory</span>
           </div>
           <ul className="activity-list">
             <li>
-              <strong>后端健康检查</strong>
-              <span>GET /health</span>
+              <strong>Resume</strong>
+              <span>{state.latestResume?.filename ?? "未上传"}</span>
             </li>
             <li>
-              <strong>前端工作台导航</strong>
-              <span>Dashboard / Resume / JD / Match</span>
+              <strong>JD</strong>
+              <span>{state.latestJob?.job_title ?? "未创建"}</span>
             </li>
             <li>
-              <strong>隐私目录隔离</strong>
-              <span>local_data ignored</span>
+              <strong>Match</strong>
+              <span>{state.latestMatch?.match_report_id ?? "未运行"}</span>
             </li>
           </ul>
         </article>

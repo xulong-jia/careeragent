@@ -5,6 +5,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { JDCenterPage } from "./pages/JDCenterPage";
 import { MatchReportPage } from "./pages/MatchReportPage";
 import { ResumeCenterPage } from "./pages/ResumeCenterPage";
+import type { JobRecord, MatchReport, ResumeRecord } from "./types/api";
 import type { NavigationItem, PageKey } from "./types/navigation";
 
 const navigation: NavigationItem[] = [
@@ -30,16 +31,42 @@ const navigation: NavigationItem[] = [
   },
 ];
 
-const pages: Record<PageKey, React.ComponentType> = {
-  dashboard: DashboardPage,
-  resume: ResumeCenterPage,
-  jd: JDCenterPage,
-  match: MatchReportPage,
-};
-
 export default function App() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
-  const ActivePage = pages[activePage];
+  const [latestResume, setLatestResume] = useState<ResumeRecord | null>(null);
+  const [latestJob, setLatestJob] = useState<JobRecord | null>(null);
+  const [latestMatch, setLatestMatch] = useState<MatchReport | null>(null);
+
+  const workbenchState = {
+    latestResume,
+    latestJob,
+    latestMatch,
+  };
+
+  const renderPage = () => {
+    if (activePage === "resume") {
+      return (
+        <ResumeCenterPage
+          latestResume={latestResume}
+          onResumeUploaded={setLatestResume}
+        />
+      );
+    }
+    if (activePage === "jd") {
+      return <JDCenterPage latestJob={latestJob} onJobCreated={setLatestJob} />;
+    }
+    if (activePage === "match") {
+      return (
+        <MatchReportPage
+          latestJob={latestJob}
+          latestMatch={latestMatch}
+          latestResume={latestResume}
+          onMatchRun={setLatestMatch}
+        />
+      );
+    }
+    return <DashboardPage state={workbenchState} onNavigate={setActivePage} />;
+  };
 
   return (
     <AppShell
@@ -47,7 +74,7 @@ export default function App() {
       navigation={navigation}
       onNavigate={setActivePage}
     >
-      <ActivePage />
+      {renderPage()}
     </AppShell>
   );
 }
