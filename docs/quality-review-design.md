@@ -1,5 +1,16 @@
 # CareerAgent 阶段五：Quality Review / Bad Case 设计
 
+## 阶段状态
+
+- 5A：Quality Review / Bad Case 设计文档与边界确认已完成。
+- 5B：`bad_cases` DB model、Alembic migration 和 schema skeleton 已完成。
+- 5C：Bad Case repository / service / API 和 tests 已完成。
+- 5D：QualityReviewPage 最小 UI 已完成。
+- 5E：Match / RAG / Agent 页面轻量 Mark as bad case 入口已完成。
+- 5F：阶段五验收、安全检查和 README 收口已补充。
+
+本设计文档保留阶段五边界：当前只做人工 review record，不接真实 LLM reviewer，不做自动评估，不做自动投递，不做正式 Evaluation Center。
+
 ## 1. 阶段五目标
 
 阶段五目标是建立质量复查和 bad case 闭环，让 CareerAgent 不只能够生成 Match Report、RAG Answer 和 Agent Run，也能够记录这些结果的问题、风险和改进线索。

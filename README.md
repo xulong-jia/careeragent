@@ -2,7 +2,7 @@
 
 CareerAgent 是面向校招学生和留学生回国求职场景的 AI 求职工作台。项目目标是把用户画像、简历版本、JD 理解、匹配评分、项目优化、面试准备、学习计划、投递管理、RAG 知识库、Agent Workflow、Bad Case 和评测体系组织成可运行、可追踪、可复查的工程链路。
 
-CareerAgent 不是简历润色器，也不是 ChatGPT 套壳。本仓库当前处于阶段 4F，已在 SQLite + SQLAlchemy 基础上支持 Resume / JD / Match Report 持久化、Resume Version 历史管理、deterministic RAG knowledge base，以及 deterministic Agent Workflow workbench。当前 Agent Workflow 支持 `agent_runs` / `agent_steps`、固定 `job_application_preparation` workflow、Agent Runs API 和 AgentRunsPage，但仍不接入真实 LLM Agent、不做自由聊天 Agent、不做自动投递。
+CareerAgent 不是简历润色器，也不是 ChatGPT 套壳。本仓库当前处于阶段 5F，已在 SQLite + SQLAlchemy 基础上支持 Resume / JD / Match Report 持久化、Resume Version 历史管理、deterministic RAG knowledge base、deterministic Agent Workflow workbench，以及人工 Quality Review / Bad Case 闭环。当前仍不接入真实 LLM reviewer、不做自动评估、不做 Evaluation Center、不做自动投递。
 
 ## 技术栈
 
@@ -138,9 +138,23 @@ cp .env.example .env
 
 阶段四验收文档：[docs/phase-4-agent-workflow-acceptance.md](docs/phase-4-agent-workflow-acceptance.md)
 
+阶段 5A / 5B / 5C / 5D / 5E / 5F 已完成：
+
+- 5A：完成 Quality Review / Bad Case 设计文档与边界确认。
+- 5B：新增 `bad_cases` ORM model、Alembic migration、schema skeleton 和 DB infrastructure tests。
+- 5C：新增 Bad Case repository / service / API 和 tests，支持 create、list、filter、detail、patch。
+- 5D：新增 QualityReviewPage 最小 UI，支持人工创建、筛选、查看和更新 bad case。
+- 5E：新增 MarkBadCasePanel，并在 Match / Knowledge Base / Agent Runs 页面加入轻量 Mark as bad case 入口。
+- 5F：补充阶段五验收文档、安全检查说明和 README 收口说明。
+- 当前 Quality Review 是人工 review record，不是真实 LLM reviewer，不做自动评估、不做自动投递、不做 Evaluation Center。
+
+阶段五设计文档：[docs/quality-review-design.md](docs/quality-review-design.md)
+
+阶段五验收文档：[docs/phase-5-quality-review-acceptance.md](docs/phase-5-quality-review-acceptance.md)
+
 ## API
 
-当前开放的阶段三工作台 API：
+当前开放的工作台 API：
 
 ```text
 GET /health
@@ -171,6 +185,10 @@ POST /api/agents/runs
 GET /api/agents/runs
 GET /api/agents/runs/{run_id}
 GET /api/agents/runs/{run_id}/steps
+POST /api/evaluations/bad-cases
+GET /api/evaluations/bad-cases
+GET /api/evaluations/bad-cases/{bad_case_id}
+PATCH /api/evaluations/bad-cases/{bad_case_id}
 ```
 
 成功响应结构：
@@ -232,7 +250,9 @@ Markdown / txt 返回结果会包含：
 - RAG 知识库：支持 document 管理、deterministic chunking/indexing、lexical search、deterministic answer with citations 和 KnowledgeBasePage。
 - RAG 边界：没有真实 embedding、FAISS、pgvector、vector store、真实 LLM answer、reranker 或 RAG evaluation dashboard。
 - Agent Workflow：支持 deterministic `job_application_preparation` workflow、Agent Runs API 和 AgentRunsPage。
-- Agent 边界：没有真实 LLM Agent、自由聊天 Agent、true tool-calling Agent、自动投递、投递管理、Bad Case 或 Evaluation Center。
+- Agent 边界：没有真实 LLM Agent、自由聊天 Agent、true tool-calling Agent、自动投递、投递管理或 Evaluation Center。
+- Quality Review：支持 `bad_cases` 持久化、Bad Case API、QualityReviewPage 和 Mark as bad case 入口。
+- Quality Review 边界：当前是人工 review record，不是真实 LLM reviewer，不做自动评估、不做自动投递、不做 Evaluation Center。
 
 ## 安全与隐私
 
@@ -243,6 +263,7 @@ Markdown / txt 返回结果会包含：
 - RAG 测试和验收只使用 synthetic data；前端默认展示 preview / snippet，不默认展示完整 raw_text 或完整 chunk text。
 - Agent step payload 只保存 IDs、refs 和 short metadata，不保存完整 resume raw_text、JD raw_text 或 RAG chunk text。
 - AgentRunsPage 使用 safe JSON render helper 过滤敏感字段，避免展示隐私原文。
+- Bad Case 只保存 `source_type` / `source_id` 和问题摘要，不自动复制 Resume / JD / RAG chunk / Agent refs 原文。
 
 ## 自查命令
 
@@ -273,6 +294,7 @@ git diff --check
    - Release notes：[docs/release-notes-v0.4.0-agent-workflow.md](docs/release-notes-v0.4.0-agent-workflow.md)
 5. 阶段五：Quality Review / Bad Case，先补质量复查和错误复盘闭环，再考虑真实 LLM 或投递管理。
    - 设计文档：[docs/quality-review-design.md](docs/quality-review-design.md)
-6. 后续阶段：投递管理与 Dashboard，绑定 JD、简历版本、状态、面试节点和复盘。当前优先级后移，避免在缺少质量闭环时过早进入自动化投递相关能力。
+   - 验收文档：[docs/phase-5-quality-review-acceptance.md](docs/phase-5-quality-review-acceptance.md)
+6. 后续阶段：投递管理与 Dashboard，绑定 JD、简历版本、状态、面试节点和复盘。当前优先级后移，避免在缺少稳定质量闭环时过早进入自动化投递相关能力。
 7. 后续阶段：评测体系扩展，沉淀 evaluation run、evaluation item、smoke set、regression set、失败样例和回归指标。
 8. 阶段七：工程化交付，补齐 Docker、文档、演示材料、安全说明和最终验收记录。
