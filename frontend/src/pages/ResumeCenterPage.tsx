@@ -432,13 +432,13 @@ export function ResumeCenterPage({
       <article className="panel">
         <div className="panel-header">
           <h3>结构化结果</h3>
-          <span className="status-pill muted">Mock schema</span>
+          <span className="status-pill muted">Structured preview</span>
         </div>
         <div className="section-grid">
           {resumeSections.map((section) => (
             <div className="schema-tile" key={section}>
               <span>{section}</span>
-              <small>{latestResume ? "Mock ready" : "Not parsed"}</small>
+              <small>{latestResume ? "Ready" : "Not parsed"}</small>
             </div>
           ))}
         </div>

@@ -47,7 +47,7 @@ export function DashboardPage({
     {
       label: "Risk",
       value: String(state.latestMatch?.risk_flags.length ?? 0),
-      detail: "Mock risk flags",
+      detail: "Quality signals",
       tone: "red",
       page: "match" as const,
     },
@@ -79,7 +79,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>阶段 5D 展示 SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs 和人工 Quality Review。当前不接真实 LLM，不做自动评估，不自动投递。</p>
+        <p>当前稳定节点：v0.5.0-quality-review，已支持 SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs 和人工 Quality Review。当前不接真实 LLM，不做自动评估，不自动投递。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -102,7 +102,7 @@ export function DashboardPage({
         <article className="panel">
           <div className="panel-header">
             <h3>持久化闭环</h3>
-            <span className="status-pill">Phase 3F</span>
+            <span className="status-pill">v0.5.0 Quality Review</span>
           </div>
           <div className="workflow-rail" aria-label="阶段 2F 持久化流程">
             {workflow.map((step) => (

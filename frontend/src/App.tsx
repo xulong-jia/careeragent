@@ -110,7 +110,7 @@ export default function App() {
       setLoadError(null);
     } catch (error) {
       setLoadError(
-        error instanceof Error ? error.message : "Unable to load mock state.",
+        error instanceof Error ? error.message : "Unable to load workbench data.",
       );
     }
   };

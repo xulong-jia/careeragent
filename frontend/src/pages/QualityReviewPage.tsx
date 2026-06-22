@@ -327,7 +327,7 @@ export function QualityReviewPage({
       <div className="page-heading">
         <p className="eyebrow">Quality Review</p>
         <h2 id="quality-review-title">Bad Case Review</h2>
-        <p>阶段 5D 前端最小 UI：人工记录、筛选、查看和更新 Bad Case，不做自动评估，也不接真实 LLM。</p>
+        <p>阶段 5F 已完成：人工记录、筛选、查看和更新 Bad Case，不做自动评估，也不接真实 LLM。</p>
       </div>
 
       <article className="panel warning-panel">

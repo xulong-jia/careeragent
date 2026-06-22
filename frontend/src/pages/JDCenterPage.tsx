@@ -16,7 +16,7 @@ export function JDCenterPage({
   onRefresh,
   onJobCreated,
 }: JDCenterPageProps) {
-  const [company, setCompany] = useState("Mock Company");
+  const [company, setCompany] = useState("Synthetic Company");
   const [jobTitle, setJobTitle] = useState("AI Application Engineer");
   const [location, setLocation] = useState("Shanghai");
   const [sourceUrl, setSourceUrl] = useState("");
