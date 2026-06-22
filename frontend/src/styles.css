@@ -634,6 +634,48 @@ button:disabled {
   line-height: 1.6;
 }
 
+.mark-bad-case-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.mark-bad-case-form {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 14px;
+}
+
+.readonly-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.readonly-grid span,
+.helper-text {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.readonly-grid span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f8f6;
+  padding: 9px 11px;
+  word-break: break-word;
+}
+
+.helper-text {
+  margin: 0;
+}
+
 .rag-document-list li {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(90px, auto) minmax(100px, auto) minmax(100px, auto) auto;
@@ -904,7 +946,8 @@ button:disabled {
   .rag-document-list li,
   .agent-run-list li,
   .bad-case-list li,
-  .filter-grid {
+  .filter-grid,
+  .readonly-grid {
     grid-template-columns: 1fr;
     align-items: flex-start;
   }

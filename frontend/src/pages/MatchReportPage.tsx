@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { MarkBadCasePanel } from "../components/MarkBadCasePanel";
 import { getMatch, runMatch } from "../api/matches";
 import type { JobRecord, MatchReport, ResumeRecord } from "../types/api";
 
@@ -254,6 +255,13 @@ export function MatchReportPage({
                 </span>
               </li>
             </ul>
+            <MarkBadCasePanel
+              defaultCategory="match_score_inaccurate"
+              defaultTitle="Match report review"
+              key={detailReport.match_report_id}
+              sourceId={detailReport.match_report_id}
+              sourceType="match_report"
+            />
             <div className="score-list">
               {detailScoreRows.map(([key, value]) => (
                 <div className="score-row" key={`detail-${key}`}>

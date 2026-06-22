@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { MarkBadCasePanel } from "../components/MarkBadCasePanel";
 import {
   createAgentRun,
   getAgentRun,
@@ -114,6 +115,16 @@ function BusinessState({ run }: { run: AgentRunRecord }) {
     );
   }
   return null;
+}
+
+function defaultRunBadCaseCategory(status: AgentRunRecord["status"]) {
+  if (status === "failed") {
+    return "agent_step_failed";
+  }
+  if (status === "need_more_info") {
+    return "need_more_info_wrong";
+  }
+  return "other";
 }
 
 export function AgentRunsPage({
@@ -389,6 +400,13 @@ export function AgentRunsPage({
                 </li>
               </ul>
               <BusinessState run={detailRun} />
+              <MarkBadCasePanel
+                defaultCategory={defaultRunBadCaseCategory(detailRun.status)}
+                defaultTitle="Agent run review"
+                key={detailRun.id}
+                sourceId={detailRun.id}
+                sourceType="agent_run"
+              />
               <SafeJsonBlock label="Input refs" value={detailRun.input_refs} />
               <SafeJsonBlock label="Output refs" value={detailRun.output_refs} />
               {detailRun.missing_slots?.length ? (

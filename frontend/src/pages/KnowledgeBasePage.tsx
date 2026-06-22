@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { MarkBadCasePanel } from "../components/MarkBadCasePanel";
 import {
   answerRag,
   createRagDocument,
@@ -351,6 +352,13 @@ export function KnowledgeBasePage({
               </ul>
               <pre className="json-preview text-preview">{selectedDocument.raw_text_preview}</pre>
               <pre className="json-preview compact">{formatMetadata(selectedDocument.metadata)}</pre>
+              <MarkBadCasePanel
+                defaultCategory="irrelevant_rag_source"
+                defaultTitle="RAG document review"
+                key={selectedDocument.doc_id}
+                sourceId={selectedDocument.doc_id}
+                sourceType="rag_document"
+              />
               <button className="primary-action" disabled={isLoading} onClick={handleIndex} type="button">
                 Index document
               </button>
@@ -490,6 +498,13 @@ export function KnowledgeBasePage({
               <pre className="json-preview text-preview">
                 {answerResult.answer || "没有找到足够来源。"}
               </pre>
+              <MarkBadCasePanel
+                defaultCategory="unsupported_answer"
+                defaultTitle="RAG answer review"
+                key={answerResult.sources[0]?.doc_id ?? "rag_answer_no_source"}
+                sourceId={answerResult.sources[0]?.doc_id ?? "rag_answer_no_source"}
+                sourceType={answerResult.sources[0] ? "rag_document" : "other"}
+              />
               <SourceList sources={answerResult.sources} />
             </>
           ) : null}
