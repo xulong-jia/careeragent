@@ -96,7 +96,7 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 ### Dashboard
 
-回到 Dashboard，确认展示 profile readiness、resume parse status、risk flags count，以及 Resume、JD、Match、Knowledge、Agent、Applications、Quality、Evaluation 统计。若刚运行 seed 脚本，应看到多个模块已有数据。
+回到 Dashboard，确认展示 profile readiness、resume parse status、risk flags count、project count、active project count、latest project status，以及 Resume、JD、Match、Knowledge、Agent、Applications、Quality、Evaluation 统计。若刚运行 seed 脚本，应看到多个模块已有数据。
 
 ### JD Center
 
@@ -112,12 +112,13 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 ### Project Optimization
 
-1. 创建 synthetic project facts。
-2. 填写 name、role、period、background、tech stack、responsibilities、results 和 evidence JSON。
-3. 选择 project，查看 detail 和 evidence。
-4. 输入 JD ID，可选输入 resume version、match report 或 profile refs。
-5. 点击 Run rewrite。
-6. 查看 matched points、missing points、evidence required、rewritten bullets、forbidden changes 和 risk flags。
+1. 先在 JD Center 创建或选择一个 synthetic JD，并复制 JD ID。
+2. 创建 synthetic project facts。
+3. 填写 name、role、period、background、tech stack、responsibilities、results 和 evidence JSON。
+4. 选择 project，查看 detail 和 evidence。
+5. 输入 JD ID，可选输入 resume version、match report 或 profile refs。
+6. 点击 Run rewrite。
+7. 查看 matched points、missing points、evidence required、rewritten bullets、forbidden changes 和 risk flags。
 
 当前 Project Rewrite 是 deterministic suggestions，不接真实 LLM，不自动写回 Resume Version，不新增不存在的项目经历、指标、公司、技术栈、上线成果或业务规模。
 
@@ -166,6 +167,7 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 - Dashboard
 - Resume Center
 - Resume Center parse / risk-check / confirmed version workflow
+- Project Optimization
 - Match Report
 - Knowledge Base
 - Agent Runs

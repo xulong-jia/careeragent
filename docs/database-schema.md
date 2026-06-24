@@ -86,7 +86,7 @@
 - `created_at`
 - `updated_at`
 
-隐私说明：不复制 resume raw_text；`profile_id` 和 `resume_version_id` 只保存引用。`evidence` 应保存可证明材料摘要，不粘贴大段隐私原文。
+隐私说明：不复制 resume raw_text；`profile_id` 和 `resume_version_id` 只保存引用。`evidence` 应保存可证明材料摘要，不粘贴大段隐私原文。Project facts 不应保存真实公司私密信息、敏感商业数据或内部不可公开材料。
 
 ## project_rewrites
 
@@ -118,7 +118,7 @@ JSON 字段说明：
 - `forbidden_changes`：固定列出不得新增的事实类型，例如 company、user_count、revenue、accuracy、production_status、business_scale、tech_stack_not_in_facts、unsupported_metric。
 - `risk_flags`：unsupported metric、fabricated skill、missing evidence、overclaim、learning-to-business overclaim 等 deterministic 风险标记。
 
-隐私说明：只保存项目事实引用和 rewrite 产物，不复制 resume raw_text。`rewritten_bullets` 必须基于已有 project facts；缺少指标或证据时写入 `evidence_required` / `risk_flags`，不生成虚构数字、公司、用户量、收益、准确率、上线状态或技术栈。
+隐私说明：只保存项目事实引用和 rewrite 产物，不复制 resume raw_text，也不保存真实公司内部材料。`rewritten_bullets` 必须基于已有 project facts；缺少指标或证据时写入 `evidence_required` / `risk_flags`，不生成虚构数字、公司、用户量、收益、准确率、上线状态或技术栈。
 
 ## job_descriptions
 

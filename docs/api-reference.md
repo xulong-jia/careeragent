@@ -102,6 +102,8 @@ Rewrite response 关键字段：
 
 前端流程：ProjectOptimizationPage 支持创建 / 更新 project facts、选择 project、输入 JD ID 运行 rewrite，并展示 matched points、missing points、evidence required、rewritten bullets、forbidden changes 和 risk flags。页面只展示建议，不自动写回 Resume Version。
 
+v0.9 final handoff 的 Project Optimization API surface 以本节为准：Project CRUD 使用 `/api/projects`，rewrite 运行使用 `/api/projects/{project_id}/rewrite`，rewrite 详情查询使用 `/api/project-rewrites/{rewrite_id}`。
+
 ## Resume APIs
 
 | Method | Path | 说明 |
