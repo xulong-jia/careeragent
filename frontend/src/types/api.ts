@@ -367,6 +367,72 @@ export type BadCaseFilters = {
   limit?: number;
 };
 
+export type ApplicationStatus =
+  | "saved"
+  | "ready_to_apply"
+  | "applied"
+  | "written_test"
+  | "first_interview"
+  | "second_interview"
+  | "hr_interview"
+  | "offer"
+  | "rejected"
+  | "withdrawn"
+  | "archived";
+
+export type ApplicationRecord = {
+  application_id: string;
+  user_id: string;
+  company: string;
+  role_title: string;
+  role_category: string | null;
+  jd_id: string | null;
+  resume_version_id: string | null;
+  match_report_id: string | null;
+  status: ApplicationStatus;
+  apply_date: string | null;
+  next_step_date: string | null;
+  interview_notes: string | null;
+  reflection: string | null;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type ApplicationCreatePayload = {
+  company: string;
+  role_title: string;
+  role_category?: string | null;
+  jd_id?: string | null;
+  resume_version_id?: string | null;
+  match_report_id?: string | null;
+  status?: ApplicationStatus;
+  apply_date?: string | null;
+  next_step_date?: string | null;
+  interview_notes?: string | null;
+  reflection?: string | null;
+  tags?: string[];
+};
+
+export type ApplicationUpdatePayload = Partial<ApplicationCreatePayload>;
+
+export type ApplicationFilters = {
+  status?: ApplicationStatus | "";
+  company?: string;
+  roleCategory?: string;
+  resumeVersionId?: string;
+  jdId?: string;
+};
+
+export type ApplicationStats = {
+  total_applications: number;
+  by_status: Record<ApplicationStatus, number>;
+  interview_count: number;
+  offer_count: number;
+  rejected_count: number;
+  active_count: number;
+};
+
 export type WorkbenchState = {
   latestResume: ResumeRecord | null;
   latestJob: JobRecord | null;
@@ -377,4 +443,6 @@ export type WorkbenchState = {
   ragDocuments: RagDocumentRecord[];
   agentRuns: AgentRunRecord[];
   badCases: BadCaseRecord[];
+  applications: ApplicationRecord[];
+  applicationStats: ApplicationStats | null;
 };

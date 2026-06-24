@@ -66,6 +66,41 @@ export function DashboardPage({
       page: "agents" as const,
     },
     {
+      label: "Applications",
+      value: String(state.applicationStats?.total_applications ?? 0),
+      detail: "Manual tracking",
+      tone: "blue",
+      page: "applications" as const,
+    },
+    {
+      label: "Interviews",
+      value: String(state.applicationStats?.interview_count ?? 0),
+      detail: "Active interview stages",
+      tone: "amber",
+      page: "applications" as const,
+    },
+    {
+      label: "Offers",
+      value: String(state.applicationStats?.offer_count ?? 0),
+      detail: "Application outcomes",
+      tone: "green",
+      page: "applications" as const,
+    },
+    {
+      label: "Rejected",
+      value: String(state.applicationStats?.rejected_count ?? 0),
+      detail: "Rejected applications",
+      tone: "red",
+      page: "applications" as const,
+    },
+    {
+      label: "Active Apps",
+      value: String(state.applicationStats?.active_count ?? 0),
+      detail: "Not closed",
+      tone: "blue",
+      page: "applications" as const,
+    },
+    {
       label: "Quality",
       value: String(state.badCases.length),
       detail: "Manual bad cases",
@@ -139,6 +174,13 @@ export function DashboardPage({
             <li>
               <strong>Agent Runs</strong>
               <span>{state.agentRuns.length} deterministic runs</span>
+            </li>
+            <li>
+              <strong>Applications</strong>
+              <span>
+                {state.applicationStats?.total_applications ?? 0} records /{" "}
+                {state.applicationStats?.active_count ?? 0} active
+              </span>
             </li>
             <li>
               <strong>Quality Review</strong>

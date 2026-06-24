@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 
 import { AppShell } from "./components/AppShell";
 import { listAgentRuns } from "./api/agents";
+import { getApplicationStats, listApplications } from "./api/applications";
 import { listBadCases } from "./api/evaluations";
 import { listJobs } from "./api/jobs";
 import { listMatches } from "./api/matches";
 import { listRagDocuments } from "./api/rag";
 import { listResumes } from "./api/resumes";
 import { AgentRunsPage } from "./pages/AgentRunsPage";
+import { ApplicationTrackerPage } from "./pages/ApplicationTrackerPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { JDCenterPage } from "./pages/JDCenterPage";
 import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
@@ -16,6 +18,8 @@ import { QualityReviewPage } from "./pages/QualityReviewPage";
 import { ResumeCenterPage } from "./pages/ResumeCenterPage";
 import type {
   AgentRunRecord,
+  ApplicationRecord,
+  ApplicationStats,
   BadCaseRecord,
   JobRecord,
   MatchReport,
@@ -56,6 +60,11 @@ const navigation: NavigationItem[] = [
     description: "工作流状态机",
   },
   {
+    key: "applications",
+    label: "Applications",
+    description: "投递 tracking",
+  },
+  {
     key: "quality",
     label: "Quality Review",
     description: "Bad Case 复盘",
@@ -72,6 +81,9 @@ export default function App() {
   const [matches, setMatches] = useState<MatchReport[]>([]);
   const [ragDocuments, setRagDocuments] = useState<RagDocumentRecord[]>([]);
   const [agentRuns, setAgentRuns] = useState<AgentRunRecord[]>([]);
+  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
+  const [applicationStats, setApplicationStats] =
+    useState<ApplicationStats | null>(null);
   const [badCases, setBadCases] = useState<BadCaseRecord[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -83,6 +95,8 @@ export default function App() {
         matchList,
         ragDocumentList,
         agentRunList,
+        applicationList,
+        applicationStatsData,
         badCaseList,
       ] = await Promise.all([
           listResumes(),
@@ -90,6 +104,8 @@ export default function App() {
           listMatches(),
           listRagDocuments(),
           listAgentRuns({ limit: 50 }),
+          listApplications(),
+          getApplicationStats(),
           listBadCases({ limit: 50 }),
         ]);
       setResumes(resumeList.items);
@@ -97,6 +113,8 @@ export default function App() {
       setMatches(matchList.items);
       setRagDocuments(ragDocumentList.items);
       setAgentRuns(agentRunList.items);
+      setApplications(applicationList.items);
+      setApplicationStats(applicationStatsData);
       setBadCases(badCaseList.items);
       setLatestResume(
         (current) => current ?? resumeList.items[resumeList.items.length - 1] ?? null,
@@ -128,6 +146,8 @@ export default function App() {
     matches,
     ragDocuments,
     agentRuns,
+    applications,
+    applicationStats,
     badCases,
   };
 
@@ -174,6 +194,16 @@ export default function App() {
         <AgentRunsPage
           agentRuns={agentRuns}
           onAgentRunsChanged={setAgentRuns}
+        />
+      );
+    }
+    if (activePage === "applications") {
+      return (
+        <ApplicationTrackerPage
+          applicationStats={applicationStats}
+          applications={applications}
+          onApplicationStatsChanged={setApplicationStats}
+          onApplicationsChanged={setApplications}
         />
       );
     }

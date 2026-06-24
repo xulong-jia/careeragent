@@ -5,6 +5,7 @@ export type PageKey =
   | "match"
   | "knowledge"
   | "agents"
+  | "applications"
   | "quality";
 
 export type NavigationItem = {
