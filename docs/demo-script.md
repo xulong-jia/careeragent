@@ -1,0 +1,148 @@
+# CareerAgent Demo Script
+
+本文档给出从零演示 CareerAgent 当前本地原型的流程。所有示例数据必须是 synthetic data，不使用真实简历、真实 JD、真实公司隐私、真实联系方式或真实面试复盘。
+
+## 1. 启动后端
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+检查：
+
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/api/db/health
+```
+
+## 2. 启动前端
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+打开：
+
+```text
+http://localhost:5173
+```
+
+## 3. 可选：使用 Docker Compose
+
+```bash
+docker compose build
+docker compose up
+```
+
+Compose 后端会在容器启动时执行 `alembic upgrade head`。SQLite 数据保存在 `backend/local_data/careeragent.db`，该目录不进入 Git。
+
+## 4. 可选：生成 synthetic demo data
+
+后端启动后，在仓库根目录运行：
+
+```bash
+python3 scripts/seed_demo_data.py
+```
+
+如果后端不是默认地址：
+
+```bash
+CAREERAGENT_API_BASE_URL=http://localhost:8000 python3 scripts/seed_demo_data.py
+```
+
+脚本会通过公开 HTTP API 创建：
+
+- synthetic resume
+- synthetic JD
+- match report
+- RAG document + chunks
+- Agent run
+- application record
+- bad case
+- evaluation case
+- evaluation run
+
+## 5. 手动演示流程
+
+### Dashboard
+
+打开 Dashboard，确认各模块统计卡片显示当前对象数量。若刚运行 seed 脚本，应看到 Resume、JD、Match、Knowledge、Agent、Applications、Quality、Evaluation 都有数据。
+
+### Resume Center
+
+1. 上传 `.md` 或 `.txt` synthetic resume。
+2. 查看 `raw_text_preview`。
+3. 查看 resume versions。
+4. clone 或 archive 一个版本。
+
+### JD Center
+
+1. 创建 synthetic JD。
+2. 查看 deterministic job profile。
+3. 确认 required skills、role category、interview focus。
+
+### Match Report
+
+1. 选择 resume version 和 JD。
+2. 点击 Run Match。
+3. 查看 total score、dimension scores、strengths、gaps 和 evidence。
+
+### Knowledge Base
+
+1. 创建 synthetic RAG document。
+2. 点击 index。
+3. 搜索关键词，例如 `FastAPI interview preparation`。
+4. 运行 deterministic answer。
+5. 查看 sources 和 snippets。
+
+### Agent Runs
+
+1. 创建 `job_application_preparation` workflow。
+2. 选择 resume version 和 JD。
+3. 可选启用 RAG query。
+4. 查看 run detail 和 step timeline。
+
+### Applications
+
+1. 创建手动 application record。
+2. 绑定 `jd_id`、`resume_version_id`、`match_report_id`。
+3. 修改 status。
+4. 使用 status / company / jd_id / resume_version_id 筛选。
+5. 查看 stats。
+
+### Quality Review
+
+1. 创建 bad case。
+2. 选择 source type 和 source id。
+3. 只写问题摘要，不粘贴完整 raw_text。
+4. 更新 status。
+
+### Evaluation
+
+1. 打开 Evaluation 页面。
+2. 选择 `all`。
+3. 点击 Run smoke set。
+4. 查看 latest metrics。
+5. 查看 results 和 cases。
+
+## 6. 截图清单
+
+当前仓库不包含真实截图，不伪造截图。运行本地 demo 后可人工补充以下截图到 `docs/screenshots/`：
+
+- Dashboard
+- Resume Center
+- Match Report
+- Knowledge Base
+- Agent Runs
+- Application Tracker
+- Quality Review
+- Evaluation Page
+
+截图提交前必须确认没有真实个人信息、真实 JD、真实公司隐私、API key 或本地路径敏感信息。
