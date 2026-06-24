@@ -29,6 +29,10 @@ export function DashboardPage({
   const resumeDetail = state.latestResume
     ? `${state.latestResume.parse_status} / ${state.latestResume.risk_flags.length} resume risks`
     : "等待上传";
+  const latestProject = state.projects[state.projects.length - 1] ?? null;
+  const activeProjectCount = state.projects.filter(
+    (project) => project.status === "active",
+  ).length;
   const metrics = [
     {
       label: "Profile",
@@ -57,6 +61,20 @@ export function DashboardPage({
       detail: state.latestMatch?.match_report_id ?? "等待运行",
       tone: "amber",
       page: "match" as const,
+    },
+    {
+      label: "Projects",
+      value: String(state.projects.length),
+      detail: latestProject?.name ?? "等待创建",
+      tone: "green",
+      page: "project-optimization" as const,
+    },
+    {
+      label: "Active Projects",
+      value: String(activeProjectCount),
+      detail: "Confirmed facts",
+      tone: "blue",
+      page: "project-optimization" as const,
     },
     {
       label: "Risk",
@@ -138,7 +156,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>当前稳定节点：v0.8.0-resume-profile-foundation，已支持 Profile Center MVP、真实 PDF / DOCX 文本提取、deterministic resume parsing、risk-check API、SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs、手动投递 tracking、Bad Case 和 deterministic evaluation。当前不接真实 LLM，不做 LLM judge，不自动投递。</p>
+        <p>当前稳定节点：v0.9.0-project-optimization in progress，已支持 Profile Center、Resume parsing / risk-check、Project facts / rewrite backend、SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs、手动投递 tracking、Bad Case 和 deterministic evaluation。当前不接真实 LLM，不做 LLM judge，不自动投递。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -202,6 +220,12 @@ export function DashboardPage({
             <li>
               <strong>Match</strong>
               <span>{state.latestMatch?.match_report_id ?? "未运行"}</span>
+            </li>
+            <li>
+              <strong>Projects</strong>
+              <span>
+                {state.projects.length} records / {activeProjectCount} active
+              </span>
             </li>
             <li>
               <strong>Knowledge</strong>

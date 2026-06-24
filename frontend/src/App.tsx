@@ -7,6 +7,7 @@ import { getEvaluationStats, listBadCases } from "./api/evaluations";
 import { listJobs } from "./api/jobs";
 import { listMatches } from "./api/matches";
 import { getProfileSummary, listProfiles } from "./api/profiles";
+import { listProjects } from "./api/projects";
 import { listRagDocuments } from "./api/rag";
 import { listResumes } from "./api/resumes";
 import { AgentRunsPage } from "./pages/AgentRunsPage";
@@ -17,6 +18,7 @@ import { JDCenterPage } from "./pages/JDCenterPage";
 import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { MatchReportPage } from "./pages/MatchReportPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { ProjectOptimizationPage } from "./pages/ProjectOptimizationPage";
 import { QualityReviewPage } from "./pages/QualityReviewPage";
 import { ResumeCenterPage } from "./pages/ResumeCenterPage";
 import type {
@@ -29,6 +31,7 @@ import type {
   MatchReport,
   ProfileRecord,
   ProfileSummary,
+  ProjectRecord,
   RagDocumentRecord,
   ResumeRecord,
 } from "./types/api";
@@ -59,6 +62,11 @@ const navigation: NavigationItem[] = [
     key: "match",
     label: "Match Report",
     description: "匹配报告",
+  },
+  {
+    key: "project-optimization",
+    label: "Project Optimization",
+    description: "项目优化",
   },
   {
     key: "knowledge",
@@ -118,6 +126,7 @@ export default function App() {
   const [profiles, setProfiles] = useState<ProfileRecord[]>([]);
   const [latestProfileSummary, setLatestProfileSummary] =
     useState<ProfileSummary | null>(null);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [matches, setMatches] = useState<MatchReport[]>([]);
   const [ragDocuments, setRagDocuments] = useState<RagDocumentRecord[]>([]);
@@ -136,6 +145,7 @@ export default function App() {
       const [
         resumeList,
         profileWorkbench,
+        projectList,
         jobList,
         matchList,
         ragDocumentList,
@@ -147,6 +157,7 @@ export default function App() {
       ] = await Promise.all([
           listResumes(),
           loadProfileWorkbench(),
+          listProjects(),
           listJobs(),
           listMatches(),
           listRagDocuments(),
@@ -159,6 +170,7 @@ export default function App() {
       setResumes(resumeList.items);
       setProfiles(profileWorkbench.profiles);
       setLatestProfileSummary(profileWorkbench.latestProfileSummary);
+      setProjects(projectList.items);
       setJobs(jobList.items);
       setMatches(matchList.items);
       setRagDocuments(ragDocumentList.items);
@@ -194,6 +206,7 @@ export default function App() {
     latestMatch,
     profiles,
     latestProfileSummary,
+    projects,
     resumes,
     jobs,
     matches,
@@ -247,6 +260,14 @@ export default function App() {
           onMatchRun={setLatestMatch}
           onRefresh={refreshWorkbench}
           resumes={resumes}
+        />
+      );
+    }
+    if (activePage === "project-optimization") {
+      return (
+        <ProjectOptimizationPage
+          onProjectsChanged={setProjects}
+          projects={projects}
         />
       );
     }

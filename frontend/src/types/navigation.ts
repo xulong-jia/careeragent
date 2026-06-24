@@ -4,6 +4,7 @@ export type PageKey =
   | "resume"
   | "jd"
   | "match"
+  | "project-optimization"
   | "knowledge"
   | "agents"
   | "applications"

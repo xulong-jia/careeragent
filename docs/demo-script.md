@@ -110,6 +110,17 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 2. 点击 Run Match。
 3. 查看 total score、dimension scores、strengths、gaps 和 evidence。
 
+### Project Optimization
+
+1. 创建 synthetic project facts。
+2. 填写 name、role、period、background、tech stack、responsibilities、results 和 evidence JSON。
+3. 选择 project，查看 detail 和 evidence。
+4. 输入 JD ID，可选输入 resume version、match report 或 profile refs。
+5. 点击 Run rewrite。
+6. 查看 matched points、missing points、evidence required、rewritten bullets、forbidden changes 和 risk flags。
+
+当前 Project Rewrite 是 deterministic suggestions，不接真实 LLM，不自动写回 Resume Version，不新增不存在的项目经历、指标、公司、技术栈、上线成果或业务规模。
+
 ### Knowledge Base
 
 1. 创建 synthetic RAG document。

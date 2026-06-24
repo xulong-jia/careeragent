@@ -100,6 +100,8 @@ Rewrite response 关键字段：
 
 当前 Project Rewrite 是 deterministic rule-based backend：只从用户保存的 project facts 和 JD profile 中提取匹配点，不接真实 LLM，不自动改写简历版本，不编造公司、用户量、收益、准确率、上线状态、业务规模、技术栈或 unsupported metric。risk_flags 覆盖 unsupported metric、fabricated skill、missing evidence、overclaim 和 learning-to-business overclaim。Project API 不返回 Resume raw text，也不自动从简历生成项目事实。
 
+前端流程：ProjectOptimizationPage 支持创建 / 更新 project facts、选择 project、输入 JD ID 运行 rewrite，并展示 matched points、missing points、evidence required、rewritten bullets、forbidden changes 和 risk flags。页面只展示建议，不自动写回 Resume Version。
+
 ## Resume APIs
 
 | Method | Path | 说明 |

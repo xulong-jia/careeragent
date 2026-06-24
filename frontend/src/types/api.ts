@@ -151,6 +151,134 @@ export type ProfileSummary = {
   readiness_level: "incomplete" | "basic" | "ready";
 };
 
+export type ProjectStatus = "active" | "archived";
+
+export type ProjectRecord = {
+  id: string;
+  user_id: string;
+  profile_id: string | null;
+  resume_version_id: string | null;
+  name: string;
+  role: string | null;
+  period: string | null;
+  background: string | null;
+  tech_stack: string[];
+  responsibilities: string[];
+  results: string[];
+  evidence: Record<string, unknown>[];
+  status: ProjectStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectCreateRequest = {
+  profile_id?: string | null;
+  resume_version_id?: string | null;
+  name: string;
+  role?: string | null;
+  period?: string | null;
+  background?: string | null;
+  tech_stack?: string[];
+  responsibilities?: string[];
+  results?: string[];
+  evidence?: Record<string, unknown>[];
+  status?: ProjectStatus;
+};
+
+export type ProjectUpdateRequest = Partial<ProjectCreateRequest>;
+
+export type ProjectFilters = {
+  profileId?: string;
+  resumeVersionId?: string;
+  status?: ProjectStatus | "";
+};
+
+export type ProjectListResponse = ListResponse<ProjectRecord>;
+
+export type ProjectRewriteRequest = {
+  jd_id: string;
+  resume_version_id?: string | null;
+  match_report_id?: string | null;
+  profile_id?: string | null;
+};
+
+export type ProjectMatchedPoint = {
+  skill: string;
+  source_field: string;
+  project_text: string;
+  jd_requirement: string;
+  match_type:
+    | "required_skill"
+    | "preferred_skill"
+    | "responsibility"
+    | "business_scenario";
+};
+
+export type ProjectMissingPoint = {
+  requirement: string;
+  requirement_type: "required_skill" | "preferred_skill";
+  reason: string;
+  priority: "high" | "medium";
+};
+
+export type ProjectEvidenceRequired = {
+  type:
+    | "unsupported_metric"
+    | "missing_evidence"
+    | "timeline_or_scope_evidence";
+  source_field: string;
+  project_text: string;
+  reason: string;
+};
+
+export type ProjectRewrittenBullet = {
+  before: string;
+  after: string;
+  reason: string;
+  evidence_required: string;
+  risk_level: "low" | "medium" | "high";
+};
+
+export type ProjectRiskFlag = {
+  type:
+    | "unsupported_metric"
+    | "missing_evidence"
+    | "overclaim"
+    | "fabricated_skill"
+    | "learning_to_business_overclaim";
+  severity: "low" | "medium" | "high";
+  source_field: string;
+  message: string;
+};
+
+export type ProjectForbiddenChange =
+  | "company"
+  | "user_count"
+  | "revenue"
+  | "accuracy"
+  | "production_status"
+  | "business_scale"
+  | "tech_stack_not_in_facts"
+  | "unsupported_metric"
+  | string;
+
+export type ProjectRewriteRecord = {
+  id: string;
+  project_id: string;
+  jd_id: string;
+  resume_version_id: string | null;
+  match_report_id: string | null;
+  profile_id: string | null;
+  matched_points: ProjectMatchedPoint[];
+  missing_points: ProjectMissingPoint[];
+  evidence_required: ProjectEvidenceRequired[];
+  rewritten_bullets: ProjectRewrittenBullet[];
+  forbidden_changes: ProjectForbiddenChange[];
+  risk_flags: ProjectRiskFlag[];
+  rewrite_strategy: string;
+  created_at: string;
+};
+
 export type JobCreatePayload = {
   company: string;
   job_title: string;
@@ -625,6 +753,7 @@ export type WorkbenchState = {
   latestMatch: MatchReport | null;
   profiles: ProfileRecord[];
   latestProfileSummary: ProfileSummary | null;
+  projects: ProjectRecord[];
   resumes: ResumeRecord[];
   jobs: JobRecord[];
   matches: MatchReport[];
