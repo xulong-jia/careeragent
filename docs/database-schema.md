@@ -12,8 +12,11 @@
 - `user_id`
 - `filename`
 - `file_type`
+- `source_file_hash`
 - `parse_status`
+- `status`
 - `created_at`
+- `updated_at`
 
 ## resume_versions
 
@@ -29,12 +32,16 @@
 - `raw_text`
 - `raw_text_preview`
 - `structured_resume`
+- `extraction_status`
+- `extraction_method`
+- `extraction_warnings`
 - `risk_flags`
 - `risk_report`
 - `status`
+- `created_at`
 - `archived_at`
 
-隐私说明：`raw_text` 是本地 prototype 数据，不应提交真实简历或输出到日志。
+隐私说明：`raw_text` 是本地 prototype 数据，不应提交真实简历或输出到日志。前端 Resume Center 只展示 preview；生产化前需要继续收敛 raw_text 返回策略。
 
 ## profiles
 
@@ -54,6 +61,8 @@
 - `updated_at`
 
 隐私说明：只保存求职目标、技能结构、偏好和可选 resume version ref，不复制 resume raw_text。
+
+当前无认证系统，`user_id` 使用默认值 `default`；Profile 不应保存身份证、详细住址、政治、健康等敏感身份信息。
 
 ## job_descriptions
 

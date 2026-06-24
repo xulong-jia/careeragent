@@ -71,10 +71,6 @@ CAREERAGENT_API_BASE_URL=http://localhost:8000 python3 scripts/seed_demo_data.py
 
 ## 5. 手动演示流程
 
-### Dashboard
-
-打开 Dashboard，确认各模块统计卡片显示当前对象数量。若刚运行 seed 脚本，应看到 Resume、JD、Match、Knowledge、Agent、Applications、Quality、Evaluation 都有数据。
-
 ### Resume Center
 
 1. 上传 `.pdf`、`.docx`、`.md` 或 `.txt` synthetic resume。
@@ -86,6 +82,21 @@ CAREERAGENT_API_BASE_URL=http://localhost:8000 python3 scripts/seed_demo_data.py
 7. 填写 version name、target role，保存 confirmed version。
 8. 查看 resume versions，确认新增 version 不覆盖旧版本。
 9. 可继续 clone 或 archive 一个版本。
+
+PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则检测结果，不自动修改简历。
+
+### Profile Center
+
+1. 创建 synthetic profile。
+2. 填写 target roles、target locations、target industries、skill map 和 preferences。
+3. 可选绑定刚保存的 confirmed resume version。
+4. 查看 completeness score、missing fields 和 readiness level。
+
+当前无认证系统，`user_id` 使用默认 `default`，不演示多用户权限。
+
+### Dashboard
+
+回到 Dashboard，确认展示 profile readiness、resume parse status、risk flags count，以及 Resume、JD、Match、Knowledge、Agent、Applications、Quality、Evaluation 统计。若刚运行 seed 脚本，应看到多个模块已有数据。
 
 ### JD Center
 

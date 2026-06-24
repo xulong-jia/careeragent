@@ -53,6 +53,8 @@
 
 隐私边界：Profile API 只保存目标、技能结构、偏好和可选 resume version ref，不返回 Resume raw text。
 
+当前无认证系统，Profile 的 `user_id` 由后端使用默认值 `default`，不做多用户权限隔离。
+
 ## Resume APIs
 
 | Method | Path | 说明 |
@@ -75,6 +77,8 @@
 - `risk_report`
 
 前端流程：Resume Center 会先调用 parse 生成可编辑 `structured_resume`，再用编辑后的 JSON 调用 risk-check，最后把 `structured_resume`、`risk_report`、`version_name`、`target_role` 和 `source_version_id` 提交到保存版本 API。risk-check 不会自动修改简历。
+
+解析边界：PDF 使用文本层提取，DOCX 使用文档文本提取，Markdown / txt 使用 UTF-8 文本读取；当前不做 OCR，不接真实 LLM parser。risk-check 只做 unsupported metric、fabricated skill、timeline conflict、missing evidence、overclaim 等确定性规则检测，不是事实审计。
 
 ## Resume Version APIs
 

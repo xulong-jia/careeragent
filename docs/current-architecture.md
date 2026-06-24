@@ -103,6 +103,38 @@ sqlite:///./local_data/careeragent.db
 - Agent：deterministic state machine，不是自由工具调用 Agent。
 - Evaluation：deterministic smoke set，不是 LLM judge。
 
+### Resume Center v0.8
+
+Resume Center 当前链路：
+
+1. `POST /api/resumes/upload` 上传 `.pdf` / `.docx` / `.md` / `.markdown` / `.txt` synthetic resume。
+2. `text_extraction_service` 对 Markdown / txt 做 UTF-8 文本读取，对 PDF 使用 PyMuPDF 文本层提取，对 DOCX 使用 python-docx 文本层提取。
+3. `POST /api/resumes/{resume_id}/parse` 运行 deterministic parser，返回候选 `structured_resume`，不写入 confirmed version。
+4. 前端 ResumeCenterPage 允许人工编辑 structured JSON。
+5. `POST /api/resumes/{resume_id}/risk-check` 对当前 structured JSON 做确定性规则检测，返回 `risk_flags` 和 `risk_report`，不自动修改简历。
+6. `POST /api/resumes/{resume_id}/versions` 保存人工确认后的 confirmed version。
+
+当前不做 OCR，不处理扫描版 PDF 图片文字，不调用 LLM parser，也不做事实审计。
+
+### Profile Center v0.8
+
+Profile Center 当前链路：
+
+1. `profiles` 表保存求职目标、目标行业、目标地点、技能结构、偏好和可选 `source_resume_version_id`。
+2. Profile API 支持 create / list / detail / patch / summary。
+3. ProfilePage 支持创建、选择、更新 profile，并展示 completeness / readiness summary。
+4. 当前没有认证系统，`user_id` 固定为 `default`，不提供多用户权限隔离。
+
+Profile 不从简历自动生成，也不保存身份证、详细住址、政治、健康等敏感身份信息。
+
+### Dashboard readiness
+
+Dashboard 当前展示：
+
+- latest profile readiness level 和 completeness score。
+- latest resume parse status 和 risk flags count。
+- 原有 Resume、JD、Match、RAG、Agent、Application、Bad Case、Evaluation 统计。
+
 ## 7. 阶段完成状态
 
 | 阶段 | 当前状态 |
