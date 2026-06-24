@@ -367,6 +367,110 @@ export type BadCaseFilters = {
   limit?: number;
 };
 
+export type EvaluationModule =
+  | "match"
+  | "rag"
+  | "agent"
+  | "application"
+  | "bad_case";
+
+export type EvaluationRunModule = EvaluationModule | "all";
+
+export type EvaluationRunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed";
+
+export type EvaluationResultStatus = "passed" | "failed" | "error";
+
+export type EvaluationCaseSourceType = "synthetic" | "bad_case" | "manual";
+
+export type EvaluationRunCreatePayload = {
+  module?: EvaluationRunModule | null;
+  dataset_name?: string;
+  name?: string | null;
+};
+
+export type EvaluationCaseCreatePayload = {
+  module: EvaluationModule;
+  dataset_name?: string;
+  case_name: string;
+  input_payload?: Record<string, unknown>;
+  expected_output?: Record<string, unknown>;
+  tags?: string[];
+  source_type?: EvaluationCaseSourceType;
+  bad_case_id?: string | null;
+};
+
+export type EvaluationRunRecord = {
+  id: string;
+  name: string;
+  module: EvaluationRunModule;
+  dataset_name: string;
+  status: EvaluationRunStatus;
+  metrics: Record<string, unknown>;
+  run_config: Record<string, unknown>;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+};
+
+export type EvaluationCaseRecord = {
+  id: string;
+  module: EvaluationModule;
+  dataset_name: string;
+  case_name: string;
+  input_payload: Record<string, unknown>;
+  expected_output: Record<string, unknown>;
+  tags: string[];
+  source_type: EvaluationCaseSourceType;
+  bad_case_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EvaluationResultRecord = {
+  id: string;
+  run_id: string;
+  case_id: string;
+  module: EvaluationModule;
+  status: EvaluationResultStatus;
+  actual_output: Record<string, unknown>;
+  expected_output: Record<string, unknown>;
+  passed: boolean;
+  score: number;
+  error: string | null;
+  created_at: string;
+};
+
+export type EvaluationRunSummary = {
+  run: EvaluationRunRecord;
+  results_count: number;
+};
+
+export type EvaluationStats = {
+  total_runs: number;
+  latest_run_status: EvaluationRunStatus | null;
+  latest_pass_rate: number | null;
+  total_cases: number;
+  failed_results: number;
+  by_module: Record<EvaluationModule, number>;
+};
+
+export type EvaluationRunFilters = {
+  module?: EvaluationRunModule | "";
+  datasetName?: string;
+  limit?: number;
+};
+
+export type EvaluationCaseFilters = {
+  module?: EvaluationModule | "";
+  datasetName?: string;
+  sourceType?: EvaluationCaseSourceType | "";
+  limit?: number;
+};
+
 export type ApplicationStatus =
   | "saved"
   | "ready_to_apply"
@@ -445,4 +549,5 @@ export type WorkbenchState = {
   badCases: BadCaseRecord[];
   applications: ApplicationRecord[];
   applicationStats: ApplicationStats | null;
+  evaluationStats: EvaluationStats | null;
 };

@@ -6,6 +6,7 @@ export type PageKey =
   | "knowledge"
   | "agents"
   | "applications"
+  | "evaluation"
   | "quality";
 
 export type NavigationItem = {

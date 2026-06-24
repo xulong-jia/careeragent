@@ -554,7 +554,17 @@ button:disabled {
   padding: 10px 12px;
 }
 
+.inline-form select {
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 10px 12px;
+}
+
 .inline-form input:focus,
+.inline-form select:focus,
 .ghost-action:focus-visible {
   border-color: var(--green);
   outline: 3px solid rgba(45, 106, 79, 0.14);
@@ -689,6 +699,33 @@ button:disabled {
 .bad-case-list li {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(150px, auto) minmax(90px, auto) minmax(100px, auto) minmax(160px, auto) auto;
+}
+
+.evaluation-run-list li {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(90px, auto) minmax(150px, auto) minmax(90px, auto) auto;
+}
+
+.evaluation-result-list li {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(220px, 1fr) minmax(90px, auto) minmax(80px, auto) minmax(90px, auto);
+}
+
+.evaluation-case-list li {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, auto) minmax(150px, auto) minmax(110px, auto);
+}
+
+.status-passed {
+  border-color: #b9cbbf;
+  background: #edf5ef;
+  color: var(--green);
+}
+
+.status-error {
+  border-color: #e5b4b4;
+  background: #fff1f1;
+  color: var(--red);
 }
 
 .bad-case-detail li {
@@ -946,6 +983,9 @@ button:disabled {
   .rag-document-list li,
   .agent-run-list li,
   .bad-case-list li,
+  .evaluation-run-list li,
+  .evaluation-result-list li,
+  .evaluation-case-list li,
   .filter-grid,
   .readonly-grid {
     grid-template-columns: 1fr;

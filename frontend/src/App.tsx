@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "./components/AppShell";
 import { listAgentRuns } from "./api/agents";
 import { getApplicationStats, listApplications } from "./api/applications";
-import { listBadCases } from "./api/evaluations";
+import { getEvaluationStats, listBadCases } from "./api/evaluations";
 import { listJobs } from "./api/jobs";
 import { listMatches } from "./api/matches";
 import { listRagDocuments } from "./api/rag";
@@ -11,6 +11,7 @@ import { listResumes } from "./api/resumes";
 import { AgentRunsPage } from "./pages/AgentRunsPage";
 import { ApplicationTrackerPage } from "./pages/ApplicationTrackerPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { EvaluationPage } from "./pages/EvaluationPage";
 import { JDCenterPage } from "./pages/JDCenterPage";
 import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { MatchReportPage } from "./pages/MatchReportPage";
@@ -21,6 +22,7 @@ import type {
   ApplicationRecord,
   ApplicationStats,
   BadCaseRecord,
+  EvaluationStats,
   JobRecord,
   MatchReport,
   RagDocumentRecord,
@@ -65,6 +67,11 @@ const navigation: NavigationItem[] = [
     description: "投递 tracking",
   },
   {
+    key: "evaluation",
+    label: "Evaluation",
+    description: "确定性评测",
+  },
+  {
     key: "quality",
     label: "Quality Review",
     description: "Bad Case 复盘",
@@ -85,6 +92,9 @@ export default function App() {
   const [applicationStats, setApplicationStats] =
     useState<ApplicationStats | null>(null);
   const [badCases, setBadCases] = useState<BadCaseRecord[]>([]);
+  const [evaluationStats, setEvaluationStats] = useState<EvaluationStats | null>(
+    null,
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const refreshWorkbench = async () => {
@@ -98,6 +108,7 @@ export default function App() {
         applicationList,
         applicationStatsData,
         badCaseList,
+        evaluationStatsData,
       ] = await Promise.all([
           listResumes(),
           listJobs(),
@@ -107,6 +118,7 @@ export default function App() {
           listApplications(),
           getApplicationStats(),
           listBadCases({ limit: 50 }),
+          getEvaluationStats(),
         ]);
       setResumes(resumeList.items);
       setJobs(jobList.items);
@@ -116,6 +128,7 @@ export default function App() {
       setApplications(applicationList.items);
       setApplicationStats(applicationStatsData);
       setBadCases(badCaseList.items);
+      setEvaluationStats(evaluationStatsData);
       setLatestResume(
         (current) => current ?? resumeList.items[resumeList.items.length - 1] ?? null,
       );
@@ -149,6 +162,7 @@ export default function App() {
     applications,
     applicationStats,
     badCases,
+    evaluationStats,
   };
 
   const renderPage = () => {
@@ -214,6 +228,9 @@ export default function App() {
           onBadCasesChanged={setBadCases}
         />
       );
+    }
+    if (activePage === "evaluation") {
+      return <EvaluationPage />;
     }
     return (
       <DashboardPage

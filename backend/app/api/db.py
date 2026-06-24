@@ -17,6 +17,9 @@ CORE_TABLES = {
     "job_profiles",
     "match_reports",
     "applications",
+    "evaluation_runs",
+    "evaluation_cases",
+    "evaluation_results",
 }
 
 

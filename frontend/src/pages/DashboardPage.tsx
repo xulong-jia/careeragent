@@ -107,6 +107,16 @@ export function DashboardPage({
       tone: "red",
       page: "quality" as const,
     },
+    {
+      label: "Evaluation",
+      value: String(state.evaluationStats?.total_runs ?? 0),
+      detail:
+        state.evaluationStats?.latest_pass_rate != null
+          ? `${Math.round(state.evaluationStats.latest_pass_rate * 100)}% latest`
+          : "Deterministic smoke",
+      tone: "blue",
+      page: "evaluation" as const,
+    },
   ];
 
   return (
@@ -114,7 +124,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>当前稳定节点：v0.5.0-quality-review，已支持 SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs 和人工 Quality Review。当前不接真实 LLM，不做自动评估，不自动投递。</p>
+        <p>当前稳定节点：v0.6.0-deterministic-evaluation，已支持 SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs、手动投递 tracking、Bad Case 和 deterministic evaluation。当前不接真实 LLM，不做 LLM judge，不自动投递。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -137,7 +147,7 @@ export function DashboardPage({
         <article className="panel">
           <div className="panel-header">
             <h3>持久化闭环</h3>
-            <span className="status-pill">v0.5.0 Quality Review</span>
+            <span className="status-pill">v0.6.0 Evaluation</span>
           </div>
           <div className="workflow-rail" aria-label="阶段 2F 持久化流程">
             {workflow.map((step) => (
@@ -185,6 +195,13 @@ export function DashboardPage({
             <li>
               <strong>Quality Review</strong>
               <span>{state.badCases.length} manual bad cases</span>
+            </li>
+            <li>
+              <strong>Evaluation</strong>
+              <span>
+                {state.evaluationStats?.total_runs ?? 0} runs /{" "}
+                {state.evaluationStats?.failed_results ?? 0} failed results
+              </span>
             </li>
           </ul>
         </article>
