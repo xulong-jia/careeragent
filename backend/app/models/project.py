@@ -42,3 +42,45 @@ class Project(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class ProjectRewrite(Base):
+    __tablename__ = "project_rewrites"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    jd_id: Mapped[str] = mapped_column(
+        ForeignKey("job_descriptions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    resume_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("resume_versions.id", ondelete="SET NULL"),
+        index=True,
+    )
+    match_report_id: Mapped[str | None] = mapped_column(
+        ForeignKey("match_reports.id", ondelete="SET NULL"),
+        index=True,
+    )
+    profile_id: Mapped[str | None] = mapped_column(
+        ForeignKey("profiles.id", ondelete="SET NULL"),
+        index=True,
+    )
+    matched_points: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    missing_points: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    evidence_required: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    rewritten_bullets: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    forbidden_changes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    risk_flags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    rewrite_strategy: Mapped[str] = mapped_column(
+        String(120),
+        default="deterministic_project_rewrite_v1",
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )

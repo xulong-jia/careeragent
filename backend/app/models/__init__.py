@@ -4,7 +4,7 @@ from app.models.evaluation import BadCase, EvaluationCase, EvaluationResult, Eva
 from app.models.job import JobDescription, JobProfile
 from app.models.match import MatchReport
 from app.models.profile import Profile
-from app.models.project import Project
+from app.models.project import Project, ProjectRewrite
 from app.models.rag import RagChunk, RagDocument
 from app.models.resume import Resume, ResumeVersion
 
@@ -22,6 +22,7 @@ __all__ = [
     "MatchReport",
     "Profile",
     "Project",
+    "ProjectRewrite",
     "RagChunk",
     "RagDocument",
     "Resume",

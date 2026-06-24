@@ -6,10 +6,13 @@ from app.schemas.common import ApiResponse, ListResponse
 from app.schemas.projects import (
     ProjectCreateRequest,
     ProjectRecord,
+    ProjectRewriteRecord,
+    ProjectRewriteRequest,
     ProjectStatus,
     ProjectUpdateRequest,
 )
 from app.services import project_service
+from app.services import project_rewrite_service
 
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -47,6 +50,21 @@ async def list_projects(
         "data": ListResponse(items=items, total=len(items)),
         "request_id": request.state.request_id,
     }
+
+
+@router.post(
+    "/{project_id}/rewrite",
+    response_model=ApiResponse[ProjectRewriteRecord],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_project_rewrite(
+    request: Request,
+    project_id: str,
+    payload: ProjectRewriteRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    rewrite = project_rewrite_service.create_project_rewrite(db, project_id, payload)
+    return {"data": rewrite, "request_id": request.state.request_id}
 
 
 @router.get("/{project_id}", response_model=ApiResponse[ProjectRecord])

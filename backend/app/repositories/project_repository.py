@@ -4,8 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models.project import Project
-from app.schemas.projects import ProjectRecord
+from app.models.project import Project, ProjectRewrite
+from app.schemas.projects import ProjectRecord, ProjectRewriteRecord
 
 
 def _next_project_id(db: Session) -> str:
@@ -16,6 +16,19 @@ def _next_project_id(db: Session) -> str:
     raise AppError(
         code="project_id_generation_failed",
         message="Unable to generate a unique project id.",
+        status_code=500,
+        details={},
+    )
+
+
+def _next_project_rewrite_id(db: Session) -> str:
+    for _ in range(10):
+        rewrite_id = f"project_rewrite_{uuid4().hex[:12]}"
+        if db.get(ProjectRewrite, rewrite_id) is None:
+            return rewrite_id
+    raise AppError(
+        code="project_rewrite_id_generation_failed",
+        message="Unable to generate a unique project rewrite id.",
         status_code=500,
         details={},
     )
@@ -38,6 +51,25 @@ def _to_project_record(project: Project) -> ProjectRecord:
         status=project.status,  # type: ignore[arg-type]
         created_at=project.created_at,
         updated_at=project.updated_at,
+    )
+
+
+def _to_project_rewrite_record(record: ProjectRewrite) -> ProjectRewriteRecord:
+    return ProjectRewriteRecord(
+        id=record.id,
+        project_id=record.project_id,
+        jd_id=record.jd_id,
+        resume_version_id=record.resume_version_id,
+        match_report_id=record.match_report_id,
+        profile_id=record.profile_id,
+        matched_points=list(record.matched_points or []),
+        missing_points=list(record.missing_points or []),
+        evidence_required=list(record.evidence_required or []),
+        rewritten_bullets=list(record.rewritten_bullets or []),
+        forbidden_changes=list(record.forbidden_changes or []),
+        risk_flags=list(record.risk_flags or []),
+        rewrite_strategy=record.rewrite_strategy,
+        created_at=record.created_at,
     )
 
 
@@ -81,6 +113,47 @@ def create_project(
     return _to_project_record(project)
 
 
+def create_project_rewrite(
+    db: Session,
+    *,
+    project_id: str,
+    jd_id: str,
+    resume_version_id: str | None,
+    match_report_id: str | None,
+    profile_id: str | None,
+    matched_points: list[dict[str, object]],
+    missing_points: list[dict[str, object]],
+    evidence_required: list[dict[str, object]],
+    rewritten_bullets: list[dict[str, object]],
+    forbidden_changes: list[str],
+    risk_flags: list[dict[str, object]],
+    rewrite_strategy: str,
+) -> ProjectRewriteRecord:
+    record = ProjectRewrite(
+        id=_next_project_rewrite_id(db),
+        project_id=project_id,
+        jd_id=jd_id,
+        resume_version_id=resume_version_id,
+        match_report_id=match_report_id,
+        profile_id=profile_id,
+        matched_points=matched_points,
+        missing_points=missing_points,
+        evidence_required=evidence_required,
+        rewritten_bullets=rewritten_bullets,
+        forbidden_changes=forbidden_changes,
+        risk_flags=risk_flags,
+        rewrite_strategy=rewrite_strategy,
+    )
+    try:
+        db.add(record)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(record)
+    return _to_project_rewrite_record(record)
+
+
 def list_projects(
     db: Session,
     *,
@@ -113,6 +186,18 @@ def get_project(db: Session, project_id: str) -> ProjectRecord:
             details={"project_id": project_id},
         )
     return _to_project_record(project)
+
+
+def get_project_rewrite(db: Session, rewrite_id: str) -> ProjectRewriteRecord:
+    record = db.get(ProjectRewrite, rewrite_id)
+    if not record:
+        raise AppError(
+            code="project_rewrite_not_found",
+            message="Project rewrite was not found.",
+            status_code=404,
+            details={"rewrite_id": rewrite_id},
+        )
+    return _to_project_rewrite_record(record)
 
 
 def update_project(

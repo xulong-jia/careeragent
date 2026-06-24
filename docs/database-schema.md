@@ -88,7 +88,28 @@
 
 隐私说明：不复制 resume raw_text；`profile_id` 和 `resume_version_id` 只保存引用。`evidence` 应保存可证明材料摘要，不粘贴大段隐私原文。
 
-当前只包含 Project facts backend，不包含 `project_rewrites` 表。
+## project_rewrites
+
+用途：记录 deterministic project rewrite 结果，保存针对 JD 的匹配点、缺口、证据需求、改写建议和风险边界。
+
+关键字段：
+
+- `id`
+- `project_id`
+- `jd_id`
+- `resume_version_id`
+- `match_report_id`
+- `profile_id`
+- `matched_points`
+- `missing_points`
+- `evidence_required`
+- `rewritten_bullets`
+- `forbidden_changes`
+- `risk_flags`
+- `rewrite_strategy`
+- `created_at`
+
+隐私说明：只保存项目事实引用和 rewrite 产物，不复制 resume raw_text。`rewritten_bullets` 必须基于已有 project facts；缺少指标或证据时写入 `evidence_required` / `risk_flags`，不生成虚构数字、公司、用户量、收益、准确率、上线状态或技术栈。
 
 ## job_descriptions
 

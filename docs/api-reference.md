@@ -63,6 +63,8 @@
 | GET | `/api/projects` | 查询项目列表，可按 `profile_id`、`resume_version_id`、`status` 筛选 |
 | GET | `/api/projects/{project_id}` | 查询项目事实详情 |
 | PATCH | `/api/projects/{project_id}` | 更新项目事实或归档状态 |
+| POST | `/api/projects/{project_id}/rewrite` | 针对 JD 运行 deterministic project rewrite |
+| GET | `/api/project-rewrites/{rewrite_id}` | 查询 project rewrite 详情 |
 
 关键字段：
 
@@ -79,7 +81,24 @@
 - `evidence`
 - `status`
 
-当前只实现 Project facts backend；`POST /api/projects/{project_id}/rewrite` 和 `GET /api/project-rewrites/{rewrite_id}` 尚未实现。Project API 不返回 Resume raw text，也不自动从简历生成项目事实。
+Rewrite request 关键字段：
+
+- `jd_id`
+- `resume_version_id`
+- `match_report_id`
+- `profile_id`
+
+Rewrite response 关键字段：
+
+- `matched_points`
+- `missing_points`
+- `evidence_required`
+- `rewritten_bullets`
+- `forbidden_changes`
+- `risk_flags`
+- `rewrite_strategy`
+
+当前 Project Rewrite 是 deterministic rule-based backend：只从用户保存的 project facts 和 JD profile 中提取匹配点，不接真实 LLM，不自动改写简历版本，不编造公司、用户量、收益、准确率、上线状态、业务规模、技术栈或 unsupported metric。risk_flags 覆盖 unsupported metric、fabricated skill、missing evidence、overclaim 和 learning-to-business overclaim。Project API 不返回 Resume raw text，也不自动从简历生成项目事实。
 
 ## Resume APIs
 

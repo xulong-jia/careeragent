@@ -37,7 +37,7 @@ scripts/                    Local helper scripts
 - 成功：`{"data": ..., "request_id": "..."}`
 - 失败：`{"error": {"code": "...", "message": "...", "details": {...}}, "request_id": "..."}`
 
-FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、Resume、Resume Version、JD、Match、RAG、Agent、Application 和 Evaluation routers。
+FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、Project Rewrite、Resume、Resume Version、JD、Match、RAG、Agent、Application 和 Evaluation routers。
 
 业务代码遵循：
 
@@ -71,6 +71,7 @@ FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、R
 - `resume_versions`
 - `profiles`
 - `projects`
+- `project_rewrites`
 - `job_descriptions`
 - `job_profiles`
 - `match_reports`
@@ -97,7 +98,7 @@ sqlite:///./local_data/careeragent.db
 当前不接真实 OpenAI、DeepSeek、Qwen 或其他 LLM provider。
 
 - Profile：manual CRUD + readiness summary，不自动从简历生成画像。
-- Project：manual project facts CRUD，可选绑定 profile / resume version，不自动生成项目事实，不做 rewrite。
+- Project：manual project facts CRUD + deterministic rewrite backend，可选绑定 profile / resume version，不自动生成项目事实，不接真实 LLM。
 - Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
@@ -129,16 +130,19 @@ Profile Center 当前链路：
 
 Profile 不从简历自动生成，也不保存身份证、详细住址、政治、健康等敏感身份信息。
 
-### Project Facts Backend v0.9 9A
+### Project Optimization Backend v0.9 9A / 9B
 
-Project facts backend 当前链路：
+Project optimization backend 当前链路：
 
 1. `projects` 表保存用户手动确认的项目事实。
 2. Project API 支持 create / list / detail / patch。
 3. Project 可选绑定 `profile_id` 和 `resume_version_id`，绑定对象传入时会校验存在。
 4. 保存字段包括项目名称、角色、周期、背景、技术栈、职责、结果和 evidence。
+5. `POST /api/projects/{project_id}/rewrite` 针对 JD profile 运行 deterministic rewrite。
+6. `project_rewrites` 表保存 `matched_points`、`missing_points`、`evidence_required`、`rewritten_bullets`、`forbidden_changes`、`risk_flags` 和 `rewrite_strategy`。
+7. `GET /api/project-rewrites/{rewrite_id}` 查询已保存 rewrite 结果。
 
-当前不做 Project Rewrite API，不生成 `matched_points`、`missing_points`、`rewritten_bullets`、`evidence_required`、`risk_flags` 或 `forbidden_changes`；ProjectOptimizationPage 也尚未实现。
+当前 Project Rewrite 是规则版，不接真实 LLM，不自动写入 Resume Version，不编造项目经历、指标、公司、技术栈、上线状态或业务规模；risk flags 覆盖 unsupported metric、fabricated skill、missing evidence、overclaim 和 learning-to-business overclaim。ProjectOptimizationPage 尚未实现。
 
 ### Dashboard readiness
 
@@ -159,7 +163,7 @@ Dashboard 当前展示：
 | 阶段五 | Application Tracking + Dashboard MVP 已完成 |
 | 阶段六 | Deterministic Evaluation MVP + Bad Case 关联已完成 |
 | v0.8 Resume/Profile Foundation | Resume parser / risk-check APIs + Profile Center MVP 已完成 |
-| v0.9 Project Optimization 9A | Project facts backend 已完成，rewrite 和前端页面未实现 |
+| v0.9 Project Optimization 9A / 9B | Project facts backend 和 deterministic rewrite backend 已完成，前端页面未实现 |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做
