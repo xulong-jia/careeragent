@@ -64,6 +64,32 @@
 
 当前无认证系统，`user_id` 使用默认值 `default`；Profile 不应保存身份证、详细住址、政治、健康等敏感身份信息。
 
+## projects
+
+用途：保存用户手动确认的项目事实，作为后续项目优化、简历版本和岗位匹配的证据基础。
+
+关键字段：
+
+- `id`
+- `user_id`
+- `profile_id`
+- `resume_version_id`
+- `name`
+- `role`
+- `period`
+- `background`
+- `tech_stack`
+- `responsibilities`
+- `results`
+- `evidence`
+- `status`
+- `created_at`
+- `updated_at`
+
+隐私说明：不复制 resume raw_text；`profile_id` 和 `resume_version_id` 只保存引用。`evidence` 应保存可证明材料摘要，不粘贴大段隐私原文。
+
+当前只包含 Project facts backend，不包含 `project_rewrites` 表。
+
 ## job_descriptions
 
 用途：记录岗位 JD。

@@ -13,6 +13,7 @@ from app.api.health import router as health_router
 from app.api.jobs import router as jobs_router
 from app.api.matches import router as matches_router
 from app.api.profiles import router as profiles_router
+from app.api.projects import router as projects_router
 from app.api.rag import router as rag_router
 from app.api.resume_versions import router as resume_versions_router
 from app.api.resumes import router as resumes_router
@@ -53,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(db_router)
     app.include_router(profiles_router)
+    app.include_router(projects_router)
     app.include_router(resumes_router)
     app.include_router(resume_versions_router)
     app.include_router(jobs_router)

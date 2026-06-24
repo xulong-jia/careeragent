@@ -55,6 +55,32 @@
 
 当前无认证系统，Profile 的 `user_id` 由后端使用默认值 `default`，不做多用户权限隔离。
 
+## Project APIs
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| POST | `/api/projects` | 创建项目事实 |
+| GET | `/api/projects` | 查询项目列表，可按 `profile_id`、`resume_version_id`、`status` 筛选 |
+| GET | `/api/projects/{project_id}` | 查询项目事实详情 |
+| PATCH | `/api/projects/{project_id}` | 更新项目事实或归档状态 |
+
+关键字段：
+
+- `id`
+- `profile_id`
+- `resume_version_id`
+- `name`
+- `role`
+- `period`
+- `background`
+- `tech_stack`
+- `responsibilities`
+- `results`
+- `evidence`
+- `status`
+
+当前只实现 Project facts backend；`POST /api/projects/{project_id}/rewrite` 和 `GET /api/project-rewrites/{rewrite_id}` 尚未实现。Project API 不返回 Resume raw text，也不自动从简历生成项目事实。
+
 ## Resume APIs
 
 | Method | Path | 说明 |
