@@ -13,6 +13,8 @@ const workflow = [
   "Version History",
   "JD Create",
   "Match History",
+  "Project Facts",
+  "Project Rewrite",
   "RAG Search",
   "Agent Run",
   "Frontend Display",
@@ -65,7 +67,9 @@ export function DashboardPage({
     {
       label: "Projects",
       value: String(state.projects.length),
-      detail: latestProject?.name ?? "等待创建",
+      detail: latestProject
+        ? `${latestProject.name} / ${latestProject.status}`
+        : "等待创建",
       tone: "green",
       page: "project-optimization" as const,
     },
@@ -179,7 +183,7 @@ export function DashboardPage({
         <article className="panel">
           <div className="panel-header">
             <h3>持久化闭环</h3>
-            <span className="status-pill">v0.6.0 Evaluation</span>
+            <span className="status-pill">v0.9 Project Optimization</span>
           </div>
           <div className="workflow-rail" aria-label="阶段 2F 持久化流程">
             {workflow.map((step) => (
@@ -224,7 +228,9 @@ export function DashboardPage({
             <li>
               <strong>Projects</strong>
               <span>
-                {state.projects.length} records / {activeProjectCount} active
+                {latestProject
+                  ? `${latestProject.name} / ${latestProject.status}`
+                  : `${state.projects.length} records / ${activeProjectCount} active`}
               </span>
             </li>
             <li>

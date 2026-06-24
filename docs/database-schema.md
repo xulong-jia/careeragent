@@ -109,6 +109,15 @@
 - `rewrite_strategy`
 - `created_at`
 
+JSON 字段说明：
+
+- `matched_points`：JD required / preferred skill 与 project facts 的命中证据。
+- `missing_points`：未在 project facts 中命中的 JD skill gap。
+- `evidence_required`：unsupported metric、missing evidence、timeline/scope evidence 等需要用户补证据的项目 claim。
+- `rewritten_bullets`：基于已有 responsibilities / results 生成的保守改写建议，包含 before / after / reason / evidence_required / risk_level。
+- `forbidden_changes`：固定列出不得新增的事实类型，例如 company、user_count、revenue、accuracy、production_status、business_scale、tech_stack_not_in_facts、unsupported_metric。
+- `risk_flags`：unsupported metric、fabricated skill、missing evidence、overclaim、learning-to-business overclaim 等 deterministic 风险标记。
+
 隐私说明：只保存项目事实引用和 rewrite 产物，不复制 resume raw_text。`rewritten_bullets` 必须基于已有 project facts；缺少指标或证据时写入 `evidence_required` / `risk_flags`，不生成虚构数字、公司、用户量、收益、准确率、上线状态或技术栈。
 
 ## job_descriptions

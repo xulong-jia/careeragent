@@ -1,6 +1,27 @@
 # CareerAgent Final Acceptance Report
 
-本报告记录 v0.8.0 `resume-profile-foundation` handoff 后的当前项目状态。报告基于当前仓库真实代码、测试和文档，不代表生产就绪系统。
+本报告记录 v0.8.0 `resume-profile-foundation` handoff 后的当前项目状态，并补充 v0.9.0 `project-optimization` 当前收口状态。报告基于当前仓库真实代码、测试和文档，不代表生产就绪系统。
+
+## 0. v0.9 Project Optimization 当前状态
+
+v0.9.0 `project-optimization` 已完成 Project Optimization 的 deterministic MVP：
+
+- 9A Project facts backend：新增 `projects` 表、Project model / schema / repository / service / API，支持 create / list / detail / patch，可按 `profile_id`、`resume_version_id`、`status` 筛选。
+- 9B Project rewrite backend：新增 `project_rewrites` 表、ProjectRewrite model / schema / service / API，支持 `POST /api/projects/{project_id}/rewrite` 和 `GET /api/project-rewrites/{rewrite_id}`。
+- 9B deterministic rewrite：生成 `matched_points`、`missing_points`、`evidence_required`、`rewritten_bullets`、`forbidden_changes`、`risk_flags`，不接真实 LLM，不自动写回 Resume Version。
+- 9C ProjectOptimizationPage：前端接入 Project CRUD 和 Project Rewrite API，支持创建 / 更新 project facts、选择 project、运行 rewrite、展示 risk flags 和 forbidden changes。
+- 9D Dashboard / docs / tests 收口：Dashboard 展示 project count、active project count、latest project name/status；README、API、DB schema、架构和 demo flow 已更新。
+
+v0.9 仍明确不做：
+
+- 不接真实 LLM。
+- 不自动写回 Resume Version。
+- 不编造项目经历、数字、公司、技术栈、上线状态或业务规模。
+- 不做 Interview Center。
+- 不做 Study Plan。
+- 不重写 Match Scoring。
+- 不接 embedding / vector DB。
+- 不做认证、多用户。
 
 ## 1. 总体完成度
 
@@ -17,6 +38,7 @@
 - RAG deterministic lexical prototype。
 - Agent deterministic state machine prototype。
 - Application Tracking + Dashboard MVP。
+- Project Optimization deterministic MVP。
 - Quality Review / Bad Case。
 - Deterministic Evaluation MVP。
 - Docker / Compose 本地开发配置。
@@ -34,13 +56,14 @@
 | RAG Knowledge Base | 已完成 deterministic prototype |
 | Agent Runs | 已完成 deterministic state machine prototype |
 | Application Tracking | 已完成手动 tracking MVP |
-| Dashboard | 已接入 profile readiness、resume parse status、risk flags count 和核心统计 |
+| Dashboard | 已接入 profile readiness、resume parse status、risk flags count、project count / latest project status 和核心统计 |
+| Project Optimization | 已完成 v0.9 deterministic MVP |
 | Bad Case | 已完成人工质量复盘 MVP |
 | Evaluation | 已完成 deterministic smoke evaluation MVP |
 | Docker / Compose | 已完成本地开发配置 |
 | Docs / Demo | 已完成 v0.8 handoff 说明 |
 
-## 3. v0.8 验收结果
+## 3. v0.8 / v0.9 验收结果
 
 2026-06-24 在 `main` 执行：
 
@@ -48,7 +71,51 @@
 PYTHONPATH=backend backend/.venv/bin/python -m pytest backend/tests
 ```
 
-结果：165 passed, 6 warnings。
+v0.8 handoff 结果：165 passed, 6 warnings。
+
+v0.9 9D 于 2026-06-24 执行全量回归：
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python -m pytest backend/tests
+```
+
+结果：193 passed, 6 warnings。
+
+```bash
+cd frontend && npm run build
+```
+
+结果：通过，TypeScript 和 Vite production build 成功。
+
+```bash
+docker compose config
+```
+
+结果：通过，Compose 配置可解析。
+
+```bash
+python3 -m py_compile scripts/seed_demo_data.py
+```
+
+结果：通过。
+
+```bash
+git diff --check
+```
+
+结果：通过。
+
+```bash
+docker compose build
+```
+
+结果：未完成。失败原因是当前环境 Docker daemon/socket 不可用：
+
+```text
+failed to connect to the docker API at unix:///Users/jiaxulong/.docker/run/docker.sock
+```
+
+该结果记录为环境限制，不视为代码失败。Docker build 需要在 Docker daemon 可用的环境重新验证。
 
 ```bash
 cd frontend && npm run build
@@ -113,6 +180,7 @@ Dashboard：
 
 - 展示 latest profile readiness level 和 completeness score。
 - 展示 latest resume parse status 和 risk flags count。
+- 展示 project count、active project count 和 latest project name/status。
 - 保留 application / evaluation / RAG / Agent / Bad Case 等现有统计。
 
 ## 5. API / DB / Docs 状态
