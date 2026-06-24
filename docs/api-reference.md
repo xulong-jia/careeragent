@@ -74,6 +74,8 @@
 - `risk_flags`
 - `risk_report`
 
+前端流程：Resume Center 会先调用 parse 生成可编辑 `structured_resume`，再用编辑后的 JSON 调用 risk-check，最后把 `structured_resume`、`risk_report`、`version_name`、`target_role` 和 `source_version_id` 提交到保存版本 API。risk-check 不会自动修改简历。
+
 ## Resume Version APIs
 
 | Method | Path | 说明 |

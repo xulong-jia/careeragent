@@ -1,9 +1,14 @@
 import { requestJson } from "./client";
 import type {
   ListResponse,
+  ResumeParseRequest,
+  ResumeParseResponse,
   ResumeRecord,
+  ResumeRiskCheckRequest,
+  ResumeRiskCheckResponse,
   ResumeVersionClonePayload,
   ResumeVersionRecord,
+  SaveResumeVersionRequest,
 } from "../types/api";
 
 export function uploadResume(file: File): Promise<ResumeRecord> {
@@ -32,6 +37,48 @@ export function getResumeVersion(
   versionId: string,
 ): Promise<ResumeVersionRecord> {
   return requestJson<ResumeVersionRecord>(`/api/resume-versions/${versionId}`);
+}
+
+export function parseResume(
+  resumeId: string,
+  payload: ResumeParseRequest = {},
+): Promise<ResumeParseResponse> {
+  return requestJson<ResumeParseResponse>(`/api/resumes/${resumeId}/parse`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function riskCheckResume(
+  resumeId: string,
+  payload: ResumeRiskCheckRequest,
+): Promise<ResumeRiskCheckResponse> {
+  return requestJson<ResumeRiskCheckResponse>(
+    `/api/resumes/${resumeId}/risk-check`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function saveResumeVersion(
+  resumeId: string,
+  payload: SaveResumeVersionRequest,
+): Promise<ResumeVersionRecord> {
+  return requestJson<ResumeVersionRecord>(`/api/resumes/${resumeId}/versions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 export function cloneResumeVersion(

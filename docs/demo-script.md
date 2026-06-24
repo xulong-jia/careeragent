@@ -77,10 +77,15 @@ CAREERAGENT_API_BASE_URL=http://localhost:8000 python3 scripts/seed_demo_data.py
 
 ### Resume Center
 
-1. 上传 `.md` 或 `.txt` synthetic resume。
+1. 上传 `.pdf`、`.docx`、`.md` 或 `.txt` synthetic resume。
 2. 查看 `raw_text_preview`。
-3. 查看 resume versions。
-4. clone 或 archive 一个版本。
+3. 选择 resume version，点击 Parse。
+4. 查看 parser method、warnings、raw text preview 和 structured resume JSON。
+5. 编辑 structured resume JSON，确认 JSON valid。
+6. 点击 Risk Check，查看 risk flags 和 risk report。
+7. 填写 version name、target role，保存 confirmed version。
+8. 查看 resume versions，确认新增 version 不覆盖旧版本。
+9. 可继续 clone 或 archive 一个版本。
 
 ### JD Center
 
@@ -138,6 +143,7 @@ CAREERAGENT_API_BASE_URL=http://localhost:8000 python3 scripts/seed_demo_data.py
 
 - Dashboard
 - Resume Center
+- Resume Center parse / risk-check / confirmed version workflow
 - Match Report
 - Knowledge Base
 - Agent Runs

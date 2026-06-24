@@ -18,12 +18,13 @@ export type ListResponse<T> = {
 };
 
 export type StructuredResume = {
-  basic_info: Record<string, string | null>;
+  basic_info: Record<string, unknown>;
   education: Record<string, unknown>[];
   projects: Record<string, unknown>[];
   experience: Record<string, unknown>[];
   skills: Record<string, string[]>;
   certificates: Record<string, unknown>[];
+  awards: Record<string, unknown>[];
 };
 
 export type ResumeRecord = {
@@ -43,6 +44,7 @@ export type ResumeRecord = {
     text_hash: string | null;
   };
   risk_flags: Record<string, unknown>[];
+  risk_report: Record<string, unknown>;
 };
 
 export type ResumeVersionRecord = {
@@ -58,6 +60,7 @@ export type ResumeVersionRecord = {
   extraction_method: string;
   extraction_warnings: string[];
   risk_flags: Record<string, unknown>[];
+  risk_report: Record<string, unknown>;
   status: string;
   is_archived: boolean;
   created_at: string;
@@ -67,6 +70,50 @@ export type ResumeVersionRecord = {
 export type ResumeVersionClonePayload = {
   version_name: string | null;
   target_role: string | null;
+};
+
+export type ResumeParseRequest = {
+  resume_version_id?: string | null;
+  parser_mode?: "deterministic";
+};
+
+export type ResumeParseResponse = {
+  resume_id: string;
+  source_version_id: string;
+  raw_text_preview: string;
+  structured_resume: StructuredResume;
+  extraction_method: string;
+  extraction_warnings: string[];
+  parsed_at: string;
+};
+
+export type ResumeRiskFlag = {
+  type: string;
+  severity: "low" | "medium" | "high";
+  message: string;
+  location: string | null;
+  evidence: string | null;
+};
+
+export type ResumeRiskCheckRequest = {
+  resume_version_id?: string | null;
+  structured_resume?: StructuredResume | null;
+};
+
+export type ResumeRiskCheckResponse = {
+  resume_id: string;
+  source_version_id: string | null;
+  risk_flags: ResumeRiskFlag[];
+  risk_report: Record<string, unknown>;
+  checked_at: string;
+};
+
+export type SaveResumeVersionRequest = {
+  version_name: string;
+  target_role?: string | null;
+  structured_resume: StructuredResume;
+  risk_report?: Record<string, unknown> | null;
+  source_version_id?: string | null;
 };
 
 export type ProfileRecord = {

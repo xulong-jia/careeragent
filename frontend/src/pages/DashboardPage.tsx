@@ -26,6 +26,9 @@ export function DashboardPage({
   const profileDetail = state.latestProfileSummary
     ? `${state.latestProfileSummary.readiness_level} / ${state.latestProfileSummary.completeness_score}%`
     : "等待创建";
+  const resumeDetail = state.latestResume
+    ? `${state.latestResume.parse_status} / ${state.latestResume.risk_flags.length} resume risks`
+    : "等待上传";
   const metrics = [
     {
       label: "Profile",
@@ -37,7 +40,7 @@ export function DashboardPage({
     {
       label: "Resume",
       value: String(state.resumes.length),
-      detail: state.latestResume?.resume_id ?? "等待上传",
+      detail: resumeDetail,
       tone: "green",
       page: "resume" as const,
     },
@@ -186,7 +189,11 @@ export function DashboardPage({
             </li>
             <li>
               <strong>Resume</strong>
-              <span>{state.latestResume?.filename ?? "未上传"}</span>
+              <span>
+                {state.latestResume
+                  ? `${state.latestResume.filename} / ${state.latestResume.parse_status}`
+                  : "未上传"}
+              </span>
             </li>
             <li>
               <strong>JD</strong>

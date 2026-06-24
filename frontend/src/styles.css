@@ -619,6 +619,20 @@ button:disabled {
   outline: 3px solid rgba(45, 106, 79, 0.14);
 }
 
+.json-editor-label {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.resume-json-editor {
+  min-height: 280px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
 .compact-textarea {
   min-height: 96px;
 }
