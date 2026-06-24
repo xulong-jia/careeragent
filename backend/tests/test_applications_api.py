@@ -1,5 +1,9 @@
+import re
+
 from conftest import get_data, get_error, make_client
 
+
+APPLICATION_ID_PATTERN = re.compile(r"^app_[0-9a-f]{12}$")
 
 PRIVATE_TEXT_KEYS = {
     "raw_text",
@@ -94,7 +98,7 @@ def test_create_application_record_with_optional_refs_and_safe_response():
 
     data = _create_application(client, **refs)
 
-    assert data["application_id"].startswith("application_")
+    assert APPLICATION_ID_PATTERN.match(data["application_id"])
     assert data["company"] == "Synthetic Company"
     assert data["role_title"] == "AI Application Engineer"
     assert data["role_category"] == "AI Application"
@@ -108,6 +112,22 @@ def test_create_application_record_with_optional_refs_and_safe_response():
     assert data["created_at"]
     assert data["updated_at"]
     _assert_private_safe(data)
+
+
+def test_create_multiple_applications_generates_unique_stable_ids():
+    client = make_client()
+
+    applications = [
+        _create_application(client, company=f"Synthetic Company {index}")
+        for index in range(5)
+    ]
+    application_ids = [application["application_id"] for application in applications]
+
+    assert len(application_ids) == len(set(application_ids))
+    assert all(
+        APPLICATION_ID_PATTERN.match(application_id)
+        for application_id in application_ids
+    )
 
 
 def test_create_application_record_without_refs_supports_manual_tracking():
@@ -138,10 +158,10 @@ def test_list_application_records_and_detail():
     assert list_response.status_code == 200
     listed = get_data(list_response)
     assert listed["total"] == 2
-    assert [item["application_id"] for item in listed["items"]] == [
+    assert {item["application_id"] for item in listed["items"]} == {
         first["application_id"],
         second["application_id"],
-    ]
+    }
     assert detail_response.status_code == 200
     assert get_data(detail_response)["application_id"] == first["application_id"]
 

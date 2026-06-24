@@ -535,6 +535,32 @@ export function ApplicationTrackerPage({
                   value={filters.roleCategory ?? ""}
                 />
               </label>
+              <label>
+                JD ID
+                <input
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      jdId: event.target.value,
+                    }))
+                  }
+                  placeholder="optional jd_0001"
+                  value={filters.jdId ?? ""}
+                />
+              </label>
+              <label>
+                Resume Version ID
+                <input
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      resumeVersionId: event.target.value,
+                    }))
+                  }
+                  placeholder="optional resume_0001_version_0001"
+                  value={filters.resumeVersionId ?? ""}
+                />
+              </label>
             </div>
             <button
               className="primary-action"

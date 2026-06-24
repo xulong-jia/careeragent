@@ -270,7 +270,7 @@ Markdown / txt 返回结果会包含：
 - RAG 知识库：支持 document 管理、deterministic chunking/indexing、lexical search、deterministic answer with citations 和 KnowledgeBasePage。
 - RAG 边界：没有真实 embedding、FAISS、pgvector、vector store、真实 LLM answer、reranker 或 RAG evaluation dashboard。
 - Agent Workflow：支持 deterministic `job_application_preparation` workflow、Agent Runs API 和 AgentRunsPage。
-- Agent 边界：没有真实 LLM Agent、自由聊天 Agent、true tool-calling Agent、自动投递、投递管理或 Evaluation Center。
+- Agent 边界：没有真实 LLM Agent、自由聊天 Agent 或 true tool-calling Agent；Agent Workflow 当前不自动创建投递记录、不自动投递，也不接招聘网站或 Evaluation Center。
 - Quality Review：支持 `bad_cases` 持久化、Bad Case API、QualityReviewPage 和 Mark as bad case 入口。
 - Quality Review 边界：当前是人工 review record，不是真实 LLM reviewer，不做自动评估、不做自动投递、不做 Evaluation Center。
 - Application Management：支持手动投递 tracking、application stats 和 ApplicationTrackerPage。

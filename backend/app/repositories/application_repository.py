@@ -1,4 +1,6 @@
-from sqlalchemy import func, select
+from uuid import uuid4
+
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
@@ -7,8 +9,16 @@ from app.schemas.applications import ApplicationRecord
 
 
 def _next_application_id(db: Session) -> str:
-    count = db.scalar(select(func.count()).select_from(Application)) or 0
-    return f"application_{count + 1:04d}"
+    for _ in range(10):
+        application_id = f"app_{uuid4().hex[:12]}"
+        if db.get(Application, application_id) is None:
+            return application_id
+    raise AppError(
+        code="application_id_generation_failed",
+        message="Unable to generate a unique application id.",
+        status_code=500,
+        details={},
+    )
 
 
 def _to_application_record(application: Application) -> ApplicationRecord:
