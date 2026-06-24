@@ -1,16 +1,24 @@
 from hashlib import sha256
 from pathlib import Path
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.repositories import resume_repository
 from app.schemas.resumes import (
+    ResumeParseRequest,
+    ResumeParseResult,
     ResumeRecord,
+    ResumeRiskCheckRequest,
+    ResumeRiskCheckResult,
     ResumeVersionCloneRequest,
+    ResumeVersionCreateRequest,
     ResumeVersionRecord,
     StructuredResume,
 )
+from app.services.resume_parser_service import PARSER_METHOD, parse_structured_resume
+from app.services.resume_risk_service import evaluate_resume_risks
 from app.services.text_extraction_service import extract_resume_text
 
 
@@ -80,48 +88,19 @@ def validate_resume_upload(
     return file_type
 
 
-def extract_mock_skills(text: str) -> dict[str, list[str]]:
-    lowered = text.lower()
-    skills = {
-        "programming": [],
-        "backend": [],
-        "frontend": [],
-        "ai": [],
-        "database": [],
-        "tools": [],
-    }
-    if "python" in lowered:
-        skills["programming"].append("Python")
-    if "typescript" in lowered:
-        skills["programming"].append("TypeScript")
-    if "fastapi" in lowered:
-        skills["backend"].append("FastAPI")
-    if "react" in lowered:
-        skills["frontend"].append("React")
-    if "rag" in lowered:
-        skills["ai"].append("RAG")
-    if "sql" in lowered:
-        skills["database"].append("SQL")
-    if "docker" in lowered:
-        skills["tools"].append("Docker")
-    return skills
-
-
 def create_resume(
     db: Session, filename: str, content_type: str | None, content: bytes
 ) -> ResumeRecord:
     file_type = validate_resume_upload(filename, content_type, content)
     extraction = extract_resume_text(filename, file_type, content_type, content)
     raw_text = extraction.raw_text
-    structured_resume = StructuredResume(
-        basic_info={"name": None, "email": None, "phone": None, "location": None},
-        skills=extract_mock_skills(raw_text),
-    )
+    structured_resume = parse_structured_resume(raw_text)
     return resume_repository.create_resume_with_initial_version(
         db,
         filename=filename,
         file_type=file_type,
         text_hash=sha256(content).hexdigest(),
+        parse_status="parsed",
         raw_text=raw_text,
         raw_text_preview=raw_text[:500],
         structured_resume=structured_resume,
@@ -129,6 +108,7 @@ def create_resume(
         extraction_method=extraction.extraction_method,
         extraction_warnings=extraction.warnings,
         risk_flags=[],
+        risk_report={},
     )
 
 
@@ -138,6 +118,64 @@ def list_resumes(db: Session) -> list[ResumeRecord]:
 
 def get_resume(db: Session, resume_id: str) -> ResumeRecord:
     return resume_repository.get_resume(db, resume_id)
+
+
+def parse_resume(
+    db: Session, resume_id: str, payload: ResumeParseRequest | None = None
+) -> ResumeParseResult:
+    request = payload or ResumeParseRequest()
+    source = resume_repository.get_source_resume_version(
+        db, resume_id, request.resume_version_id
+    )
+    raw_text = source.raw_text.strip()
+    if not raw_text:
+        raise AppError(
+            code="resume_raw_text_empty",
+            message="Resume raw text is empty and cannot be parsed.",
+            status_code=400,
+            details={"resume_id": resume_id, "version_id": source.id},
+        )
+    return ResumeParseResult(
+        resume_id=resume_id,
+        source_version_id=source.id,
+        raw_text_preview=source.raw_text_preview,
+        structured_resume=parse_structured_resume(raw_text),
+        extraction_method=PARSER_METHOD,
+        extraction_warnings=list(source.extraction_warnings or []),
+        parsed_at=_utc_now(),
+    )
+
+
+def check_resume_risk(
+    db: Session, resume_id: str, payload: ResumeRiskCheckRequest | None = None
+) -> ResumeRiskCheckResult:
+    request = payload or ResumeRiskCheckRequest()
+    source_version_id: str | None = None
+
+    if request.structured_resume is not None:
+        if request.resume_version_id:
+            source = resume_repository.get_source_resume_version(
+                db, resume_id, request.resume_version_id
+            )
+            source_version_id = source.id
+        else:
+            resume_repository.get_resume(db, resume_id)
+        structured_resume = request.structured_resume
+    else:
+        source = resume_repository.get_source_resume_version(
+            db, resume_id, request.resume_version_id
+        )
+        source_version_id = source.id
+        structured_resume = StructuredResume.model_validate(source.structured_resume)
+
+    risk_flags, risk_report = evaluate_resume_risks(structured_resume)
+    return ResumeRiskCheckResult(
+        resume_id=resume_id,
+        source_version_id=source_version_id,
+        risk_flags=risk_flags,
+        risk_report=risk_report,
+        checked_at=_utc_now(),
+    )
 
 
 def _normalize_optional_text(
@@ -156,6 +194,65 @@ def _normalize_optional_text(
             details={"field": field_name, "max_length": max_length},
         )
     return normalized
+
+
+def _normalize_required_text(value: str, max_length: int, field_name: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise AppError(
+            code="validation_error",
+            message=f"{field_name} is required.",
+            status_code=400,
+            details={"field": field_name},
+        )
+    if len(normalized) > max_length:
+        raise AppError(
+            code="validation_error",
+            message=f"{field_name} is too long.",
+            status_code=400,
+            details={"field": field_name, "max_length": max_length},
+        )
+    return normalized
+
+
+def save_confirmed_resume_version(
+    db: Session, resume_id: str, payload: ResumeVersionCreateRequest
+) -> ResumeVersionRecord:
+    version_name = _normalize_required_text(
+        payload.version_name, VERSION_NAME_MAX_LENGTH, "version_name"
+    )
+    target_role = _normalize_optional_text(
+        payload.target_role, TARGET_ROLE_MAX_LENGTH, "target_role"
+    )
+    risk_report = payload.risk_report
+    if risk_report is None:
+        risk_flags, risk_report = evaluate_resume_risks(payload.structured_resume)
+        risk_flag_dicts = [flag.model_dump() for flag in risk_flags]
+    else:
+        risk_report = dict(risk_report)
+        risk_flag_dicts = _risk_flags_from_report(risk_report)
+
+    return resume_repository.create_confirmed_resume_version(
+        db,
+        resume_id,
+        source_version_id=payload.source_version_id,
+        version_name=version_name,
+        target_role=target_role,
+        structured_resume=payload.structured_resume,
+        risk_flags=risk_flag_dicts,
+        risk_report=risk_report,
+    )
+
+
+def _risk_flags_from_report(risk_report: dict[str, object]) -> list[dict[str, object]]:
+    flags = risk_report.get("flags") or risk_report.get("risk_flags")
+    if not isinstance(flags, list):
+        return []
+    return [flag for flag in flags if isinstance(flag, dict)]
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def list_resume_versions(db: Session, resume_id: str) -> list[ResumeVersionRecord]:

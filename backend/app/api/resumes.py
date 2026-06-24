@@ -3,12 +3,23 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
-from app.schemas.resumes import ResumeRecord, ResumeVersionRecord
+from app.schemas.resumes import (
+    ResumeParseRequest,
+    ResumeParseResult,
+    ResumeRecord,
+    ResumeRiskCheckRequest,
+    ResumeRiskCheckResult,
+    ResumeVersionCreateRequest,
+    ResumeVersionRecord,
+)
 from app.services.resume_service import (
+    check_resume_risk,
     create_resume,
     get_resume as get_resume_record,
     list_resume_versions,
     list_resumes,
+    parse_resume,
+    save_confirmed_resume_version,
 )
 
 
@@ -47,6 +58,31 @@ async def get_resume_detail(
     return {"data": resume, "request_id": request.state.request_id}
 
 
+@router.post("/{resume_id}/parse", response_model=ApiResponse[ResumeParseResult])
+async def parse_resume_record(
+    request: Request,
+    resume_id: str,
+    payload: ResumeParseRequest | None = None,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    result = parse_resume(db, resume_id, payload)
+    return {"data": result, "request_id": request.state.request_id}
+
+
+@router.post(
+    "/{resume_id}/risk-check",
+    response_model=ApiResponse[ResumeRiskCheckResult],
+)
+async def risk_check_resume_record(
+    request: Request,
+    resume_id: str,
+    payload: ResumeRiskCheckRequest | None = None,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    result = check_resume_risk(db, resume_id, payload)
+    return {"data": result, "request_id": request.state.request_id}
+
+
 @router.get(
     "/{resume_id}/versions",
     response_model=ApiResponse[ListResponse[ResumeVersionRecord]],
@@ -59,3 +95,18 @@ async def list_resume_version_records(
         "data": ListResponse(items=items, total=len(items)),
         "request_id": request.state.request_id,
     }
+
+
+@router.post(
+    "/{resume_id}/versions",
+    response_model=ApiResponse[ResumeVersionRecord],
+    status_code=status.HTTP_201_CREATED,
+)
+async def save_resume_version_record(
+    request: Request,
+    resume_id: str,
+    payload: ResumeVersionCreateRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    version = save_confirmed_resume_version(db, resume_id, payload)
+    return {"data": version, "request_id": request.state.request_id}

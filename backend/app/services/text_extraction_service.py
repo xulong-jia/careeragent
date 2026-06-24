@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from io import BytesIO
 from pathlib import Path
 
 from app.core.errors import AppError
@@ -21,17 +22,9 @@ def extract_resume_text(
     if file_type in TEXT_FILE_TYPES:
         return _extract_utf8_text(filename, file_type, content)
     if file_type == "pdf":
-        return _placeholder_result(
-            file_type="pdf",
-            method="pdf_parser_placeholder",
-            warning="PDF parser is not connected in Phase 1C.",
-        )
+        return _extract_pdf_text(filename, content)
     if file_type == "docx":
-        return _placeholder_result(
-            file_type="docx",
-            method="docx_parser_placeholder",
-            warning="DOCX parser is not connected in Phase 1C.",
-        )
+        return _extract_docx_text(filename, content)
     raise AppError(
         code="unsupported_resume_file_type",
         message="Supported resume file types are PDF, DOCX, Markdown, and text.",
@@ -75,16 +68,69 @@ def _extract_utf8_text(
     )
 
 
-def _placeholder_result(
-    file_type: str, method: str, warning: str
+def _extract_pdf_text(filename: str, content: bytes) -> TextExtractionResult:
+    try:
+        import fitz
+
+        with fitz.open(stream=content, filetype="pdf") as document:
+            page_text = [page.get_text("text").strip() for page in document]
+    except Exception as exc:
+        raise AppError(
+            code="resume_pdf_extract_failed",
+            message="Unable to extract text from PDF resume.",
+            status_code=400,
+            details={"filename": filename, "file_type": "pdf"},
+        ) from exc
+
+    return _build_extracted_result(
+        filename=filename,
+        file_type="pdf",
+        raw_text="\n\n".join(text for text in page_text if text),
+        method="pymupdf_text",
+    )
+
+
+def _extract_docx_text(filename: str, content: bytes) -> TextExtractionResult:
+    try:
+        from docx import Document
+
+        document = Document(BytesIO(content))
+        parts = [paragraph.text.strip() for paragraph in document.paragraphs]
+        for table in document.tables:
+            for row in table.rows:
+                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
+    except Exception as exc:
+        raise AppError(
+            code="resume_docx_extract_failed",
+            message="Unable to extract text from DOCX resume.",
+            status_code=400,
+            details={"filename": filename, "file_type": "docx"},
+        ) from exc
+
+    return _build_extracted_result(
+        filename=filename,
+        file_type="docx",
+        raw_text="\n".join(part for part in parts if part),
+        method="python_docx_text",
+    )
+
+
+def _build_extracted_result(
+    *, filename: str, file_type: str, raw_text: str, method: str
 ) -> TextExtractionResult:
-    label = file_type.upper()
+    normalized_text = raw_text.strip()
+    if not normalized_text:
+        raise AppError(
+            code="resume_text_empty_after_extraction",
+            message="Resume text extraction produced empty text.",
+            status_code=400,
+            details={"filename": filename, "file_type": file_type},
+        )
     return TextExtractionResult(
-        raw_text=(
-            f"{label} raw text extraction placeholder. "
-            f"{label} parser is not connected in Phase 1C."
-        ),
-        extraction_status="parser_placeholder",
+        raw_text=normalized_text,
+        extraction_status="extracted",
         extraction_method=method,
-        warnings=[warning],
+        warnings=[],
     )

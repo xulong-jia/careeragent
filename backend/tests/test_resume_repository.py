@@ -21,6 +21,7 @@ def test_resume_repository_create_list_get(db_session):
         filename="repo_resume.md",
         file_type="markdown",
         text_hash="hash",
+        parse_status="parsed",
         raw_text="Python project",
         raw_text_preview="Python project",
         structured_resume=structured_resume,
@@ -28,6 +29,7 @@ def test_resume_repository_create_list_get(db_session):
         extraction_method="utf8_md_decode",
         extraction_warnings=[],
         risk_flags=[],
+        risk_report={},
     )
 
     listed = list_resumes(db_session)
@@ -49,6 +51,7 @@ def test_resume_repository_clone_and_archive_version(db_session):
         filename="repo_resume.md",
         file_type="markdown",
         text_hash="hash",
+        parse_status="parsed",
         raw_text="Python project",
         raw_text_preview="Python project",
         structured_resume=structured_resume,
@@ -56,6 +59,7 @@ def test_resume_repository_clone_and_archive_version(db_session):
         extraction_method="utf8_md_decode",
         extraction_warnings=[],
         risk_flags=[],
+        risk_report={"passed": True, "flags": []},
     )
     initial = list_resume_versions(db_session, created.resume_id)[0]
 
@@ -72,6 +76,7 @@ def test_resume_repository_clone_and_archive_version(db_session):
     assert cloned.raw_text == initial.raw_text
     assert cloned.structured_resume == initial.structured_resume
     assert cloned.target_role == "Backend Engineer"
+    assert cloned.risk_report == initial.risk_report
     assert archived.status == "archived"
     assert archived.is_archived is True
     assert get_resume_version(db_session, initial.resume_version_id).raw_text == initial.raw_text

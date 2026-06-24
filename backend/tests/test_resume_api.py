@@ -1,13 +1,39 @@
+from io import BytesIO
+
+import fitz
+from docx import Document
+
 from conftest import get_data, get_error, make_client
 from app.models.resume import Resume, ResumeVersion
 
 
-def test_resume_upload_accepts_supported_file_and_returns_mock_result():
+def make_pdf_bytes(text: str) -> bytes:
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), text)
+    content = document.tobytes()
+    document.close()
+    return content
+
+
+def make_docx_bytes(text: str) -> bytes:
+    document = Document()
+    for line in text.splitlines():
+        document.add_paragraph(line)
+    buffer = BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
+
+
+def test_resume_upload_accepts_supported_file_and_returns_parsed_result():
     client = make_client()
+    content = make_pdf_bytes(
+        "PDF Candidate\nSkills\nPython FastAPI\nProjects\nCareerAgent\nTech: Python, FastAPI"
+    )
 
     response = client.post(
         "/api/resumes/upload",
-        files={"file": ("resume.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+        files={"file": ("resume.pdf", content, "application/pdf")},
     )
 
     assert response.status_code == 201
@@ -15,12 +41,12 @@ def test_resume_upload_accepts_supported_file_and_returns_mock_result():
     assert data["resume_id"].startswith("resume_")
     assert data["filename"] == "resume.pdf"
     assert data["file_type"] == "pdf"
-    assert data["parse_status"] == "mock_parsed"
-    assert data["extraction_status"] == "parser_placeholder"
-    assert data["extraction_method"] == "pdf_parser_placeholder"
-    assert data["extraction_warnings"]
-    assert data["raw_text"]
-    assert data["structured_resume"]["projects"] == []
+    assert data["parse_status"] == "parsed"
+    assert data["extraction_status"] == "extracted"
+    assert data["extraction_method"] == "pymupdf_text"
+    assert data["extraction_warnings"] == []
+    assert "PDF Candidate" in data["raw_text"]
+    assert "FastAPI" in data["structured_resume"]["skills"]["backend"]
     assert data["risk_flags"] == []
 
 
@@ -83,7 +109,7 @@ def test_resume_upload_without_file_returns_validation_error():
     assert get_error(response)["code"] == "validation_error"
 
 
-def test_resume_upload_extracts_real_markdown_text_and_mock_skills():
+def test_resume_upload_extracts_real_markdown_text_and_deterministic_skills():
     client = make_client()
     content = "# Resume\nBuilt Python FastAPI and React tools."
 
@@ -143,31 +169,49 @@ def test_resume_upload_rejects_non_utf8_text():
     assert get_error(response)["code"] == "resume_text_decode_failed"
 
 
-def test_resume_upload_returns_pdf_placeholder_extraction():
+def test_resume_upload_returns_real_pdf_extraction():
     client = make_client()
+    content = make_pdf_bytes("PDF Candidate\nPython FastAPI PDF resume.")
 
     response = client.post(
         "/api/resumes/upload",
-        files={"file": ("candidate.pdf", b"%PDF-1.4 mock", "application/pdf")},
+        files={"file": ("candidate.pdf", content, "application/pdf")},
     )
 
     assert response.status_code == 201
     data = get_data(response)
-    assert data["raw_text"].startswith("PDF raw text extraction placeholder.")
-    assert data["extraction_status"] == "parser_placeholder"
-    assert data["extraction_method"] == "pdf_parser_placeholder"
-    assert data["extraction_warnings"] == ["PDF parser is not connected in Phase 1C."]
+    assert "PDF Candidate" in data["raw_text"]
+    assert data["extraction_status"] == "extracted"
+    assert data["extraction_method"] == "pymupdf_text"
+    assert data["extraction_warnings"] == []
 
 
-def test_resume_upload_returns_docx_placeholder_extraction():
+def test_resume_upload_rejects_pdf_without_extractable_text():
     client = make_client()
+    document = fitz.open()
+    document.new_page()
+    content = document.tobytes()
+    document.close()
+
+    response = client.post(
+        "/api/resumes/upload",
+        files={"file": ("blank.pdf", content, "application/pdf")},
+    )
+
+    assert response.status_code == 400
+    assert get_error(response)["code"] == "resume_text_empty_after_extraction"
+
+
+def test_resume_upload_returns_real_docx_extraction():
+    client = make_client()
+    content = make_docx_bytes("DOCX Candidate\nPython FastAPI DOCX resume.")
 
     response = client.post(
         "/api/resumes/upload",
         files={
             "file": (
                 "candidate.docx",
-                b"mock docx bytes",
+                content,
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             )
         },
@@ -175,10 +219,10 @@ def test_resume_upload_returns_docx_placeholder_extraction():
 
     assert response.status_code == 201
     data = get_data(response)
-    assert data["raw_text"].startswith("DOCX raw text extraction placeholder.")
-    assert data["extraction_status"] == "parser_placeholder"
-    assert data["extraction_method"] == "docx_parser_placeholder"
-    assert data["extraction_warnings"] == ["DOCX parser is not connected in Phase 1C."]
+    assert "DOCX Candidate" in data["raw_text"]
+    assert data["extraction_status"] == "extracted"
+    assert data["extraction_method"] == "python_docx_text"
+    assert data["extraction_warnings"] == []
 
 
 def test_resume_list_and_detail_return_uploaded_resume():

@@ -15,6 +15,7 @@ class Resume(Base):
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[str] = mapped_column(String(40), nullable=False)
     source_file_hash: Mapped[str | None] = mapped_column(String(128))
+    parse_status: Mapped[str] = mapped_column(String(40), default="parsed", nullable=False)
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
@@ -48,6 +49,7 @@ class ResumeVersion(Base):
     extraction_method: Mapped[str] = mapped_column(String(120), nullable=False)
     extraction_warnings: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     risk_flags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    risk_report: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False

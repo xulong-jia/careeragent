@@ -13,6 +13,10 @@ from app.schemas.resumes import (
 )
 
 
+ARCHIVED_STATUS = "archived"
+CONFIRMED_STATUS = "confirmed"
+
+
 def _next_resume_id(db: Session) -> str:
     count = db.scalar(select(func.count()).select_from(Resume)) or 0
     return f"resume_{count + 1:04d}"
@@ -27,7 +31,7 @@ def _to_resume_record(resume: Resume, version: ResumeVersion) -> ResumeRecord:
         resume_id=resume.id,
         filename=resume.original_filename,
         file_type=resume.file_type,
-        parse_status="mock_parsed",
+        parse_status=resume.parse_status,
         raw_text=version.raw_text,
         raw_text_preview=version.raw_text_preview,
         extraction_status=version.extraction_status,
@@ -40,6 +44,7 @@ def _to_resume_record(resume: Resume, version: ResumeVersion) -> ResumeRecord:
             text_hash=resume.source_file_hash,
         ),
         risk_flags=list(version.risk_flags or []),
+        risk_report=dict(version.risk_report or {}),
     )
 
 
@@ -57,6 +62,7 @@ def _to_resume_version_record(version: ResumeVersion) -> ResumeVersionRecord:
         extraction_method=version.extraction_method,
         extraction_warnings=list(version.extraction_warnings or []),
         risk_flags=list(version.risk_flags or []),
+        risk_report=dict(version.risk_report or {}),
         status=version.status,
         is_archived=version.status == "archived",
         created_at=version.created_at,
@@ -68,7 +74,7 @@ def _latest_version(db: Session, resume_id: str) -> ResumeVersion | None:
     return db.scalars(
         select(ResumeVersion)
         .where(ResumeVersion.resume_id == resume_id)
-        .where(ResumeVersion.status == "active")
+        .where(ResumeVersion.status != ARCHIVED_STATUS)
         .order_by(ResumeVersion.version_number.desc(), ResumeVersion.created_at.desc())
         .limit(1)
     ).first()
@@ -80,6 +86,7 @@ def create_resume_with_initial_version(
     filename: str,
     file_type: str,
     text_hash: str,
+    parse_status: str,
     raw_text: str,
     raw_text_preview: str,
     structured_resume: StructuredResume,
@@ -87,6 +94,7 @@ def create_resume_with_initial_version(
     extraction_method: str,
     extraction_warnings: list[str],
     risk_flags: list[dict[str, object]],
+    risk_report: dict[str, object] | None = None,
 ) -> ResumeRecord:
     resume_id = _next_resume_id(db)
     resume = Resume(
@@ -96,6 +104,7 @@ def create_resume_with_initial_version(
         original_filename=filename,
         file_type=file_type,
         source_file_hash=text_hash,
+        parse_status=parse_status,
         status="active",
     )
     version = ResumeVersion(
@@ -111,6 +120,7 @@ def create_resume_with_initial_version(
         extraction_method=extraction_method,
         extraction_warnings=extraction_warnings,
         risk_flags=risk_flags,
+        risk_report=risk_report or {},
         status="active",
     )
 
@@ -232,6 +242,7 @@ def clone_resume_version(
         extraction_method=source.extraction_method,
         extraction_warnings=list(source.extraction_warnings or []),
         risk_flags=list(source.risk_flags or []),
+        risk_report=dict(source.risk_report or {}),
         status="active",
         archived_at=None,
     )
@@ -256,8 +267,8 @@ def archive_resume_version(db: Session, version_id: str) -> ResumeVersionRecord:
             details={"version_id": version_id},
         )
 
-    if version.status != "archived":
-        version.status = "archived"
+    if version.status != ARCHIVED_STATUS:
+        version.status = ARCHIVED_STATUS
         version.archived_at = datetime.now(timezone.utc).replace(tzinfo=None)
         try:
             db.commit()
@@ -265,4 +276,94 @@ def archive_resume_version(db: Session, version_id: str) -> ResumeVersionRecord:
             db.rollback()
             raise
         db.refresh(version)
+    return _to_resume_version_record(version)
+
+
+def get_source_resume_version(
+    db: Session, resume_id: str, version_id: str | None = None
+) -> ResumeVersion:
+    resume = db.get(Resume, resume_id)
+    if not resume or resume.status != "active":
+        raise AppError(
+            code="resume_not_found",
+            message="Resume was not found.",
+            status_code=404,
+            details={"resume_id": resume_id},
+        )
+
+    if version_id:
+        version = db.get(ResumeVersion, version_id)
+        if not version:
+            raise AppError(
+                code="resume_version_not_found",
+                message="Resume version was not found.",
+                status_code=404,
+                details={"version_id": version_id},
+            )
+        if version.resume_id != resume_id:
+            raise AppError(
+                code="resume_version_resume_mismatch",
+                message="Resume version does not belong to the requested resume.",
+                status_code=400,
+                details={"resume_id": resume_id, "version_id": version_id},
+            )
+        return version
+
+    version = _latest_version(db, resume_id)
+    if not version:
+        raise AppError(
+            code="resume_version_not_found",
+            message="Resume version was not found.",
+            status_code=404,
+            details={"resume_id": resume_id},
+        )
+    return version
+
+
+def create_confirmed_resume_version(
+    db: Session,
+    resume_id: str,
+    *,
+    source_version_id: str | None,
+    version_name: str,
+    target_role: str | None,
+    structured_resume: StructuredResume,
+    risk_flags: list[dict[str, object]],
+    risk_report: dict[str, object],
+) -> ResumeVersionRecord:
+    source = get_source_resume_version(db, resume_id, source_version_id)
+    max_version_number = (
+        db.scalar(
+            select(func.max(ResumeVersion.version_number)).where(
+                ResumeVersion.resume_id == resume_id
+            )
+        )
+        or 0
+    )
+    next_version_number = max_version_number + 1
+    version = ResumeVersion(
+        id=_next_resume_version_id(resume_id, next_version_number),
+        resume_id=resume_id,
+        version_name=version_name,
+        version_number=next_version_number,
+        target_role=target_role,
+        raw_text=source.raw_text,
+        raw_text_preview=source.raw_text_preview,
+        structured_resume=structured_resume.model_dump(),
+        extraction_status=source.extraction_status,
+        extraction_method=source.extraction_method,
+        extraction_warnings=list(source.extraction_warnings or []),
+        risk_flags=risk_flags,
+        risk_report=risk_report,
+        status=CONFIRMED_STATUS,
+        archived_at=None,
+    )
+
+    try:
+        db.add(version)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(version)
     return _to_resume_version_record(version)

@@ -65,6 +65,7 @@ def test_clone_resume_version_creates_new_version_without_overwriting_source():
     assert cloned["structured_resume"] == initial["structured_resume"]
     assert cloned["extraction_status"] == initial["extraction_status"]
     assert cloned["risk_flags"] == initial["risk_flags"]
+    assert cloned["risk_report"] == initial["risk_report"]
 
     versions = get_data(client.get(f"/api/resumes/{resume['resume_id']}/versions"))
     assert versions["total"] == 2
