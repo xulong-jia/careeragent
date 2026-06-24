@@ -19,6 +19,7 @@ CORE_TABLES = {
     "evaluation_runs",
     "evaluation_cases",
     "evaluation_results",
+    "profiles",
 }
 
 

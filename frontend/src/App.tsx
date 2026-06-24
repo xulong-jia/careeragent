@@ -6,6 +6,7 @@ import { getApplicationStats, listApplications } from "./api/applications";
 import { getEvaluationStats, listBadCases } from "./api/evaluations";
 import { listJobs } from "./api/jobs";
 import { listMatches } from "./api/matches";
+import { getProfileSummary, listProfiles } from "./api/profiles";
 import { listRagDocuments } from "./api/rag";
 import { listResumes } from "./api/resumes";
 import { AgentRunsPage } from "./pages/AgentRunsPage";
@@ -15,6 +16,7 @@ import { EvaluationPage } from "./pages/EvaluationPage";
 import { JDCenterPage } from "./pages/JDCenterPage";
 import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { MatchReportPage } from "./pages/MatchReportPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { QualityReviewPage } from "./pages/QualityReviewPage";
 import { ResumeCenterPage } from "./pages/ResumeCenterPage";
 import type {
@@ -25,6 +27,8 @@ import type {
   EvaluationStats,
   JobRecord,
   MatchReport,
+  ProfileRecord,
+  ProfileSummary,
   RagDocumentRecord,
   ResumeRecord,
 } from "./types/api";
@@ -35,6 +39,11 @@ const navigation: NavigationItem[] = [
     key: "dashboard",
     label: "Dashboard",
     description: "总览",
+  },
+  {
+    key: "profile",
+    label: "Profile Center",
+    description: "用户画像",
   },
   {
     key: "resume",
@@ -78,12 +87,37 @@ const navigation: NavigationItem[] = [
   },
 ];
 
+async function loadProfileWorkbench(): Promise<{
+  profiles: ProfileRecord[];
+  latestProfileSummary: ProfileSummary | null;
+}> {
+  try {
+    const profileList = await listProfiles();
+    const latestProfile = profileList.items[profileList.items.length - 1] ?? null;
+    const latestProfileSummary = latestProfile
+      ? await getProfileSummary(latestProfile.id)
+      : null;
+    return {
+      profiles: profileList.items,
+      latestProfileSummary,
+    };
+  } catch {
+    return {
+      profiles: [],
+      latestProfileSummary: null,
+    };
+  }
+}
+
 export default function App() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
   const [latestResume, setLatestResume] = useState<ResumeRecord | null>(null);
   const [latestJob, setLatestJob] = useState<JobRecord | null>(null);
   const [latestMatch, setLatestMatch] = useState<MatchReport | null>(null);
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
+  const [profiles, setProfiles] = useState<ProfileRecord[]>([]);
+  const [latestProfileSummary, setLatestProfileSummary] =
+    useState<ProfileSummary | null>(null);
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [matches, setMatches] = useState<MatchReport[]>([]);
   const [ragDocuments, setRagDocuments] = useState<RagDocumentRecord[]>([]);
@@ -101,6 +135,7 @@ export default function App() {
     try {
       const [
         resumeList,
+        profileWorkbench,
         jobList,
         matchList,
         ragDocumentList,
@@ -111,6 +146,7 @@ export default function App() {
         evaluationStatsData,
       ] = await Promise.all([
           listResumes(),
+          loadProfileWorkbench(),
           listJobs(),
           listMatches(),
           listRagDocuments(),
@@ -121,6 +157,8 @@ export default function App() {
           getEvaluationStats(),
         ]);
       setResumes(resumeList.items);
+      setProfiles(profileWorkbench.profiles);
+      setLatestProfileSummary(profileWorkbench.latestProfileSummary);
       setJobs(jobList.items);
       setMatches(matchList.items);
       setRagDocuments(ragDocumentList.items);
@@ -154,6 +192,8 @@ export default function App() {
     latestResume,
     latestJob,
     latestMatch,
+    profiles,
+    latestProfileSummary,
     resumes,
     jobs,
     matches,
@@ -166,6 +206,16 @@ export default function App() {
   };
 
   const renderPage = () => {
+    if (activePage === "profile") {
+      return (
+        <ProfilePage
+          latestProfileSummary={latestProfileSummary}
+          onProfileSummaryChanged={setLatestProfileSummary}
+          onProfilesChanged={setProfiles}
+          profiles={profiles}
+        />
+      );
+    }
     if (activePage === "resume") {
       return (
         <ResumeCenterPage

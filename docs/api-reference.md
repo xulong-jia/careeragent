@@ -29,11 +29,38 @@
 | GET | `/health` | API health check |
 | GET | `/api/db/health` | DB reachability、database type、core table check |
 
+## Profile APIs
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| POST | `/api/profiles` | 创建用户求职画像 |
+| GET | `/api/profiles` | 查询 profile 列表 |
+| GET | `/api/profiles/{profile_id}` | 查询 profile detail |
+| PATCH | `/api/profiles/{profile_id}` | 更新 profile |
+| GET | `/api/profiles/{profile_id}/summary` | 查询 completeness / readiness summary |
+
+关键字段：
+
+- `id`
+- `target_roles`
+- `target_industries`
+- `target_locations`
+- `skill_map`
+- `preferences`
+- `source_resume_version_id`
+- `readiness_level`
+- `completeness_score`
+
+隐私边界：Profile API 只保存目标、技能结构、偏好和可选 resume version ref，不返回 Resume raw text。
+
 ## Resume APIs
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| POST | `/api/resumes/upload` | 上传 `.md` / `.markdown` / `.txt` / placeholder PDF / DOCX |
+| POST | `/api/resumes/upload` | 上传 `.pdf` / `.docx` / `.md` / `.markdown` / `.txt` 并提取文本 |
+| POST | `/api/resumes/{resume_id}/parse` | deterministic parse，返回结构化简历候选结果 |
+| POST | `/api/resumes/{resume_id}/risk-check` | deterministic risk-check，不修改数据库 |
+| POST | `/api/resumes/{resume_id}/versions` | 保存用户确认后的 structured resume version |
 | GET | `/api/resumes` | 查询 resume 列表 |
 | GET | `/api/resumes/{resume_id}` | 查询 resume detail |
 | GET | `/api/resumes/{resume_id}/versions` | 查询 resume versions |
@@ -45,6 +72,7 @@
 - `raw_text_preview`
 - `structured_resume`
 - `risk_flags`
+- `risk_report`
 
 ## Resume Version APIs
 

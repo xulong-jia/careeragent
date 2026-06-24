@@ -37,7 +37,7 @@ scripts/                    Local helper scripts
 - 成功：`{"data": ..., "request_id": "..."}`
 - 失败：`{"error": {"code": "...", "message": "...", "details": {...}}, "request_id": "..."}`
 
-FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Resume、Resume Version、JD、Match、RAG、Agent、Application 和 Evaluation routers。
+FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Resume、Resume Version、JD、Match、RAG、Agent、Application 和 Evaluation routers。
 
 业务代码遵循：
 
@@ -51,6 +51,7 @@ FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Resume、Resume Versi
 前端是单页工作台，没有路由库，使用 `App.tsx` 内部状态切换页面。当前页面包括：
 
 - Dashboard
+- Profile Center
 - Resume Center
 - JD Center
 - Match Report
@@ -68,6 +69,7 @@ FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Resume、Resume Versi
 
 - `resumes`
 - `resume_versions`
+- `profiles`
 - `job_descriptions`
 - `job_profiles`
 - `match_reports`
@@ -93,7 +95,8 @@ sqlite:///./local_data/careeragent.db
 
 当前不接真实 OpenAI、DeepSeek、Qwen 或其他 LLM provider。
 
-- Resume：读取 txt/markdown；PDF/DOCX 是 parser placeholder。
+- Profile：manual CRUD + readiness summary，不自动从简历生成画像。
+- Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
 - RAG：deterministic chunking + lexical retrieval + deterministic answer。
@@ -110,6 +113,7 @@ sqlite:///./local_data/careeragent.db
 | 阶段四 | Agent deterministic workflow prototype 已完成 |
 | 阶段五 | Application Tracking + Dashboard MVP 已完成 |
 | 阶段六 | Deterministic Evaluation MVP + Bad Case 关联已完成 |
+| v0.8 Resume/Profile Foundation | Resume parser / risk-check APIs + Profile Center MVP 已完成 |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做

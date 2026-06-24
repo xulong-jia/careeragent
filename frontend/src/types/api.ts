@@ -69,6 +69,41 @@ export type ResumeVersionClonePayload = {
   target_role: string | null;
 };
 
+export type ProfileRecord = {
+  id: string;
+  user_id: string;
+  target_roles: string[];
+  target_industries: string[];
+  target_locations: string[];
+  skill_map: Record<string, unknown>;
+  preferences: Record<string, unknown>;
+  source_resume_version_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProfileCreatePayload = {
+  target_roles: string[];
+  target_industries: string[];
+  target_locations: string[];
+  skill_map: Record<string, unknown>;
+  preferences: Record<string, unknown>;
+  source_resume_version_id?: string | null;
+};
+
+export type ProfileUpdatePayload = Partial<ProfileCreatePayload>;
+
+export type ProfileSummary = {
+  profile_id: string;
+  completeness_score: number;
+  missing_fields: string[];
+  target_roles_count: number;
+  target_locations_count: number;
+  skill_categories_count: number;
+  source_resume_version_id: string | null;
+  readiness_level: "incomplete" | "basic" | "ready";
+};
+
 export type JobCreatePayload = {
   company: string;
   job_title: string;
@@ -541,6 +576,8 @@ export type WorkbenchState = {
   latestResume: ResumeRecord | null;
   latestJob: JobRecord | null;
   latestMatch: MatchReport | null;
+  profiles: ProfileRecord[];
+  latestProfileSummary: ProfileSummary | null;
   resumes: ResumeRecord[];
   jobs: JobRecord[];
   matches: MatchReport[];

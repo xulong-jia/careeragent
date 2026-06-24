@@ -1,5 +1,6 @@
 export type PageKey =
   | "dashboard"
+  | "profile"
   | "resume"
   | "jd"
   | "match"

@@ -30,10 +30,30 @@
 - `raw_text_preview`
 - `structured_resume`
 - `risk_flags`
+- `risk_report`
 - `status`
 - `archived_at`
 
 隐私说明：`raw_text` 是本地 prototype 数据，不应提交真实简历或输出到日志。
+
+## profiles
+
+用途：记录用户求职画像和后续匹配、学习计划、Agent 工作流可读取的手动确认上下文。
+
+关键字段：
+
+- `id`
+- `user_id`
+- `target_roles`
+- `target_industries`
+- `target_locations`
+- `skill_map`
+- `preferences`
+- `source_resume_version_id`
+- `created_at`
+- `updated_at`
+
+隐私说明：只保存求职目标、技能结构、偏好和可选 resume version ref，不复制 resume raw_text。
 
 ## job_descriptions
 
