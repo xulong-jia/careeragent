@@ -92,7 +92,41 @@ Interview Center 当前已完成 10A / 10B / 10C / 10D / 10E：
 
 Interview Center 当前仍不做 Study Plan 自动写入、不接真实 LLM / LLM judge、不接 embedding/vector DB、不做 RAG completion、不做 Agent full workflow，也不展示 Resume/JD full raw_text 或完整已保存 `answer_text`。
 
-## 5. 明确边界
+## 5. v1.1 Study Plan Center 当前状态
+
+Study Plan Center 当前已完成 11A / 11B / 11C / 11D：
+
+- 11A：新增 `study_plans` 表、model/schema/repository/service/API 和 `POST /api/study-plans/generate`，支持 deterministic study plan generation。
+- 11B：新增 `GET /api/study-plans`、`GET /api/study-plans/{study_plan_id}`、`PATCH /api/study-plans/{study_plan_id}/tasks/{task_id}` 和 `GET /api/study-plans/stats`。
+- 11C：新增 `frontend/src/api/studyPlans.ts`、Study Plan TypeScript types、StudyPlanPage、导航和路由，前端接入 generate/list/filter/detail/task status update API。
+- 11D：Dashboard 接入 `GET /api/study-plans/stats`，展示 Study Plans、Active Study Plans、Pending Tasks、Blocked Tasks、Done Tasks、Latest Study Target 和 In Progress Tasks。
+
+11D stats 字段：
+
+- `total_plans`
+- `active_plans`
+- `completed_plans`
+- `archived_plans`
+- `pending_tasks`
+- `blocked_tasks`
+- `done_tasks`
+- `in_progress_tasks`
+- `skipped_tasks`
+- `latest_plan_id`
+- `latest_target_role`
+
+11D 检查结果（2026-06-25）：
+
+- `PYTHONPATH=backend backend/.venv/bin/python -m pytest backend/tests`：237 passed, 6 warnings。
+- `cd frontend && npm run build`：通过。
+- `docker compose config`：通过。
+- `python3 -m py_compile scripts/seed_demo_data.py`：通过。
+- `git diff --check`：通过。
+- `docker compose build`：未验证，当前环境 Docker daemon/socket 不可用；`docker compose config` 已通过。
+
+Study Plan Center 当前仍不接真实 LLM，不做 RAG completion，不做 Agent full workflow，不接外部学习平台或日历提醒，不自动修改简历、项目、面试答案或投递状态。`source_refs` 只保存 preview 和引用 ID；Dashboard study stats 只展示聚合计数和 latest target，不返回 source_refs 细节、Resume/JD raw_text 或完整 `answer_text`。
+
+## 6. 明确边界
 
 v1.0 明确不做：
 
@@ -106,7 +140,7 @@ v1.0 明确不做：
 - 不做认证、多用户权限。
 - 不把 deterministic evaluation 当作模型能力最终评分。
 
-## 6. 测试与检查结果
+## 7. 测试与检查结果
 
 2026-06-25 在 `main` 执行：
 

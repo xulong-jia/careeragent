@@ -963,5 +963,6 @@ export type WorkbenchState = {
   applications: ApplicationRecord[];
   applicationStats: ApplicationStats | null;
   interviewStats: InterviewStats | null;
+  studyPlanStats: StudyPlanStats | null;
   evaluationStats: EvaluationStats | null;
 };

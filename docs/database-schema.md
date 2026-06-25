@@ -222,7 +222,7 @@ JSON 字段说明：
 
 ## study_plans
 
-用途：记录 v1.1 Study Plan Center 11A/11B 生成和维护的 deterministic 学习计划。当前提供 backend generate、list/detail、task status update 和 stats API；不提供前端 StudyPlanPage，也未做 Dashboard 前端接入。
+用途：记录 v1.1 Study Plan Center 11A/11B/11C/11D 生成和维护的 deterministic 学习计划。当前提供 backend generate、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats。
 
 关键字段：
 
@@ -242,9 +242,9 @@ JSON 字段说明：
 
 - `source_refs`：学习计划来源引用，只允许保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`。
 - `phases`：阶段化学习计划，每个 phase 包含 `phase_id`、`phase`、`goal`、`tasks`、`resources`、`deliverables` 和 `acceptance_criteria`。
-- `tasks`：v1.1 11A/11B 先保存在 `phases` JSON 中，不建独立 `study_tasks` 表。每个 task 包含稳定 `task_id`、`title`、`description`、`source_gap`、`priority`、`status`、`due_hint`、`acceptance_criteria`、`evidence_required` 和 `source_refs`。
+- `tasks`：v1.1 11A/11B/11C/11D 先保存在 `phases` JSON 中，不建独立 `study_tasks` 表。每个 task 包含稳定 `task_id`、`title`、`description`、`source_gap`、`priority`、`status`、`due_hint`、`acceptance_criteria`、`evidence_required` 和 `source_refs`。
 
-状态：plan `status` 支持 `active`、`completed`、`archived`。Task `status` 支持 `todo`、`in_progress`、`done`、`blocked`、`skipped`。11B task status update 会定位 `phases[*].tasks[*].task_id`，更新 nested task 后重新赋值整个 `phases` JSON 并刷新 `updated_at`；本阶段不自动把 plan status 改为 completed。
+状态：plan `status` 支持 `active`、`completed`、`archived`。Task `status` 支持 `todo`、`in_progress`、`done`、`blocked`、`skipped`。11B task status update 会定位 `phases[*].tasks[*].task_id`，更新 nested task 后重新赋值整个 `phases` JSON 并刷新 `updated_at`；本阶段不自动把 plan status 改为 completed。11D Dashboard study stats 基于 `study_plans.status` 和 `phases[*].tasks[*].status` 聚合 total/active/completed/archived plan count、pending/in_progress/done/blocked/skipped task count 和 latest target，不读取或返回 `source_refs` 细节、Resume/JD raw_text 或完整 `answer_text`。
 
 隐私说明：Study Plan generation 可以读取 Profile、Match gaps、Project Rewrite missing/evidence signals 和 Interview weakness tags，但默认 response 不返回 Resume/JD full raw_text 或完整 `answer_text`。`source_refs` 只保存短 preview 和引用 ID。Study plan tasks 只建议补证据、补学习、写交付物或审计 claim，不自动修改简历、项目、面试答案或投递状态，不编造课程链接、公司经历、指标、上线状态或业务规模。
 

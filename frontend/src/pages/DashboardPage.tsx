@@ -44,6 +44,9 @@ export function DashboardPage({
     interviewStats?.latest_weakness_tags.length
       ? interviewStats.latest_weakness_tags.join(", ")
       : "No weakness tags";
+  const studyPlanStats = state.studyPlanStats;
+  const latestStudyTarget =
+    studyPlanStats?.latest_target_role ?? "No study target";
   const metrics = [
     {
       label: "Profile",
@@ -139,6 +142,41 @@ export function DashboardPage({
       page: "interview" as const,
     },
     {
+      label: "Study Plans",
+      value: String(studyPlanStats?.total_plans ?? 0),
+      detail: "Study plan center",
+      tone: "green",
+      page: "study-plan" as const,
+    },
+    {
+      label: "Active Study Plans",
+      value: String(studyPlanStats?.active_plans ?? 0),
+      detail: latestStudyTarget,
+      tone: "blue",
+      page: "study-plan" as const,
+    },
+    {
+      label: "Pending Tasks",
+      value: String(studyPlanStats?.pending_tasks ?? 0),
+      detail: `${studyPlanStats?.in_progress_tasks ?? 0} in progress`,
+      tone: "amber",
+      page: "study-plan" as const,
+    },
+    {
+      label: "Blocked Tasks",
+      value: String(studyPlanStats?.blocked_tasks ?? 0),
+      detail: "Study plan tasks",
+      tone: "red",
+      page: "study-plan" as const,
+    },
+    {
+      label: "Done Tasks",
+      value: String(studyPlanStats?.done_tasks ?? 0),
+      detail: "Study plan tasks",
+      tone: "green",
+      page: "study-plan" as const,
+    },
+    {
       label: "App Interview Stages",
       value: String(state.applicationStats?.interview_count ?? 0),
       detail: "Application tracking",
@@ -190,7 +228,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>当前稳定节点：v0.9.0-project-optimization in progress，已支持 Profile Center、Resume parsing / risk-check、Project facts / rewrite backend、SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs、手动投递 tracking、Bad Case 和 deterministic evaluation。当前不接真实 LLM，不做 LLM judge，不自动投递。</p>
+        <p>当前稳定节点：v1.1 Study Plan Center，已支持 Profile、Resume parsing / risk-check、Project Optimization、Interview Training、Study Plan、SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs、手动投递 tracking、Bad Case 和 deterministic evaluation。当前不接真实 LLM，不做 LLM judge，不自动投递。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -282,6 +320,18 @@ export function DashboardPage({
             <li>
               <strong>Latest Weakness Tags</strong>
               <span>{latestWeaknessTags}</span>
+            </li>
+            <li>
+              <strong>Study Plan Center</strong>
+              <span>
+                {studyPlanStats
+                  ? `${studyPlanStats.total_plans} plans / ${studyPlanStats.active_plans} active / ${studyPlanStats.pending_tasks} pending tasks`
+                  : "0 plans / 0 active / 0 pending tasks"}
+              </span>
+            </li>
+            <li>
+              <strong>Latest Study Target</strong>
+              <span>{latestStudyTarget}</span>
             </li>
             <li>
               <strong>Applications</strong>

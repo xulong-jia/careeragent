@@ -11,6 +11,7 @@ import { getProfileSummary, listProfiles } from "./api/profiles";
 import { listProjects } from "./api/projects";
 import { listRagDocuments } from "./api/rag";
 import { listResumes } from "./api/resumes";
+import { getStudyPlanStats } from "./api/studyPlans";
 import { AgentRunsPage } from "./pages/AgentRunsPage";
 import { ApplicationTrackerPage } from "./pages/ApplicationTrackerPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -38,6 +39,7 @@ import type {
   ProjectRecord,
   RagDocumentRecord,
   ResumeRecord,
+  StudyPlanStats,
 } from "./types/api";
 import type { NavigationItem, PageKey } from "./types/navigation";
 
@@ -139,6 +141,14 @@ async function loadInterviewStats(): Promise<InterviewStats | null> {
   }
 }
 
+async function loadStudyPlanStats(): Promise<StudyPlanStats | null> {
+  try {
+    return await getStudyPlanStats();
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
   const [latestResume, setLatestResume] = useState<ResumeRecord | null>(null);
@@ -157,6 +167,9 @@ export default function App() {
   const [applicationStats, setApplicationStats] =
     useState<ApplicationStats | null>(null);
   const [interviewStats, setInterviewStats] = useState<InterviewStats | null>(
+    null,
+  );
+  const [studyPlanStats, setStudyPlanStats] = useState<StudyPlanStats | null>(
     null,
   );
   const [badCases, setBadCases] = useState<BadCaseRecord[]>([]);
@@ -178,6 +191,7 @@ export default function App() {
         applicationList,
         applicationStatsData,
         interviewStatsData,
+        studyPlanStatsData,
         badCaseList,
         evaluationStatsData,
       ] = await Promise.all([
@@ -191,6 +205,7 @@ export default function App() {
           listApplications(),
           getApplicationStats(),
           loadInterviewStats(),
+          loadStudyPlanStats(),
           listBadCases({ limit: 50 }),
           getEvaluationStats(),
         ]);
@@ -205,6 +220,7 @@ export default function App() {
       setApplications(applicationList.items);
       setApplicationStats(applicationStatsData);
       setInterviewStats(interviewStatsData);
+      setStudyPlanStats(studyPlanStatsData);
       setBadCases(badCaseList.items);
       setEvaluationStats(evaluationStatsData);
       setLatestResume(
@@ -243,6 +259,7 @@ export default function App() {
     applications,
     applicationStats,
     interviewStats,
+    studyPlanStats,
     badCases,
     evaluationStats,
   };
