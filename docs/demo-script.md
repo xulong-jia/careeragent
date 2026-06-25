@@ -148,7 +148,7 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 8. 修改 task status 为 todo、in progress、done、blocked 或 skipped，确认 detail 中 updated_at 刷新。
 9. 回到 Dashboard，查看 Study Plans、Active Study Plans、Pending Tasks、Blocked Tasks、Done Tasks、Latest Study Target 和 In Progress Tasks 摘要。
 
-当前 Study Plan Center 只接 deterministic generate/list/detail/task status/stats API、前端 StudyPlanPage 和 Dashboard study stats；不接真实 LLM，不做 RAG completion，不做 Agent full workflow，不接外部学习平台或日历提醒，不展示 Resume/JD full raw_text 或完整 answer_text。
+当前 Study Plan Center 只接 deterministic generate/list/detail/task status/stats API、前端 StudyPlanPage 和 Dashboard study stats；11E final handoff 已确认完整演示路径为 generate -> 查看 phases/tasks -> 更新 task status -> Dashboard stats。不接真实 LLM，不做 RAG completion，不做 Agent full workflow，不接外部学习平台或日历提醒，不展示 Resume/JD full raw_text 或完整 answer_text。
 
 ### Knowledge Base
 

@@ -222,7 +222,7 @@ JSON 字段说明：
 
 ## study_plans
 
-用途：记录 v1.1 Study Plan Center 11A/11B/11C/11D 生成和维护的 deterministic 学习计划。当前提供 backend generate、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats。
+用途：记录 v1.1 Study Plan Center 11A/11B/11C/11D 生成和维护的 deterministic 学习计划。当前提供 backend generate、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats。11E final handoff 已确认本阶段仍使用 `study_plans.phases` JSON 承载 task 结构，不新增独立 `study_tasks` 表。
 
 关键字段：
 
