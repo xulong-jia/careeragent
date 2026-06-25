@@ -115,7 +115,7 @@ sqlite:///./local_data/careeragent.db
 - Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
-- RAG：deterministic chunking + lexical retrieval + deterministic grounded answer。v1.2 12A/12B 已开始 RAG completion contract tightening 和 grounded answer persistence，answer response 在保留 `sources` 的同时补齐 `citations`、`source_refs`、`evidence_summary`、safe `retrieval_debug` 和可选 `answer_run_id`；默认不接真实 LLM、embedding 或 vector DB。
+- RAG：deterministic chunking + lexical retrieval + deterministic grounded answer。v1.2 12A/12B/12C 已开始 RAG completion contract tightening、grounded answer persistence 和 KnowledgeBasePage answer history UI，answer response 在保留 `sources` 的同时补齐 `citations`、`source_refs`、`evidence_summary`、safe `retrieval_debug` 和可选 `answer_run_id`；默认不接真实 LLM、embedding 或 vector DB。
 - Agent：deterministic state machine，不是自由工具调用 Agent。
 - Evaluation：deterministic smoke set，不是 LLM judge。
 
@@ -223,6 +223,7 @@ Dashboard 当前展示：
 | v1.1 Study Plan Center 11A/11B/11C/11D | Backend `study_plans` table、deterministic generate API、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats 已完成；RAG completion、Agent full workflow、外部学习平台和日历提醒未实现 |
 | v1.2 RAG Completion 12A | RAG grounded answer contract tightening 已开始，标准化 citations/source_refs/retrieval_debug/evidence_summary；仍为 deterministic lexical retrieval，不新增 answer history table，不接真实 LLM、embedding/vector DB 或 Agent full workflow |
 | v1.2 RAG Completion 12B | 新增 `rag_answer_runs` 持久化、answer run list/detail API 和更强 retrieval/privacy tests；answer runs 只保存 grounded contract、短 snippet/preview 和 safe debug，不保存 raw_text/full chunk text，也不做 Interview/Study Plan 深度集成 |
+| v1.2 RAG Completion 12C | KnowledgeBasePage 接入 answer history list/detail、grounded/uncertainty/retrieval_mode filters、citations/source_refs/retrieval_debug 展示；仍不展示 raw_text/full chunk text，不做 RAG evaluation dashboard 或下游深度集成 |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做

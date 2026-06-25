@@ -4,19 +4,23 @@ import { MarkBadCasePanel } from "../components/MarkBadCasePanel";
 import {
   answerRag,
   createRagDocument,
+  getRagAnswerRun,
   getRagDocument,
   indexRagDocument,
+  listRagAnswerRuns,
   listRagChunks,
   listRagDocuments,
   searchRag,
 } from "../api/rag";
 import type {
   RagAnswerResult,
+  RagAnswerRunRecord,
   RagCitation,
   RagChunkRecord,
   RagDocumentRecord,
   RagSearchResult,
   RagSearchSource,
+  RagSourceRef,
 } from "../types/api";
 
 const sourceTypes = [
@@ -34,8 +38,29 @@ type KnowledgeBasePageProps = {
   onDocumentsChanged?: (documents: RagDocumentRecord[]) => void;
 };
 
+type GroundedFilter = "all" | "grounded" | "ungrounded";
+
+type AnswerContractView = {
+  answer_run_id?: string | null;
+  answer: string;
+  answer_type: string;
+  grounded: boolean;
+  uncertainty: string | null;
+  evidence_summary: string[];
+  citations: RagCitation[];
+  source_refs: RagSourceRef[];
+  retrieval_debug: Record<string, unknown>;
+};
+
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
+}
+
+function previewText(value: string, maxLength = 120) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 3).trim()}...`;
 }
 
 function formatMetadata(metadata: Record<string, unknown>) {
@@ -118,6 +143,104 @@ function CitationList({ citations }: { citations: RagCitation[] }) {
   );
 }
 
+function SourceRefList({ sourceRefs }: { sourceRefs: RagSourceRef[] }) {
+  if (!sourceRefs.length) {
+    return (
+      <div className="empty-state compact">
+        <strong>暂无 source refs</strong>
+        <span>证据不足时不会生成可复用引用。</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="source-list">
+      {sourceRefs.map((sourceRef) => (
+        <article className="source-card" key={sourceRef.source_id}>
+          <div className="source-card-header">
+            <strong>{sourceRef.label}</strong>
+            <span className="status-pill muted">{sourceRef.field}</span>
+          </div>
+          <p className="snippet-text">{sourceRef.preview}</p>
+          <ul className="compact-list">
+            <li>source: {sourceRef.source_type}</li>
+            <li>source_id: {sourceRef.source_id}</li>
+            <li>document: {sourceRef.document_id ?? "none"}</li>
+            <li>chunk: {sourceRef.chunk_id ?? "none"}</li>
+          </ul>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function AnswerContractPanel({
+  result,
+}: {
+  result: AnswerContractView;
+}) {
+  return (
+    <>
+      <ul className="activity-list">
+        <li>
+          <strong>Grounded</strong>
+          <span className={result.grounded ? "status-pill" : "status-pill muted"}>
+            {result.grounded ? "grounded" : "ungrounded"}
+          </span>
+        </li>
+        <li>
+          <strong>Uncertainty</strong>
+          <span>{result.uncertainty ?? "none"}</span>
+        </li>
+        <li>
+          <strong>Answer Type</strong>
+          <span>{result.answer_type}</span>
+        </li>
+        <li>
+          <strong>Answer Run</strong>
+          <span>{result.answer_run_id ?? "not persisted"}</span>
+        </li>
+        <li>
+          <strong>Citations</strong>
+          <span>{result.citations.length}</span>
+        </li>
+        <li>
+          <strong>Source Refs</strong>
+          <span>{result.source_refs.length}</span>
+        </li>
+      </ul>
+      <pre className="json-preview text-preview">
+        {result.answer || "没有找到足够来源。"}
+      </pre>
+      {result.evidence_summary.length ? (
+        <>
+          <h4>Evidence Summary</h4>
+          <ul className="compact-list">
+            {result.evidence_summary.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <div className="empty-state compact">
+          <strong>暂无 evidence summary</strong>
+          <span>证据不足或无来源时不会生成摘要。</span>
+        </div>
+      )}
+      <h4>Citations</h4>
+      <CitationList citations={result.citations} />
+      <h4>Source Refs</h4>
+      <SourceRefList sourceRefs={result.source_refs} />
+      <details className="json-details">
+        <summary>Retrieval debug</summary>
+        <pre className="json-preview compact">
+          {JSON.stringify(result.retrieval_debug, null, 2)}
+        </pre>
+      </details>
+    </>
+  );
+}
+
 export function KnowledgeBasePage({
   onDocumentsChanged,
 }: KnowledgeBasePageProps) {
@@ -141,9 +264,19 @@ export function KnowledgeBasePage({
   const [answerTopK, setAnswerTopK] = useState(5);
   const [answerSourceType, setAnswerSourceType] = useState("");
   const [answerResult, setAnswerResult] = useState<RagAnswerResult | null>(null);
+  const [answerRuns, setAnswerRuns] = useState<RagAnswerRunRecord[]>([]);
+  const [selectedAnswerRun, setSelectedAnswerRun] =
+    useState<RagAnswerRunRecord | null>(null);
+  const [groundedFilter, setGroundedFilter] = useState<GroundedFilter>("all");
+  const [uncertaintyFilter, setUncertaintyFilter] = useState("");
+  const [retrievalModeFilter, setRetrievalModeFilter] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   const refreshDocuments = async () => {
     const response = await listRagDocuments();
@@ -161,6 +294,51 @@ export function KnowledgeBasePage({
     setChunks(chunkList.items);
   };
 
+  const refreshAnswerRuns = async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const response = await listRagAnswerRuns({
+        grounded:
+          groundedFilter === "all" ? null : groundedFilter === "grounded",
+        uncertainty: uncertaintyFilter || null,
+        retrievalMode: retrievalModeFilter || null,
+      });
+      setAnswerRuns(response.items);
+      if (
+        selectedAnswerRun &&
+        !response.items.some(
+          (item) => item.answer_run_id === selectedAnswerRun.answer_run_id,
+        )
+      ) {
+        setSelectedAnswerRun(null);
+      }
+      return response.items;
+    } catch (error) {
+      setHistoryError(
+        error instanceof Error ? error.message : "Answer history 加载失败。",
+      );
+      return [];
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const loadAnswerRunDetail = async (answerRunId: string) => {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const detail = await getRagAnswerRun(answerRunId);
+      setSelectedAnswerRun(detail);
+    } catch (error) {
+      setDetailError(
+        error instanceof Error ? error.message : "Answer run detail 加载失败。",
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -168,6 +346,7 @@ export function KnowledgeBasePage({
         if (items[0]) {
           await loadDocument(items[0].doc_id);
         }
+        await refreshAnswerRuns();
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Knowledge Base 加载失败。",
@@ -254,6 +433,15 @@ export function KnowledgeBasePage({
         filters: answerSourceType ? { source_type: answerSourceType } : null,
       });
       setAnswerResult(result);
+      const items = await refreshAnswerRuns();
+      if (result.answer_run_id) {
+        const persisted = items.find(
+          (item) => item.answer_run_id === result.answer_run_id,
+        );
+        if (persisted) {
+          setSelectedAnswerRun(persisted);
+        }
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Answer 失败。");
     } finally {
@@ -517,59 +705,144 @@ export function KnowledgeBasePage({
           </div>
           {answerResult ? (
             <>
-              <ul className="activity-list">
-                <li>
-                  <strong>Grounded</strong>
-                  <span>{answerResult.grounded ? "true" : "false"}</span>
-                </li>
-                <li>
-                  <strong>Uncertainty</strong>
-                  <span>{answerResult.uncertainty ?? "none"}</span>
-                </li>
-                <li>
-                  <strong>Answer Type</strong>
-                  <span>{answerResult.answer_type}</span>
-                </li>
-                <li>
-                  <strong>Answer Run</strong>
-                  <span>{answerResult.answer_run_id ?? "not persisted"}</span>
-                </li>
-                <li>
-                  <strong>Citations</strong>
-                  <span>{answerResult.citations.length}</span>
-                </li>
-              </ul>
-              <pre className="json-preview text-preview">
-                {answerResult.answer || "没有找到足够来源。"}
-              </pre>
-              {answerResult.evidence_summary.length ? (
-                <>
-                  <h4>Evidence Summary</h4>
-                  <ul className="compact-list">
-                    {answerResult.evidence_summary.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-              <h4>Citations</h4>
-              <CitationList citations={answerResult.citations} />
-              <details className="json-details">
-                <summary>Retrieval debug</summary>
-                <pre className="json-preview compact">
-                  {JSON.stringify(answerResult.retrieval_debug, null, 2)}
-                </pre>
-              </details>
+              <AnswerContractPanel result={answerResult} />
               <MarkBadCasePanel
                 defaultCategory="unsupported_answer"
                 defaultTitle="RAG answer review"
-                key={answerResult.sources[0]?.doc_id ?? "rag_answer_no_source"}
-                sourceId={answerResult.sources[0]?.doc_id ?? "rag_answer_no_source"}
-                sourceType={answerResult.sources[0] ? "rag_document" : "other"}
+                key={answerResult.answer_run_id ?? answerResult.sources[0]?.doc_id ?? "rag_answer_no_source"}
+                sourceId={answerResult.answer_run_id ?? answerResult.sources[0]?.doc_id ?? "rag_answer_no_source"}
+                sourceType={answerResult.answer_run_id ? "rag_answer" : answerResult.sources[0] ? "rag_document" : "other"}
               />
               <SourceList sources={answerResult.sources} />
             </>
           ) : null}
+        </article>
+      </div>
+
+      <div className="two-column wide-left">
+        <article className="panel">
+          <div className="panel-header">
+            <h3>Answer History</h3>
+            <span className="status-pill muted">GET /api/rag/answers</span>
+          </div>
+          <div className="form-grid">
+            <label>
+              Grounded
+              <select
+                value={groundedFilter}
+                onChange={(event) => setGroundedFilter(event.target.value as GroundedFilter)}
+              >
+                <option value="all">All</option>
+                <option value="grounded">Grounded</option>
+                <option value="ungrounded">Ungrounded</option>
+              </select>
+            </label>
+            <label>
+              Uncertainty
+              <select
+                value={uncertaintyFilter}
+                onChange={(event) => setUncertaintyFilter(event.target.value)}
+              >
+                <option value="">All</option>
+                <option value="grounded">grounded</option>
+                <option value="no_relevant_source">no_relevant_source</option>
+                <option value="insufficient_evidence">insufficient_evidence</option>
+              </select>
+            </label>
+            <label>
+              Retrieval Mode
+              <select
+                value={retrievalModeFilter}
+                onChange={(event) => setRetrievalModeFilter(event.target.value)}
+              >
+                <option value="">All</option>
+                <option value="deterministic_lexical">lexical</option>
+              </select>
+            </label>
+          </div>
+          <button
+            className="ghost-action"
+            disabled={historyLoading}
+            onClick={() => void refreshAnswerRuns()}
+            type="button"
+          >
+            Refresh history
+          </button>
+          {historyError ? <p className="error-text">{historyError}</p> : null}
+          {historyLoading ? <p className="hint-text">Loading answer history...</p> : null}
+          {!historyLoading && answerRuns.length ? (
+            <ul className="activity-list rag-document-list">
+              {answerRuns.map((answerRun) => (
+                <li
+                  className={
+                    selectedAnswerRun?.answer_run_id === answerRun.answer_run_id
+                      ? "selected-row"
+                      : undefined
+                  }
+                  key={answerRun.answer_run_id}
+                >
+                  <div>
+                    <strong>{answerRun.answer_run_id}</strong>
+                    <small>{previewText(answerRun.question)}</small>
+                  </div>
+                  <span>{answerRun.grounded ? "grounded" : "ungrounded"}</span>
+                  <span>{answerRun.uncertainty}</span>
+                  <span>{answerRun.retrieval_mode}</span>
+                  <span>{answerRun.citations.length} citations</span>
+                  <span>{formatDate(answerRun.created_at)}</span>
+                  <button
+                    className="ghost-action"
+                    disabled={detailLoading}
+                    onClick={() => void loadAnswerRunDetail(answerRun.answer_run_id)}
+                    type="button"
+                  >
+                    Detail
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {!historyLoading && !answerRuns.length ? (
+            <div className="empty-state">
+              <strong>暂无 answer runs</strong>
+              <span>运行 persisted answer 后会显示历史记录。</span>
+            </div>
+          ) : null}
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <h3>Answer Run Detail</h3>
+            <span className="status-pill muted">
+              {selectedAnswerRun?.answer_run_id ?? "None"}
+            </span>
+          </div>
+          {detailError ? <p className="error-text">{detailError}</p> : null}
+          {detailLoading ? <p className="hint-text">Loading answer run detail...</p> : null}
+          {selectedAnswerRun ? (
+            <>
+              <ul className="activity-list">
+                <li>
+                  <strong>Question</strong>
+                  <span>{selectedAnswerRun.question}</span>
+                </li>
+                <li>
+                  <strong>Created</strong>
+                  <span>{formatDate(selectedAnswerRun.created_at)}</span>
+                </li>
+                <li>
+                  <strong>Top K</strong>
+                  <span>{selectedAnswerRun.top_k}</span>
+                </li>
+              </ul>
+              <AnswerContractPanel result={selectedAnswerRun} />
+            </>
+          ) : (
+            <div className="empty-state">
+              <strong>未选择 answer run</strong>
+              <span>选择历史记录后查看 grounded answer contract。</span>
+            </div>
+          )}
         </article>
       </div>
     </section>

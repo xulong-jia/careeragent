@@ -155,8 +155,11 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 1. 创建 synthetic RAG document。
 2. 点击 index。
 3. 搜索关键词，例如 `FastAPI interview preparation`。
-4. 运行 deterministic answer。
-5. 查看 sources 和 snippets。
+4. 运行 deterministic answer，确认 Answer Run ID、grounded、uncertainty、evidence summary、citations、source refs preview 和折叠 retrieval debug。
+5. 在 Answer History 中使用 grounded、uncertainty 和 retrieval mode filters 刷新历史。
+6. 选择一个 answer run，查看 detail 中的 question、answer、citations、source_refs preview、retrieval_debug 和 created_at。
+
+当前 Knowledge Base 使用 deterministic lexical retrieval，不接真实 LLM、embedding 或 vector DB。页面只展示 preview、snippet、source_refs preview 和 safe retrieval debug，不展示 document full raw_text、chunk full text、Resume/JD full raw_text 或完整 interview answer_text，也不自动写入 Interview、Study Plan、Resume、Project 或 Application。
 
 ### Agent Runs
 

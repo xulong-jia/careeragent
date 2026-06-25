@@ -668,6 +668,30 @@ export type RagAnswerResult = {
   retrieval_debug: RagRetrievalDebug;
 };
 
+export type RagAnswerRunRecord = {
+  answer_run_id: string;
+  question: string;
+  filters: Record<string, unknown>;
+  top_k: number;
+  retrieval_mode: string;
+  answer: string;
+  answer_type: string;
+  grounded: boolean;
+  uncertainty: string;
+  evidence_summary: string[];
+  citations: RagCitation[];
+  source_refs: RagSourceRef[];
+  retrieval_debug: RagRetrievalDebug;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RagAnswerRunFilters = {
+  grounded?: boolean | null;
+  uncertainty?: string | null;
+  retrievalMode?: string | null;
+};
+
 export type AgentRunStatus =
   | "pending"
   | "running"

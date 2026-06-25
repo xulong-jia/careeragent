@@ -3,6 +3,8 @@ import type {
   ListResponse,
   RagAnswerRequest,
   RagAnswerResult,
+  RagAnswerRunFilters,
+  RagAnswerRunRecord,
   RagChunkRecord,
   RagDocumentCreatePayload,
   RagDocumentIndexPayload,
@@ -16,6 +18,20 @@ type RagChunkFilters = {
   docId?: string;
   sourceType?: string;
 };
+
+function buildAnswerRunQuery(filters: RagAnswerRunFilters = {}) {
+  const params = new URLSearchParams();
+  if (filters.grounded !== undefined && filters.grounded !== null) {
+    params.set("grounded", String(filters.grounded));
+  }
+  if (filters.uncertainty) {
+    params.set("uncertainty", filters.uncertainty);
+  }
+  if (filters.retrievalMode) {
+    params.set("retrieval_mode", filters.retrievalMode);
+  }
+  return params.toString();
+}
 
 export function createRagDocument(
   payload: RagDocumentCreatePayload,
@@ -84,4 +100,19 @@ export function answerRag(payload: RagAnswerRequest): Promise<RagAnswerResult> {
     },
     body: JSON.stringify(payload),
   });
+}
+
+export function listRagAnswerRuns(
+  filters: RagAnswerRunFilters = {},
+): Promise<ListResponse<RagAnswerRunRecord>> {
+  const query = buildAnswerRunQuery(filters);
+  return requestJson<ListResponse<RagAnswerRunRecord>>(
+    query ? `/api/rag/answers?${query}` : "/api/rag/answers",
+  );
+}
+
+export function getRagAnswerRun(
+  answerRunId: string,
+): Promise<RagAnswerRunRecord> {
+  return requestJson<RagAnswerRunRecord>(`/api/rag/answers/${answerRunId}`);
 }
