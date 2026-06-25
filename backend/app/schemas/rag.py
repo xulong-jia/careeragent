@@ -81,11 +81,46 @@ class RagSearchSource(BaseModel):
     metadata: dict[str, object] = Field(default_factory=dict)
 
 
+class RagCitation(BaseModel):
+    source_type: str
+    document_id: str
+    chunk_id: str
+    title: str
+    section: str | None = None
+    label: str
+    snippet: str
+    score: float | None = None
+    metadata_preview: dict[str, object] = Field(default_factory=dict)
+
+
+class RagSourceRef(BaseModel):
+    source_type: str
+    source_id: str
+    document_id: str | None = None
+    chunk_id: str | None = None
+    field: str
+    label: str
+    preview: str
+    score: float | None = None
+
+
+class RagRetrievalDebug(BaseModel):
+    retrieval_mode: str
+    query_tokens: list[str] = Field(default_factory=list)
+    candidate_count: int
+    selected_chunk_ids: list[str] = Field(default_factory=list)
+    scores: list[float] = Field(default_factory=list)
+    top_k: int
+    filters: dict[str, object] = Field(default_factory=dict)
+    insufficient_reason: str | None = None
+
+
 class RagSearchResult(BaseModel):
     query: str
     top_k: int
     sources: list[RagSearchSource] = Field(default_factory=list)
     uncertainty: str | None = None
+    retrieval_debug: RagRetrievalDebug | None = None
 
 
 class RagAnswerResult(BaseModel):
@@ -95,3 +130,7 @@ class RagAnswerResult(BaseModel):
     uncertainty: str | None = None
     grounded: bool
     answer_type: str = "deterministic_summary"
+    evidence_summary: list[str] = Field(default_factory=list)
+    citations: list[RagCitation] = Field(default_factory=list)
+    source_refs: list[RagSourceRef] = Field(default_factory=list)
+    retrieval_debug: RagRetrievalDebug

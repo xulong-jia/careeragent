@@ -1,6 +1,9 @@
 from conftest import get_data, get_error, make_client
 
 
+SENSITIVE_KEYS = {"raw_text", "text", "answer_text", "chunk_text", "full_text"}
+
+
 def _create_and_index_document(
     client,
     *,
@@ -29,6 +32,16 @@ def _create_and_index_document(
     return document
 
 
+def _assert_no_sensitive_keys(value):
+    if isinstance(value, dict):
+        for key, nested_value in value.items():
+            assert key not in SENSITIVE_KEYS
+            _assert_no_sensitive_keys(nested_value)
+    elif isinstance(value, list):
+        for item in value:
+            _assert_no_sensitive_keys(item)
+
+
 def test_answer_returns_grounded_result_with_citations():
     client = make_client()
     document = _create_and_index_document(
@@ -55,9 +68,9 @@ def test_answer_returns_grounded_result_with_citations():
     result = get_data(response)
     assert result["question"] == "How should I prepare for FastAPI backend interviews?"
     assert result["grounded"] is True
-    assert result["uncertainty"] is None
+    assert result["uncertainty"] == "grounded"
     assert result["answer_type"] == "deterministic_summary"
-    assert "基于检索来源" in result["answer"]
+    assert "Based on retrieved evidence" in result["answer"]
     assert len(result["sources"]) == 1
     source = result["sources"][0]
     assert source["doc_id"] == document["doc_id"]
@@ -67,6 +80,33 @@ def test_answer_returns_grounded_result_with_citations():
     assert source["metadata"]["topic"] == "interview"
     assert "raw_text" not in result
     assert "text" not in source
+    assert len(result["citations"]) == 1
+    citation = result["citations"][0]
+    assert citation["source_type"] == "manual"
+    assert citation["document_id"] == document["doc_id"]
+    assert citation["chunk_id"] == source["chunk_id"]
+    assert citation["label"] == "Synthetic Interview Notes"
+    assert citation["snippet"] == source["snippet"]
+    assert len(citation["snippet"]) <= 240
+    assert citation["score"] == source["score"]
+    assert citation["metadata_preview"]["topic"] == "interview"
+    assert len(result["source_refs"]) == 1
+    source_ref = result["source_refs"][0]
+    assert source_ref["source_type"] == "rag_chunk"
+    assert source_ref["source_id"] == source["chunk_id"]
+    assert source_ref["document_id"] == document["doc_id"]
+    assert source_ref["chunk_id"] == source["chunk_id"]
+    assert source_ref["field"] == "snippet"
+    assert source_ref["preview"] == source["snippet"]
+    assert result["evidence_summary"]
+    debug = result["retrieval_debug"]
+    assert debug["retrieval_mode"] == "deterministic_lexical"
+    assert "fastapi" in debug["query_tokens"]
+    assert debug["candidate_count"] >= 1
+    assert debug["selected_chunk_ids"] == [source["chunk_id"]]
+    assert debug["scores"] == [source["score"]]
+    assert debug["top_k"] == 1
+    assert debug["filters"] == {"tags": ["interview"]}
 
 
 def test_answer_respects_filters_and_top_k():
@@ -119,6 +159,11 @@ def test_answer_returns_no_source_behavior():
     assert result["sources"] == []
     assert result["uncertainty"] == "no_relevant_source"
     assert result["grounded"] is False
+    assert result["citations"] == []
+    assert result["source_refs"] == []
+    assert result["evidence_summary"] == []
+    assert result["retrieval_debug"]["insufficient_reason"] == "no_relevant_source"
+    assert result["retrieval_debug"]["selected_chunk_ids"] == []
 
 
 def test_answer_rejects_empty_question():
@@ -128,3 +173,37 @@ def test_answer_rejects_empty_question():
 
     assert response.status_code == 400
     assert get_error(response)["code"] == "rag_answer_validation_error"
+
+
+def test_answer_contract_does_not_expose_full_text_in_citations_or_debug():
+    client = make_client()
+    full_private_marker = "PRIVATE_FULL_CHUNK_MARKER"
+    document = _create_and_index_document(
+        client,
+        title="Synthetic Privacy Notes",
+        raw_text=(
+            "FastAPI evidence should use snippets and citations. "
+            + " ".join([full_private_marker] * 80)
+        ),
+        metadata={
+            "topic": "privacy",
+            "raw_text": "should not appear",
+            "answer_text": "should not appear",
+            "text": "should not appear",
+        },
+    )
+
+    response = client.post(
+        "/api/rag/answer",
+        json={"question": "FastAPI evidence citations", "top_k": 1},
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert result["citations"][0]["document_id"] == document["doc_id"]
+    assert len(result["citations"][0]["snippet"]) <= 240
+    assert "should not appear" not in str(result["citations"])
+    assert "should not appear" not in str(result["source_refs"])
+    _assert_no_sensitive_keys(result["citations"])
+    _assert_no_sensitive_keys(result["source_refs"])
+    _assert_no_sensitive_keys(result["retrieval_debug"])

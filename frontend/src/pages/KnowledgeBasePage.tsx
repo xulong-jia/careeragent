@@ -12,6 +12,7 @@ import {
 } from "../api/rag";
 import type {
   RagAnswerResult,
+  RagCitation,
   RagChunkRecord,
   RagDocumentRecord,
   RagSearchResult,
@@ -75,6 +76,41 @@ function SourceList({ sources }: { sources: RagSearchSource[] }) {
           </ul>
           <pre className="json-preview compact">
             {formatMetadata(source.metadata)}
+          </pre>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function CitationList({ citations }: { citations: RagCitation[] }) {
+  if (!citations.length) {
+    return (
+      <div className="empty-state compact">
+        <strong>暂无 citations</strong>
+        <span>证据不足时不会生成引用。</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="source-list">
+      {citations.map((citation) => (
+        <article className="source-card" key={citation.chunk_id}>
+          <div className="source-card-header">
+            <strong>{citation.label}</strong>
+            <span className="status-pill muted">
+              {citation.score === null ? "score n/a" : `score ${citation.score.toFixed(3)}`}
+            </span>
+          </div>
+          <p className="snippet-text">{citation.snippet}</p>
+          <ul className="compact-list">
+            <li>document: {citation.document_id}</li>
+            <li>chunk: {citation.chunk_id}</li>
+            <li>source: {citation.source_type}</li>
+          </ul>
+          <pre className="json-preview compact">
+            {formatMetadata(citation.metadata_preview)}
           </pre>
         </article>
       ))}
@@ -494,10 +530,32 @@ export function KnowledgeBasePage({
                   <strong>Answer Type</strong>
                   <span>{answerResult.answer_type}</span>
                 </li>
+                <li>
+                  <strong>Citations</strong>
+                  <span>{answerResult.citations.length}</span>
+                </li>
               </ul>
               <pre className="json-preview text-preview">
                 {answerResult.answer || "没有找到足够来源。"}
               </pre>
+              {answerResult.evidence_summary.length ? (
+                <>
+                  <h4>Evidence Summary</h4>
+                  <ul className="compact-list">
+                    {answerResult.evidence_summary.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              <h4>Citations</h4>
+              <CitationList citations={answerResult.citations} />
+              <details className="json-details">
+                <summary>Retrieval debug</summary>
+                <pre className="json-preview compact">
+                  {JSON.stringify(answerResult.retrieval_debug, null, 2)}
+                </pre>
+              </details>
               <MarkBadCasePanel
                 defaultCategory="unsupported_answer"
                 defaultTitle="RAG answer review"

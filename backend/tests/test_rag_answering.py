@@ -10,6 +10,10 @@ def test_build_deterministic_answer_returns_no_source_behavior():
     assert result["uncertainty"] == "no_relevant_source"
     assert result["grounded"] is False
     assert result["answer_type"] == "deterministic_summary"
+    assert result["evidence_summary"] == []
+    assert result["citations"] == []
+    assert result["source_refs"] == []
+    assert result["retrieval_debug"].insufficient_reason == "no_relevant_source"
 
 
 def test_build_deterministic_answer_uses_only_source_snippets():
@@ -31,9 +35,12 @@ def test_build_deterministic_answer_uses_only_source_snippets():
     )
 
     assert result["grounded"] is True
-    assert result["uncertainty"] is None
+    assert result["uncertainty"] == "grounded"
     assert result["answer_type"] == "deterministic_summary"
-    assert "基于检索来源" in result["answer"]
+    assert "Based on retrieved evidence" in result["answer"]
     assert "FastAPI pytest coverage" in result["answer"]
     assert result["sources"][0].chunk_id == source.chunk_id
+    assert result["citations"][0].chunk_id == source.chunk_id
+    assert result["source_refs"][0].source_id == source.chunk_id
+    assert result["evidence_summary"]
     assert "full chunk text" not in result["answer"]

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.rag.answering import build_deterministic_answer
 from app.rag.chunking import chunk_document_text
-from app.rag.retriever import rank_chunks
+from app.rag.retriever import rank_chunks, tokenize_text
 from app.repositories import rag_repository
 from app.schemas.rag import (
     RagChunkRecord,
@@ -13,6 +13,7 @@ from app.schemas.rag import (
     RagDocumentIndexRequest,
     RagDocumentIndexResult,
     RagDocumentRecord,
+    RagRetrievalDebug,
     RagSearchRequest,
     RagSearchResult,
     RagSearchSource,
@@ -198,11 +199,22 @@ def search_documents(db: Session, payload: RagSearchRequest) -> RagSearchResult:
         filters=filters,
     )
     sources = [RagSearchSource(**source) for source in ranked_sources]
+    retrieval_debug = RagRetrievalDebug(
+        retrieval_mode="deterministic_lexical",
+        query_tokens=tokenize_text(query),
+        candidate_count=len(candidates),
+        selected_chunk_ids=[source.chunk_id for source in sources],
+        scores=[source.score for source in sources],
+        top_k=top_k,
+        filters=filters,
+        insufficient_reason=None if sources else "no_relevant_source",
+    )
     return RagSearchResult(
         query=query,
         top_k=top_k,
         sources=sources,
         uncertainty=None if sources else "no_relevant_source",
+        retrieval_debug=retrieval_debug,
     )
 
 
@@ -224,5 +236,9 @@ def answer_question(db: Session, payload: RagAnswerRequest) -> RagAnswerResult:
             filters=payload.filters,
         ),
     )
-    answer_payload = build_deterministic_answer(question, search_result.sources)
+    answer_payload = build_deterministic_answer(
+        question,
+        search_result.sources,
+        retrieval_debug=search_result.retrieval_debug,
+    )
     return RagAnswerResult(**answer_payload)

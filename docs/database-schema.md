@@ -282,6 +282,10 @@ JSON 字段说明：
 
 当前没有真实 embedding，`embedding_id` 是预留字段。
 
+v1.2 12A 说明：本轮只收紧 RAG grounded answer response contract，不新增 `rag_answer_runs` 或 query history 表。`POST /api/rag/answer` 的 `citations`、`source_refs`、`evidence_summary` 和 `retrieval_debug` 基于当前 lexical retrieval 临时生成，不单独持久化。
+
+隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`retrieval_debug` 只允许保存/返回 retrieval_mode、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。
+
 ## agent_runs
 
 用途：记录 deterministic workflow run。

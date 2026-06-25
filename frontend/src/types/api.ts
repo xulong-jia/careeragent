@@ -605,11 +605,46 @@ export type RagSearchSource = {
   metadata: Record<string, unknown>;
 };
 
+export type RagCitation = {
+  source_type: string;
+  document_id: string;
+  chunk_id: string;
+  title: string;
+  section: string | null;
+  label: string;
+  snippet: string;
+  score: number | null;
+  metadata_preview: Record<string, unknown>;
+};
+
+export type RagSourceRef = {
+  source_type: string;
+  source_id: string;
+  document_id: string | null;
+  chunk_id: string | null;
+  field: string;
+  label: string;
+  preview: string;
+  score: number | null;
+};
+
+export type RagRetrievalDebug = {
+  retrieval_mode: string;
+  query_tokens: string[];
+  candidate_count: number;
+  selected_chunk_ids: string[];
+  scores: number[];
+  top_k: number;
+  filters: Record<string, unknown>;
+  insufficient_reason: string | null;
+};
+
 export type RagSearchResult = {
   query: string;
   top_k: number;
   sources: RagSearchSource[];
   uncertainty: string | null;
+  retrieval_debug?: RagRetrievalDebug | null;
 };
 
 export type RagAnswerRequest = {
@@ -625,6 +660,10 @@ export type RagAnswerResult = {
   uncertainty: string | null;
   grounded: boolean;
   answer_type: string;
+  evidence_summary: string[];
+  citations: RagCitation[];
+  source_refs: RagSourceRef[];
+  retrieval_debug: RagRetrievalDebug;
 };
 
 export type AgentRunStatus =
