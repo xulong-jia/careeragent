@@ -20,6 +20,10 @@ def test_job_create_returns_mock_profile():
     data = get_data(response)
     assert data["jd_id"].startswith("jd_")
     assert data["company"] == "Mock Company"
+    assert "raw_text" not in data
+    assert data["raw_text_preview"] == (
+        "We need Python, FastAPI, RAG experience. React is a plus."
+    )
     assert data["job_profile"]["role_category"] == "AI Application Engineer"
     assert "Python" in data["job_profile"]["required_skills"]
     assert "React" in data["job_profile"]["preferred_skills"]
@@ -121,9 +125,15 @@ def test_job_list_and_detail_return_created_job():
     detail_response = client.get(f"/api/jobs/{jd_id}")
 
     assert list_response.status_code == 200
-    assert any(item["jd_id"] == jd_id for item in get_data(list_response)["items"])
+    list_items = get_data(list_response)["items"]
+    assert any(item["jd_id"] == jd_id for item in list_items)
+    assert all("raw_text" not in item for item in list_items)
+    assert all("raw_text_preview" in item for item in list_items)
     assert detail_response.status_code == 200
-    assert get_data(detail_response)["jd_id"] == jd_id
+    detail = get_data(detail_response)
+    assert detail["jd_id"] == jd_id
+    assert "raw_text" not in detail
+    assert "raw_text_preview" in detail
 
 
 def test_job_create_persists_job_description_and_profile(db_session):

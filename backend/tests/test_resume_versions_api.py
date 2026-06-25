@@ -26,6 +26,8 @@ def test_resume_upload_creates_initial_version_and_lists_versions():
     assert version["version_number"] == 1
     assert version["status"] == "active"
     assert version["is_archived"] is False
+    assert "raw_text" not in version
+    assert version["raw_text_preview"] == resume["raw_text_preview"]
 
 
 def test_resume_version_detail_returns_initial_version():
@@ -39,7 +41,8 @@ def test_resume_version_detail_returns_initial_version():
     assert response.status_code == 200
     data = get_data(response)
     assert data["resume_version_id"] == version_id
-    assert data["raw_text"] == "Python and React"
+    assert "raw_text" not in data
+    assert data["raw_text_preview"] == "Python and React"
     assert data["structured_resume"]["skills"]["programming"] == ["Python"]
 
 
@@ -61,7 +64,8 @@ def test_clone_resume_version_creates_new_version_without_overwriting_source():
     assert cloned["version_name"] == "Backend target"
     assert cloned["target_role"] == "Backend Engineer"
     assert cloned["version_number"] == 2
-    assert cloned["raw_text"] == initial["raw_text"]
+    assert "raw_text" not in cloned
+    assert cloned["raw_text_preview"] == initial["raw_text_preview"]
     assert cloned["structured_resume"] == initial["structured_resume"]
     assert cloned["extraction_status"] == initial["extraction_status"]
     assert cloned["risk_flags"] == initial["risk_flags"]

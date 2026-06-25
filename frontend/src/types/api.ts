@@ -32,7 +32,6 @@ export type ResumeRecord = {
   filename: string;
   file_type: string;
   parse_status: string;
-  raw_text: string;
   raw_text_preview: string;
   extraction_status: string;
   extraction_method: string;
@@ -53,7 +52,6 @@ export type ResumeVersionRecord = {
   version_name: string;
   version_number: number;
   target_role: string | null;
-  raw_text: string;
   raw_text_preview: string;
   structured_resume: StructuredResume;
   extraction_status: string;
@@ -305,7 +303,7 @@ export type JobRecord = {
   company: string;
   job_title: string;
   location: string | null;
-  raw_text: string;
+  raw_text_preview: string;
   source_url: string | null;
   job_profile: JobProfile;
 };

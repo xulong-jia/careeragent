@@ -27,6 +27,6 @@ class JobRecord(BaseModel):
     company: str
     job_title: str
     location: str | None = None
-    raw_text: str
+    raw_text_preview: str
     source_url: str | None = None
     job_profile: JobProfile

@@ -45,7 +45,8 @@ def test_resume_upload_accepts_supported_file_and_returns_parsed_result():
     assert data["extraction_status"] == "extracted"
     assert data["extraction_method"] == "pymupdf_text"
     assert data["extraction_warnings"] == []
-    assert "PDF Candidate" in data["raw_text"]
+    assert "raw_text" not in data
+    assert "PDF Candidate" in data["raw_text_preview"]
     assert "FastAPI" in data["structured_resume"]["skills"]["backend"]
     assert data["risk_flags"] == []
 
@@ -126,7 +127,7 @@ def test_resume_upload_extracts_real_markdown_text_and_deterministic_skills():
 
     assert response.status_code == 201
     data = get_data(response)
-    assert data["raw_text"] == content
+    assert "raw_text" not in data
     assert data["raw_text_preview"] == content
     assert data["extraction_status"] == "extracted"
     assert data["extraction_method"] == "utf8_md_decode"
@@ -149,7 +150,8 @@ def test_resume_upload_extracts_real_txt_text():
     assert response.status_code == 201
     data = get_data(response)
     assert data["file_type"] == "text"
-    assert data["raw_text"] == content
+    assert "raw_text" not in data
+    assert data["raw_text_preview"] == content
     assert data["extraction_status"] == "extracted"
     assert data["extraction_method"] == "utf8_txt_decode"
     assert data["extraction_warnings"] == []
@@ -180,7 +182,8 @@ def test_resume_upload_returns_real_pdf_extraction():
 
     assert response.status_code == 201
     data = get_data(response)
-    assert "PDF Candidate" in data["raw_text"]
+    assert "raw_text" not in data
+    assert "PDF Candidate" in data["raw_text_preview"]
     assert data["extraction_status"] == "extracted"
     assert data["extraction_method"] == "pymupdf_text"
     assert data["extraction_warnings"] == []
@@ -219,7 +222,8 @@ def test_resume_upload_returns_real_docx_extraction():
 
     assert response.status_code == 201
     data = get_data(response)
-    assert "DOCX Candidate" in data["raw_text"]
+    assert "raw_text" not in data
+    assert "DOCX Candidate" in data["raw_text_preview"]
     assert data["extraction_status"] == "extracted"
     assert data["extraction_method"] == "python_docx_text"
     assert data["extraction_warnings"] == []
@@ -237,9 +241,15 @@ def test_resume_list_and_detail_return_uploaded_resume():
     detail_response = client.get(f"/api/resumes/{resume_id}")
 
     assert list_response.status_code == 200
-    assert any(item["resume_id"] == resume_id for item in get_data(list_response)["items"])
+    list_items = get_data(list_response)["items"]
+    assert any(item["resume_id"] == resume_id for item in list_items)
+    assert all("raw_text" not in item for item in list_items)
+    assert all("raw_text_preview" in item for item in list_items)
     assert detail_response.status_code == 200
-    assert get_data(detail_response)["resume_id"] == resume_id
+    detail = get_data(detail_response)
+    assert detail["resume_id"] == resume_id
+    assert "raw_text" not in detail
+    assert "raw_text_preview" in detail
 
 
 def test_resume_upload_persists_resume_and_initial_version(db_session):

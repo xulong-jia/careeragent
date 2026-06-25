@@ -6,6 +6,9 @@ from app.models.job import JobDescription, JobProfile as JobProfileModel
 from app.schemas.jobs import JobCreateRequest, JobProfile, JobRecord
 
 
+RAW_TEXT_PREVIEW_CHARS = 500
+
+
 def _next_job_id(db: Session) -> str:
     count = db.scalar(select(func.count()).select_from(JobDescription)) or 0
     return f"jd_{count + 1:04d}"
@@ -36,7 +39,7 @@ def _to_job_record(job: JobDescription, profile: JobProfileModel) -> JobRecord:
         company=job.company,
         job_title=job.job_title,
         location=job.location,
-        raw_text=job.raw_text,
+        raw_text_preview=job.raw_text[:RAW_TEXT_PREVIEW_CHARS],
         source_url=job.source_url,
         job_profile=_to_job_profile(profile),
     )

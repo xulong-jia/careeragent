@@ -44,10 +44,10 @@ export function AppShell({
       <main className="workspace">
         <header className="workspace-header">
           <div>
-            <p className="eyebrow">Phase 0</p>
+            <p className="eyebrow">v0.9 Project Optimization</p>
             <h1>Career Operating System</h1>
           </div>
-          <div className="stage-badge">基础骨架</div>
+          <div className="stage-badge">CareerAgent Workbench</div>
         </header>
 
         {children}

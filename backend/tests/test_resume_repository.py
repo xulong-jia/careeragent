@@ -7,6 +7,7 @@ from app.repositories.resume_repository import (
     list_resume_versions,
     list_resumes,
 )
+from app.models.resume import ResumeVersion
 from app.schemas.resumes import StructuredResume
 
 
@@ -73,11 +74,18 @@ def test_resume_repository_clone_and_archive_version(db_session):
 
     assert cloned.resume_id == created.resume_id
     assert cloned.version_number == 2
-    assert cloned.raw_text == initial.raw_text
+    assert not hasattr(cloned, "raw_text")
+    assert cloned.raw_text_preview == initial.raw_text_preview
     assert cloned.structured_resume == initial.structured_resume
     assert cloned.target_role == "Backend Engineer"
     assert cloned.risk_report == initial.risk_report
     assert archived.status == "archived"
     assert archived.is_archived is True
-    assert get_resume_version(db_session, initial.resume_version_id).raw_text == initial.raw_text
+    fetched_initial = get_resume_version(db_session, initial.resume_version_id)
+    assert not hasattr(fetched_initial, "raw_text")
+    persisted_initial = db_session.get(ResumeVersion, initial.resume_version_id)
+    persisted_clone = db_session.get(ResumeVersion, cloned.resume_version_id)
+    assert persisted_initial is not None
+    assert persisted_clone is not None
+    assert persisted_clone.raw_text == persisted_initial.raw_text
     assert len(list_resume_versions(db_session, created.resume_id)) == 2

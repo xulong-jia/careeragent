@@ -125,6 +125,8 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 - `risk_flags`
 - `risk_report`
 
+隐私边界：Resume / Resume Version 默认 API response 不返回完整 `raw_text`。后端仍在本地 DB 保存 raw_text，用于 parse、risk-check 和保存 confirmed version；前端默认只展示 `raw_text_preview`。
+
 前端流程：Resume Center 会先调用 parse 生成可编辑 `structured_resume`，再用编辑后的 JSON 调用 risk-check，最后把 `structured_resume`、`risk_report`、`version_name`、`target_role` 和 `source_version_id` 提交到保存版本 API。risk-check 不会自动修改简历。
 
 解析边界：PDF 使用文本层提取，DOCX 使用文档文本提取，Markdown / txt 使用 UTF-8 文本读取；当前不做 OCR，不接真实 LLM parser。risk-check 只做 unsupported metric、fabricated skill、timeline conflict、missing evidence、overclaim 等确定性规则检测，不是事实审计。
@@ -143,6 +145,7 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 - `version_name`
 - `version_number`
 - `target_role`
+- `raw_text_preview`
 - `status`
 - `is_archived`
 
@@ -159,8 +162,11 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 - `jd_id`
 - `company`
 - `job_title`
+- `raw_text_preview`
 - `job_profile.required_skills`
 - `job_profile.role_category`
+
+隐私边界：JD 创建请求仍接收 `raw_text` 以生成 deterministic job profile；创建、列表和详情 response 默认只返回 `raw_text_preview`，不返回完整 JD raw_text。
 
 ## Match APIs
 

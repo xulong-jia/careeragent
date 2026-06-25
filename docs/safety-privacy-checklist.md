@@ -33,6 +33,8 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] Demo JD 使用 synthetic text。
 - [ ] 不上传真实简历、真实 JD、真实邮件、手机号、地址、证件号或薪资记录。
 - [ ] 不把完整 `raw_text` 输出到日志。
+- [ ] Resume / JD 默认 API response 不返回完整 raw_text，只返回 `raw_text_preview`。
+- [ ] Interview Center 后续开发继续使用 preview / refs，不把完整 raw_text 作为默认 payload 透传给前端。
 - [ ] RAG 文档只使用 synthetic notes。
 - [ ] RAG response 默认展示 preview / snippet，不展示完整 chunk text。
 

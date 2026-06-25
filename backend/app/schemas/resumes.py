@@ -25,7 +25,6 @@ class ResumeRecord(BaseModel):
     filename: str
     file_type: str
     parse_status: str
-    raw_text: str
     raw_text_preview: str
     extraction_status: str
     extraction_method: str
@@ -42,7 +41,6 @@ class ResumeVersionRecord(BaseModel):
     version_name: str
     version_number: int
     target_role: str | None = None
-    raw_text: str
     raw_text_preview: str
     structured_resume: StructuredResume
     extraction_status: str
