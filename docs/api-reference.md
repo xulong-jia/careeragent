@@ -187,6 +187,37 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 - `gaps`
 - `evidence`
 
+## Interview APIs
+
+当前为 v1.0 Interview Center 10A backend 范围：只实现表结构、deterministic question generation 和 question list。Answer submit / scoring API、InterviewCenterPage 和 Study Plan 写入尚未实现。
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| POST | `/api/interviews/questions/generate` | 基于 JD profile、structured resume、可选 project / project rewrite 生成 deterministic interview questions |
+| GET | `/api/interviews/questions` | 查询已生成 questions，可按 `jd_id`、`resume_version_id`、`project_id`、`question_type`、`difficulty` 筛选 |
+
+`POST /api/interviews/questions/generate` request:
+
+- `jd_id`
+- `resume_version_id`
+- `project_id` optional
+- `project_rewrite_id` optional
+- `question_types` optional: `project_deep_dive` / `technical_depth` / `jd_skill_check` / `risk_or_gap_explanation` / `behavior_or_collaboration` / `resume_challenge`
+- `max_questions` default `6`
+
+关键字段：
+
+- `id`
+- `question_type`
+- `question`
+- `expected_points`
+- `source_refs`
+- `difficulty`
+- `warnings`
+- `need_more_info`
+
+隐私边界：Interview questions 不返回 Resume/JD full raw_text。`source_refs` 只保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`，用于追踪题目来源；题目生成不调用真实 LLM，不要求用户编造上线、收益、用户量、准确率或公司经历。
+
 ## RAG APIs
 
 | Method | Path | 说明 |

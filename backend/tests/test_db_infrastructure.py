@@ -22,6 +22,8 @@ CORE_TABLES = {
     "profiles",
     "projects",
     "project_rewrites",
+    "interview_questions",
+    "interview_answers",
 }
 
 

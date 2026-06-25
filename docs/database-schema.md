@@ -171,6 +171,50 @@ JSON 字段说明：
 - `rewrite_priorities`
 - `risk_flags`
 
+## interview_questions
+
+用途：记录 v1.0 Interview Center 10A 生成的 deterministic 面试题。
+
+关键字段：
+
+- `id`
+- `user_id`
+- `jd_id`
+- `resume_version_id`
+- `project_id`
+- `project_rewrite_id`
+- `question_type`
+- `question`
+- `expected_points`
+- `source_refs`
+- `difficulty`
+- `created_at`
+
+JSON 字段说明：
+
+- `expected_points`：回答应覆盖的结构化要点，不是标准答案。
+- `source_refs`：题目来源引用，只允许保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`。
+
+隐私说明：Interview question generation 只读取 JD profile、structured resume、project facts 和 project rewrite JSON，不复制 Resume/JD full raw_text。题目不得诱导用户编造上线、收益、用户量、准确率、公司经历或未提供的项目事实。
+
+## interview_answers
+
+用途：预留保存用户面试回答和后续 deterministic scoring 结果。v1.0 10A 只建表，不提供 answer submit / score API。
+
+关键字段：
+
+- `id`
+- `question_id`
+- `user_id`
+- `answer_text`
+- `answer_text_preview`
+- `scores`
+- `feedback`
+- `weakness_tags`
+- `created_at`
+
+隐私说明：`answer_text` 可能包含个人经历或面试复盘，后续 API 应默认 preview-first；列表、Dashboard 和 stats 不应默认暴露完整回答原文。
+
 ## rag_documents
 
 用途：记录 RAG 知识库文档。

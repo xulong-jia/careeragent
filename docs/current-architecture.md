@@ -37,7 +37,7 @@ scripts/                    Local helper scripts
 - 成功：`{"data": ..., "request_id": "..."}`
 - 失败：`{"error": {"code": "...", "message": "...", "details": {...}}, "request_id": "..."}`
 
-FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、Project Rewrite、Resume、Resume Version、JD、Match、RAG、Agent、Application 和 Evaluation routers。
+FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、Project Rewrite、Interview、Resume、Resume Version、JD、Match、RAG、Agent、Application 和 Evaluation routers。
 
 业务代码遵循：
 
@@ -62,6 +62,8 @@ FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、P
 - Evaluation
 - Quality Review
 
+InterviewCenterPage 尚未实现；v1.0 10A 只提供后端 tables 和 question generation / list API。
+
 前端 API 封装在 `frontend/src/api/`，通过 `requestJson` 统一解析后端响应。
 
 ## 5. 数据库和持久化
@@ -73,6 +75,8 @@ FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、P
 - `profiles`
 - `projects`
 - `project_rewrites`
+- `interview_questions`
+- `interview_answers`
 - `job_descriptions`
 - `job_profiles`
 - `match_reports`
@@ -100,6 +104,7 @@ sqlite:///./local_data/careeragent.db
 
 - Profile：manual CRUD + readiness summary，不自动从简历生成画像。
 - Project：manual project facts CRUD + deterministic rewrite backend + ProjectOptimizationPage，可选绑定 profile / resume version，不自动生成项目事实，不接真实 LLM。
+- Interview：v1.0 10A 提供 deterministic question generation / list API，基于 JD profile、structured resume、可选 project facts 和 project rewrite refs，不做 answer submit/scoring，不做前端页面。
 - Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
@@ -148,6 +153,18 @@ Project Optimization 当前链路：
 
 当前 Project Rewrite 是规则版，不接真实 LLM，不自动写入 Resume Version，不编造项目经历、指标、公司、技术栈、上线状态或业务规模；risk flags 覆盖 unsupported metric、fabricated skill、missing evidence、overclaim 和 learning-to-business overclaim。ProjectOptimizationPage 只展示建议，不自动修改简历版本或项目事实。
 
+### Interview Center v1.0 10A
+
+Interview 10A 当前链路：
+
+1. `interview_questions` 表保存生成的面试题，绑定 `jd_id` 和 `resume_version_id`，可选绑定 `project_id` / `project_rewrite_id`。
+2. `interview_answers` 表已预建，用于后续 10B answer submit / scoring；当前没有 answer API。
+3. `POST /api/interviews/questions/generate` 使用 deterministic rules 读取 JD profile、structured resume、可选 project facts 和 project rewrite JSON，生成并持久化 questions。
+4. `GET /api/interviews/questions` 支持按 `jd_id`、`resume_version_id`、`project_id`、`question_type` 和 `difficulty` 筛选。
+5. 每个 question 包含 `expected_points` 和 `source_refs`；`source_refs` 只保存 source type/id/field/label/preview，不保存 Resume/JD full raw_text。
+
+当前 Interview 10A 不接真实 LLM，不接 embedding/vector DB，不调用 RAG completion，不自动写入 Study Plan，不自动修改 Resume Version，也不实现 InterviewCenterPage 或 answer scoring。
+
 ### Dashboard readiness
 
 Dashboard 当前展示：
@@ -169,6 +186,7 @@ Dashboard 当前展示：
 | 阶段六 | Deterministic Evaluation MVP + Bad Case 关联已完成 |
 | v0.8 Resume/Profile Foundation | Resume parser / risk-check APIs + Profile Center MVP 已完成 |
 | v0.9 Project Optimization 9A / 9B / 9C / 9D / 9E | Project facts backend、deterministic rewrite backend、ProjectOptimizationPage、Dashboard/docs/tests 收口和 final handoff 已完成 |
+| v1.0 Interview Center 10A | Backend interview tables、deterministic question generation 和 question list API 已完成；answer scoring 与前端未实现 |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做
