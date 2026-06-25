@@ -63,7 +63,7 @@ FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、P
 - Evaluation
 - Quality Review
 
-InterviewCenterPage 已实现；v1.0 10A/10B/10C 已接入后端 tables、question generation / list、answer submit / list 和 deterministic scoring API。
+InterviewCenterPage 已实现；v1.0 10A/10B/10C/10D 已接入后端 tables、question generation / list、answer submit / list、deterministic scoring API 和 Dashboard stats。
 
 前端 API 封装在 `frontend/src/api/`，通过 `requestJson` 统一解析后端响应。
 

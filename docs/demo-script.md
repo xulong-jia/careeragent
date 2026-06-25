@@ -124,7 +124,7 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 ### Interview Center
 
-1. 准备一个 synthetic JD ID 和一个 synthetic Resume Version ID。
+1. 先完成 JD Center、Resume Center 和 Project Optimization 的 synthetic 数据准备，至少复制一个 `jd_id` 和一个 `resume_version_id`。
 2. 打开 Interview Center。
 3. 在 Generate Questions 中输入 `jd_id` 和 `resume_version_id`，可选输入 `project_id`、`project_rewrite_id`、question types 和 max questions。
 4. 点击 Generate Questions，查看 warnings、need more info、question type、difficulty、expected points 和 source refs。
