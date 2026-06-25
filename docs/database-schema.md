@@ -199,7 +199,7 @@ JSON 字段说明：
 
 ## interview_answers
 
-用途：预留保存用户面试回答和后续 deterministic scoring 结果。v1.0 10A 只建表，不提供 answer submit / score API。
+用途：保存用户面试回答和 deterministic scoring 结果。v1.0 10B 提供 answer submit / list / score API，但默认 API response 只暴露 preview 和评分结果。
 
 关键字段：
 
@@ -213,7 +213,12 @@ JSON 字段说明：
 - `weakness_tags`
 - `created_at`
 
-隐私说明：`answer_text` 可能包含个人经历或面试复盘，后续 API 应默认 preview-first；列表、Dashboard 和 stats 不应默认暴露完整回答原文。
+JSON 字段说明：
+
+- `scores`：deterministic scoring 结果，包含 `structure`、`technical_depth`、`business_understanding`、`evidence`、`clarity`、`risk_control` 和 `overall_average`。
+- `weakness_tags`：规则生成的薄弱项标签，例如 `weak_structure`、`shallow_technical_depth`、`missing_evidence`、`overclaim_risk`。
+
+隐私说明：`answer_text` 可能包含个人经历或面试复盘，仅保存在本地 DB 用于 deterministic scoring；默认 API response、列表、Dashboard 和 stats 只使用 `answer_text_preview`，不暴露完整回答原文。Scoring 不读取 Resume/JD full raw_text，不调用真实 LLM judge，也不自动写入 Study Plan。
 
 ## rag_documents
 

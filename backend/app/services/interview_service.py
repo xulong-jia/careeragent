@@ -3,11 +3,15 @@ from collections.abc import Iterable
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.models.interview import InterviewQuestion
 from app.models.job import JobDescription, JobProfile
 from app.models.project import Project, ProjectRewrite
 from app.models.resume import ResumeVersion
 from app.repositories import interview_repository
 from app.schemas.interviews import (
+    InterviewAnswerCreateRequest,
+    InterviewAnswerRecord,
+    InterviewAnswerScoreRequest,
     InterviewDifficulty,
     InterviewQuestionGenerateRequest,
     InterviewQuestionGenerateResponse,
@@ -18,6 +22,134 @@ from app.schemas.interviews import (
 
 PREVIEW_CHARS = 180
 GENERATION_STRATEGY = "deterministic_interview_questions_v1"
+SCORING_STRATEGY = "deterministic_interview_answer_scoring_v1"
+SCORE_DIMENSIONS = (
+    "structure",
+    "technical_depth",
+    "business_understanding",
+    "evidence",
+    "clarity",
+    "risk_control",
+)
+STRUCTURE_TERMS = (
+    "background",
+    "action",
+    "result",
+    "first",
+    "second",
+    "third",
+    "1.",
+    "2.",
+    "3.",
+    "背景",
+    "行动",
+    "结果",
+    "首先",
+    "其次",
+    "最后",
+)
+TECHNICAL_TERMS = (
+    "api",
+    "backend",
+    "database",
+    "schema",
+    "validation",
+    "pytest",
+    "test",
+    "docker",
+    "sql",
+    "fastapi",
+    "model",
+    "service",
+    "repository",
+    "migration",
+    "cache",
+    "pipeline",
+    "latency",
+    "implementation",
+    "tradeoff",
+    "实现",
+    "接口",
+    "数据库",
+    "校验",
+    "测试",
+    "取舍",
+)
+BUSINESS_TERMS = (
+    "workflow",
+    "quality",
+    "risk",
+    "requirement",
+    "user",
+    "stakeholder",
+    "business",
+    "scenario",
+    "role",
+    "customer",
+    "需求",
+    "用户",
+    "业务",
+    "场景",
+    "岗位",
+    "质量",
+    "风险",
+)
+EVIDENCE_TERMS = (
+    "evidence",
+    "pytest",
+    "test",
+    "tests",
+    "evaluation",
+    "log",
+    "logs",
+    "before/after",
+    "source refs",
+    "source_refs",
+    "validation",
+    "verified",
+    "reproducible",
+    "证据",
+    "测试",
+    "验证",
+    "日志",
+    "可复现",
+)
+RISK_CONTROL_TERMS = (
+    "risk control",
+    "unsupported",
+    "honest",
+    "honestly",
+    "avoid",
+    "boundary",
+    "claims",
+    "risk",
+    "gap",
+    "风险控制",
+    "诚实",
+    "不夸大",
+    "边界",
+    "缺口",
+)
+OVERCLAIM_TERMS = (
+    "million users",
+    "revenue",
+    "commercial",
+    "accuracy",
+    "production",
+    "launched",
+    "上线",
+    "收益",
+    "百万用户",
+    "商业化",
+    "准确率",
+)
+NEGATED_EVIDENCE_TERMS = (
+    "no evidence",
+    "without evidence",
+    "have no evidence",
+    "没有证据",
+    "无证据",
+)
 
 
 def generate_questions(
@@ -116,6 +248,297 @@ def list_questions(
         question_type=question_type,
         difficulty=difficulty,
     )
+
+
+def submit_answer(
+    db: Session,
+    payload: InterviewAnswerCreateRequest,
+) -> InterviewAnswerRecord:
+    question_id = payload.question_id.strip()
+    answer_text = payload.answer_text.strip()
+    if not answer_text:
+        raise AppError(
+            code="interview_answer_validation_error",
+            message="Interview answer text cannot be empty.",
+            status_code=400,
+            details={"field": "answer_text"},
+        )
+
+    question = interview_repository.get_question_model(db, question_id)
+    if not question:
+        raise AppError(
+            code="interview_question_not_found",
+            message="Interview question was not found.",
+            status_code=404,
+            details={"question_id": question_id},
+        )
+
+    return interview_repository.create_answer(
+        db,
+        question_id=question.id,
+        answer_text=answer_text,
+        answer_text_preview=_preview(answer_text),
+    )
+
+
+def list_answers(
+    db: Session,
+    *,
+    question_id: str | None = None,
+    jd_id: str | None = None,
+    resume_version_id: str | None = None,
+    project_id: str | None = None,
+) -> list[InterviewAnswerRecord]:
+    return interview_repository.list_answers(
+        db,
+        question_id=_normalize_optional_id(question_id),
+        jd_id=_normalize_optional_id(jd_id),
+        resume_version_id=_normalize_optional_id(resume_version_id),
+        project_id=_normalize_optional_id(project_id),
+    )
+
+
+def score_answer(
+    db: Session,
+    answer_id: str,
+    payload: InterviewAnswerScoreRequest | None = None,
+) -> InterviewAnswerRecord:
+    del payload
+    normalized_answer_id = answer_id.strip()
+    answer = interview_repository.get_answer_model(db, normalized_answer_id)
+    if not answer:
+        raise AppError(
+            code="interview_answer_not_found",
+            message="Interview answer was not found.",
+            status_code=404,
+            details={"answer_id": normalized_answer_id},
+        )
+
+    question = interview_repository.get_question_model(db, answer.question_id)
+    if not question:
+        raise AppError(
+            code="interview_question_not_found",
+            message="Interview question was not found.",
+            status_code=404,
+            details={"question_id": answer.question_id},
+        )
+
+    scores = _score_answer_text(answer.answer_text, question)
+    weakness_tags = _weakness_tags(scores)
+    feedback = _feedback_for_scores(scores, weakness_tags)
+    return interview_repository.update_answer_score(
+        db,
+        answer,
+        scores=scores,
+        feedback=feedback,
+        weakness_tags=weakness_tags,
+    )
+
+
+def _score_answer_text(
+    answer_text: str,
+    question: InterviewQuestion,
+) -> dict[str, float]:
+    scores = {
+        "structure": _score_structure(answer_text),
+        "technical_depth": _score_technical_depth(answer_text, question),
+        "business_understanding": _score_business_understanding(answer_text, question),
+        "evidence": _score_evidence(answer_text),
+        "clarity": _score_clarity(answer_text),
+        "risk_control": _score_risk_control(answer_text),
+    }
+    overall = sum(scores[dimension] for dimension in SCORE_DIMENSIONS) / len(
+        SCORE_DIMENSIONS
+    )
+    scores["overall_average"] = round(overall, 2)
+    return scores
+
+
+def _score_structure(answer_text: str) -> float:
+    lower = answer_text.lower()
+    score = 1.0
+    length = len(answer_text)
+    if length >= 40:
+        score += 1.0
+    if length >= 120:
+        score += 1.0
+    if _contains_any(lower, STRUCTURE_TERMS):
+        score += 1.25
+    if answer_text.count("\n") >= 2:
+        score += 0.5
+    return _clamp_score(score)
+
+
+def _score_technical_depth(
+    answer_text: str,
+    question: InterviewQuestion,
+) -> float:
+    lower = answer_text.lower()
+    technical_hits = _count_terms(lower, TECHNICAL_TERMS)
+    expected_hits = _count_terms(lower, _question_expected_terms(question))
+    score = 1.0 + min(2.25, technical_hits * 0.45) + min(1.5, expected_hits * 0.5)
+    if len(answer_text) >= 140 and technical_hits:
+        score += 0.25
+    return _clamp_score(score)
+
+
+def _score_business_understanding(
+    answer_text: str,
+    question: InterviewQuestion,
+) -> float:
+    lower = answer_text.lower()
+    business_hits = _count_terms(lower, BUSINESS_TERMS)
+    score = 1.0 + min(2.25, business_hits * 0.55)
+    if len(answer_text) >= 80:
+        score += 0.5
+    if any(
+        str(ref.get("source_type", "")) == "job_profile"
+        for ref in list(question.source_refs or [])
+        if isinstance(ref, dict)
+    ):
+        score += 0.5
+    return _clamp_score(score)
+
+
+def _score_evidence(answer_text: str) -> float:
+    lower = answer_text.lower()
+    evidence_hits = _count_terms(lower, EVIDENCE_TERMS)
+    score = 1.0 + min(3.0, evidence_hits * 0.65)
+    if len(answer_text) >= 100 and evidence_hits:
+        score += 0.5
+    return _clamp_score(score)
+
+
+def _score_clarity(answer_text: str) -> float:
+    lower = answer_text.lower()
+    score = 1.0
+    length = len(answer_text)
+    if length >= 30:
+        score += 1.0
+    if length >= 90:
+        score += 1.0
+    if _contains_any(lower, STRUCTURE_TERMS):
+        score += 0.75
+    longest_sentence = max(
+        (len(part.strip()) for part in answer_text.split(".") if part.strip()),
+        default=0,
+    )
+    if longest_sentence <= 220:
+        score += 0.5
+    return _clamp_score(score)
+
+
+def _score_risk_control(answer_text: str) -> float:
+    lower = answer_text.lower()
+    overclaim_hits = _count_terms(lower, OVERCLAIM_TERMS)
+    has_negated_evidence = _contains_any(lower, NEGATED_EVIDENCE_TERMS)
+    if overclaim_hits:
+        score = 1.0 if overclaim_hits >= 2 else 2.0
+        if _count_terms(lower, RISK_CONTROL_TERMS) >= 2 and not has_negated_evidence:
+            score += 0.5
+        return _clamp_score(min(score, 2.0))
+
+    risk_hits = _count_terms(lower, RISK_CONTROL_TERMS)
+    evidence_hits = _count_terms(lower, EVIDENCE_TERMS)
+    score = 3.0 + min(1.25, risk_hits * 0.45) + min(0.75, evidence_hits * 0.25)
+    return _clamp_score(score)
+
+
+def _weakness_tags(scores: dict[str, float]) -> list[str]:
+    tags: list[str] = []
+    if scores["structure"] <= 2:
+        tags.append("weak_structure")
+    if scores["technical_depth"] <= 2:
+        tags.append("shallow_technical_depth")
+    if scores["business_understanding"] <= 2:
+        tags.append("weak_business_understanding")
+    if scores["evidence"] <= 2:
+        tags.append("missing_evidence")
+    if scores["clarity"] <= 2:
+        tags.append("unclear_expression")
+    if scores["risk_control"] <= 2:
+        tags.append("overclaim_risk")
+    return tags
+
+
+def _feedback_for_scores(
+    scores: dict[str, float],
+    weakness_tags: list[str],
+) -> str:
+    if not weakness_tags:
+        return (
+            "回答已覆盖结构、技术细节、证据和风险控制；继续保持只引用已有事实，"
+            "避免加入未经 source_refs 支持的新经历。"
+        )
+
+    suggestions: list[str] = []
+    if "weak_structure" in weakness_tags:
+        suggestions.append("按背景-行动-结果组织回答")
+    if "shallow_technical_depth" in weakness_tags:
+        suggestions.append("补充已有项目事实中的实现细节、关键设计取舍和边界")
+    if "weak_business_understanding" in weakness_tags:
+        suggestions.append("说明该做法如何对应岗位需求、工作流质量或风险控制")
+    if "missing_evidence" in weakness_tags:
+        suggestions.append("补充已有项目事实、测试记录或可验证证据")
+    if "unclear_expression" in weakness_tags:
+        suggestions.append("压缩泛泛表述，用更清晰的步骤描述个人行动")
+    if "overclaim_risk" in weakness_tags:
+        suggestions.append("删去未由 source_refs 或已有材料支持的强 claim")
+
+    weakest = min(
+        (dimension for dimension in SCORE_DIMENSIONS),
+        key=lambda dimension: scores[dimension],
+    )
+    return (
+        f"当前最需要改进的是 {weakest}。"
+        + "；".join(suggestions)
+        + "。不要编造未验证经历。"
+    )
+
+
+def _question_expected_terms(question: InterviewQuestion) -> tuple[str, ...]:
+    terms: list[str] = []
+    for point in list(question.expected_points or []):
+        if not isinstance(point, dict):
+            continue
+        terms.extend(_split_scoring_terms(str(point.get("name", ""))))
+        terms.extend(_split_scoring_terms(str(point.get("description", ""))))
+    for ref in list(question.source_refs or []):
+        if not isinstance(ref, dict):
+            continue
+        terms.extend(_split_scoring_terms(str(ref.get("preview", ""))))
+        terms.extend(_split_scoring_terms(str(ref.get("field", ""))))
+    terms.extend(_split_scoring_terms(question.question))
+    return tuple(sorted(set(term for term in terms if len(term) >= 3)))
+
+
+def _split_scoring_terms(value: str) -> list[str]:
+    cleaned = (
+        value.replace("_", " ")
+        .replace(",", " ")
+        .replace("。", " ")
+        .replace("，", " ")
+        .replace("、", " ")
+    )
+    terms: list[str] = []
+    for token in cleaned.split():
+        normalized = token.strip().lower()
+        if not normalized:
+            continue
+        terms.append(normalized)
+    return terms
+
+
+def _count_terms(text_lower: str, terms: Iterable[str]) -> int:
+    return sum(1 for term in terms if term and term.lower() in text_lower)
+
+
+def _contains_any(text_lower: str, terms: Iterable[str]) -> bool:
+    return any(term and term.lower() in text_lower for term in terms)
+
+
+def _clamp_score(value: float) -> float:
+    return round(max(0.0, min(5.0, value)), 2)
 
 
 def _get_active_job_with_profile(

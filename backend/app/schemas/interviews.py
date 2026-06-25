@@ -53,3 +53,29 @@ class InterviewQuestionGenerateResponse(BaseModel):
     questions: list[InterviewQuestionRecord] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     need_more_info: list[str] = Field(default_factory=list)
+
+
+class InterviewAnswerCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: str = Field(min_length=1, max_length=64)
+    answer_text: str = Field(max_length=20000)
+
+
+class InterviewAnswerScoreRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class InterviewAnswerRecord(BaseModel):
+    id: str
+    question_id: str
+    user_id: str
+    answer_text_preview: str
+    scores: dict[str, float] = Field(default_factory=dict)
+    feedback: str | None = None
+    weakness_tags: list[str] = Field(default_factory=list)
+    created_at: datetime
+
+
+class InterviewAnswerScoreResponse(BaseModel):
+    answer: InterviewAnswerRecord

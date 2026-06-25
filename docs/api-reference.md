@@ -189,12 +189,15 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 
 ## Interview APIs
 
-当前为 v1.0 Interview Center 10A backend 范围：只实现表结构、deterministic question generation 和 question list。Answer submit / scoring API、InterviewCenterPage 和 Study Plan 写入尚未实现。
+当前为 v1.0 Interview Center 10A/10B backend 范围：实现表结构、deterministic question generation、question list、answer submit / list 和 deterministic scoring。InterviewCenterPage、Study Plan 写入、RAG completion 和 LLM judge 尚未实现。
 
 | Method | Path | 说明 |
 | --- | --- | --- |
 | POST | `/api/interviews/questions/generate` | 基于 JD profile、structured resume、可选 project / project rewrite 生成 deterministic interview questions |
 | GET | `/api/interviews/questions` | 查询已生成 questions，可按 `jd_id`、`resume_version_id`、`project_id`、`question_type`、`difficulty` 筛选 |
+| POST | `/api/interviews/answers` | 提交面试回答，保存完整 `answer_text` 到本地 DB，默认 response 只返回 `answer_text_preview` |
+| GET | `/api/interviews/answers` | 查询已提交 answers，可按 `question_id`、`jd_id`、`resume_version_id`、`project_id` 筛选 |
+| POST | `/api/interviews/answers/{answer_id}/score` | 对已保存 answer 运行 deterministic scoring，返回 scores、feedback、weakness_tags 和 preview |
 
 `POST /api/interviews/questions/generate` request:
 
@@ -217,6 +220,43 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 - `need_more_info`
 
 隐私边界：Interview questions 不返回 Resume/JD full raw_text。`source_refs` 只保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`，用于追踪题目来源；题目生成不调用真实 LLM，不要求用户编造上线、收益、用户量、准确率或公司经历。
+
+`POST /api/interviews/answers` request:
+
+- `question_id`
+- `answer_text`
+
+`GET /api/interviews/answers` filters:
+
+- `question_id` optional
+- `jd_id` optional
+- `resume_version_id` optional
+- `project_id` optional
+
+`POST /api/interviews/answers/{answer_id}/score` request body may be empty.
+
+Answer response 关键字段：
+
+- `id`
+- `question_id`
+- `user_id`
+- `answer_text_preview`
+- `scores`
+- `feedback`
+- `weakness_tags`
+- `created_at`
+
+Scoring dimensions:
+
+- `structure`
+- `technical_depth`
+- `business_understanding`
+- `evidence`
+- `clarity`
+- `risk_control`
+- `overall_average`
+
+隐私边界：Answer submit 会在本地 DB 保存完整 `answer_text`，用于后续 deterministic scoring；默认 API response、列表、Dashboard 和 stats 不返回完整 `answer_text`。Scoring 只使用已保存 answer、question、`expected_points` 和 `source_refs`，不读取或返回 Resume/JD full raw_text，不调用真实 LLM judge，不自动写入 Study Plan。
 
 ## RAG APIs
 

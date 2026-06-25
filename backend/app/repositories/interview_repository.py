@@ -4,8 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models.interview import InterviewQuestion
-from app.schemas.interviews import InterviewQuestionRecord
+from app.models.interview import InterviewAnswer, InterviewQuestion
+from app.schemas.interviews import InterviewAnswerRecord, InterviewQuestionRecord
 
 
 def _next_interview_question_id(db: Session) -> str:
@@ -16,6 +16,19 @@ def _next_interview_question_id(db: Session) -> str:
     raise AppError(
         code="interview_question_id_generation_failed",
         message="Unable to generate a unique interview question id.",
+        status_code=500,
+        details={},
+    )
+
+
+def _next_interview_answer_id(db: Session) -> str:
+    for _ in range(10):
+        answer_id = f"interview_answer_{uuid4().hex[:12]}"
+        if db.get(InterviewAnswer, answer_id) is None:
+            return answer_id
+    raise AppError(
+        code="interview_answer_id_generation_failed",
+        message="Unable to generate a unique interview answer id.",
         status_code=500,
         details={},
     )
@@ -35,6 +48,19 @@ def _to_question_record(question: InterviewQuestion) -> InterviewQuestionRecord:
         source_refs=list(question.source_refs or []),
         difficulty=question.difficulty,  # type: ignore[arg-type]
         created_at=question.created_at,
+    )
+
+
+def _to_answer_record(answer: InterviewAnswer) -> InterviewAnswerRecord:
+    return InterviewAnswerRecord(
+        id=answer.id,
+        question_id=answer.question_id,
+        user_id=answer.user_id,
+        answer_text_preview=answer.answer_text_preview,
+        scores=dict(answer.scores or {}),
+        feedback=answer.feedback,
+        weakness_tags=list(answer.weakness_tags or []),
+        created_at=answer.created_at,
     )
 
 
@@ -75,6 +101,58 @@ def create_questions(
     return [_to_question_record(record) for record in records]
 
 
+def create_answer(
+    db: Session,
+    *,
+    question_id: str,
+    answer_text: str,
+    answer_text_preview: str,
+) -> InterviewAnswerRecord:
+    answer = InterviewAnswer(
+        id=_next_interview_answer_id(db),
+        question_id=question_id,
+        user_id="default",
+        answer_text=answer_text,
+        answer_text_preview=answer_text_preview,
+        scores={},
+        feedback=None,
+        weakness_tags=[],
+    )
+    try:
+        db.add(answer)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(answer)
+    return _to_answer_record(answer)
+
+
+def list_answers(
+    db: Session,
+    *,
+    question_id: str | None = None,
+    jd_id: str | None = None,
+    resume_version_id: str | None = None,
+    project_id: str | None = None,
+) -> list[InterviewAnswerRecord]:
+    statement = select(InterviewAnswer).join(InterviewQuestion)
+    if question_id is not None:
+        statement = statement.where(InterviewAnswer.question_id == question_id)
+    if jd_id is not None:
+        statement = statement.where(InterviewQuestion.jd_id == jd_id)
+    if resume_version_id is not None:
+        statement = statement.where(
+            InterviewQuestion.resume_version_id == resume_version_id
+        )
+    if project_id is not None:
+        statement = statement.where(InterviewQuestion.project_id == project_id)
+    answers = db.scalars(
+        statement.order_by(InterviewAnswer.created_at, InterviewAnswer.id)
+    ).all()
+    return [_to_answer_record(answer) for answer in answers]
+
+
 def list_questions(
     db: Session,
     *,
@@ -103,8 +181,12 @@ def list_questions(
     return [_to_question_record(record) for record in records]
 
 
+def get_question_model(db: Session, question_id: str) -> InterviewQuestion | None:
+    return db.get(InterviewQuestion, question_id)
+
+
 def get_question(db: Session, question_id: str) -> InterviewQuestionRecord:
-    question = db.get(InterviewQuestion, question_id)
+    question = get_question_model(db, question_id)
     if not question:
         raise AppError(
             code="interview_question_not_found",
@@ -113,3 +195,40 @@ def get_question(db: Session, question_id: str) -> InterviewQuestionRecord:
             details={"question_id": question_id},
         )
     return _to_question_record(question)
+
+
+def get_answer_model(db: Session, answer_id: str) -> InterviewAnswer | None:
+    return db.get(InterviewAnswer, answer_id)
+
+
+def get_answer(db: Session, answer_id: str) -> InterviewAnswerRecord:
+    answer = get_answer_model(db, answer_id)
+    if not answer:
+        raise AppError(
+            code="interview_answer_not_found",
+            message="Interview answer was not found.",
+            status_code=404,
+            details={"answer_id": answer_id},
+        )
+    return _to_answer_record(answer)
+
+
+def update_answer_score(
+    db: Session,
+    answer: InterviewAnswer,
+    *,
+    scores: dict[str, float],
+    feedback: str,
+    weakness_tags: list[str],
+) -> InterviewAnswerRecord:
+    answer.scores = scores
+    answer.feedback = feedback
+    answer.weakness_tags = weakness_tags
+    try:
+        db.add(answer)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(answer)
+    return _to_answer_record(answer)
