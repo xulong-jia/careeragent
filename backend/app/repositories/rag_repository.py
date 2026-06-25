@@ -2,8 +2,12 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models.rag import RagChunk, RagDocument
-from app.schemas.rag import RagChunkRecord, RagDocumentRecord
+from app.models.rag import RagAnswerRun, RagChunk, RagDocument
+from app.schemas.rag import (
+    RagAnswerRunRecord,
+    RagChunkRecord,
+    RagDocumentRecord,
+)
 
 
 PREVIEW_CHARS = 500
@@ -16,6 +20,11 @@ def _next_document_id(db: Session) -> str:
 
 def _chunk_id(document_id: str, chunk_index: int) -> str:
     return f"{document_id}_chunk_{chunk_index + 1:04d}"
+
+
+def _next_answer_run_id(db: Session) -> str:
+    count = db.scalar(select(func.count()).select_from(RagAnswerRun)) or 0
+    return f"rag_answer_run_{count + 1:04d}"
 
 
 def _preview(text: str) -> str:
@@ -48,6 +57,26 @@ def _to_chunk_record(chunk: RagChunk) -> RagChunkRecord:
         metadata=dict(chunk.metadata_json or {}),
         embedding_id=chunk.embedding_id,
         created_at=chunk.created_at,
+    )
+
+
+def _to_answer_run_record(answer_run: RagAnswerRun) -> RagAnswerRunRecord:
+    return RagAnswerRunRecord(
+        answer_run_id=answer_run.id,
+        question=answer_run.question,
+        filters=dict(answer_run.filters_json or {}),
+        top_k=answer_run.top_k,
+        retrieval_mode=answer_run.retrieval_mode,
+        answer=answer_run.answer,
+        answer_type=answer_run.answer_type,
+        grounded=answer_run.grounded,
+        uncertainty=answer_run.uncertainty,
+        evidence_summary=list(answer_run.evidence_summary or []),
+        citations=list(answer_run.citations_json or []),
+        source_refs=list(answer_run.source_refs_json or []),
+        retrieval_debug=dict(answer_run.retrieval_debug_json or {}),
+        created_at=answer_run.created_at,
+        updated_at=answer_run.updated_at,
     )
 
 
@@ -228,3 +257,77 @@ def update_document_index_status(
         raise
     db.refresh(document)
     return _to_document_record(document)
+
+
+def create_answer_run(
+    db: Session,
+    *,
+    question: str,
+    filters: dict[str, object],
+    top_k: int,
+    retrieval_mode: str,
+    answer: str,
+    answer_type: str,
+    grounded: bool,
+    uncertainty: str,
+    evidence_summary: list[str],
+    citations: list[dict[str, object]],
+    source_refs: list[dict[str, object]],
+    retrieval_debug: dict[str, object],
+) -> RagAnswerRunRecord:
+    answer_run = RagAnswerRun(
+        id=_next_answer_run_id(db),
+        user_id="default",
+        question=question,
+        filters_json=filters,
+        top_k=top_k,
+        retrieval_mode=retrieval_mode,
+        answer=answer,
+        answer_type=answer_type,
+        grounded=grounded,
+        uncertainty=uncertainty,
+        evidence_summary=evidence_summary,
+        citations_json=citations,
+        source_refs_json=source_refs,
+        retrieval_debug_json=retrieval_debug,
+    )
+    try:
+        db.add(answer_run)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(answer_run)
+    return _to_answer_run_record(answer_run)
+
+
+def list_answer_runs(
+    db: Session,
+    *,
+    grounded: bool | None = None,
+    uncertainty: str | None = None,
+    retrieval_mode: str | None = None,
+) -> list[RagAnswerRunRecord]:
+    statement = select(RagAnswerRun)
+    if grounded is not None:
+        statement = statement.where(RagAnswerRun.grounded == grounded)
+    if uncertainty:
+        statement = statement.where(RagAnswerRun.uncertainty == uncertainty)
+    if retrieval_mode:
+        statement = statement.where(RagAnswerRun.retrieval_mode == retrieval_mode)
+    answer_runs = db.scalars(
+        statement.order_by(RagAnswerRun.created_at.desc(), RagAnswerRun.id.desc())
+    ).all()
+    return [_to_answer_run_record(answer_run) for answer_run in answer_runs]
+
+
+def get_answer_run(db: Session, answer_run_id: str) -> RagAnswerRunRecord:
+    answer_run = db.get(RagAnswerRun, answer_run_id)
+    if not answer_run:
+        raise AppError(
+            code="rag_answer_run_not_found",
+            message="RAG answer run was not found.",
+            status_code=404,
+            details={"answer_run_id": answer_run_id},
+        )
+    return _to_answer_run_record(answer_run)

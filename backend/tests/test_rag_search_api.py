@@ -98,6 +98,36 @@ def test_search_respects_top_k_and_source_type_filter():
     assert result["sources"][0]["source_type"] == "markdown"
 
 
+def test_search_orders_clear_keyword_match_above_weaker_match():
+    client = make_client()
+    strong = _create_and_index_document(
+        client,
+        title="Strong FastAPI Notes",
+        raw_text=(
+            "FastAPI FastAPI pytest API contracts require evidence-backed "
+            "backend interview examples."
+        ),
+        metadata={"tags": ["backend"]},
+    )
+    _create_and_index_document(
+        client,
+        title="Weak FastAPI Notes",
+        raw_text="FastAPI backend notes mention interviews only briefly.",
+        metadata={"tags": ["backend"]},
+    )
+
+    response = client.post(
+        "/api/rag/search",
+        json={"query": "FastAPI pytest API contracts", "top_k": 2},
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert len(result["sources"]) == 2
+    assert result["sources"][0]["doc_id"] == strong["doc_id"]
+    assert result["sources"][0]["score"] > result["sources"][1]["score"]
+
+
 def test_search_respects_doc_id_and_metadata_filters():
     client = make_client()
     target = _create_and_index_document(

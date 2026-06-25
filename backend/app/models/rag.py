@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -60,3 +60,38 @@ class RagChunk(Base):
     )
 
     document: Mapped[RagDocument] = relationship(back_populates="chunks")
+
+
+class RagAnswerRun(Base):
+    __tablename__ = "rag_answer_runs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        default="default",
+        nullable=False,
+        index=True,
+    )
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    filters_json: Mapped[dict | None] = mapped_column(JSON)
+    top_k: Mapped[int] = mapped_column(Integer, nullable=False)
+    retrieval_mode: Mapped[str] = mapped_column(
+        String(40),
+        default="deterministic_lexical",
+        nullable=False,
+        index=True,
+    )
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    answer_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    grounded: Mapped[bool] = mapped_column(Boolean, nullable=False, index=True)
+    uncertainty: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    evidence_summary: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    citations_json: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    source_refs_json: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    retrieval_debug_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )

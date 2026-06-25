@@ -282,9 +282,32 @@ JSON 字段说明：
 
 当前没有真实 embedding，`embedding_id` 是预留字段。
 
-v1.2 12A 说明：本轮只收紧 RAG grounded answer response contract，不新增 `rag_answer_runs` 或 query history 表。`POST /api/rag/answer` 的 `citations`、`source_refs`、`evidence_summary` 和 `retrieval_debug` 基于当前 lexical retrieval 临时生成，不单独持久化。
+## rag_answer_runs
 
-隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`retrieval_debug` 只允许保存/返回 retrieval_mode、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。
+用途：记录 v1.2 12B persisted grounded answer run，供后续 Evaluation、Bad Case 或 Agent 引用 answer run ID。
+
+关键字段：
+
+- `id`
+- `user_id`
+- `question`
+- `filters_json`
+- `top_k`
+- `retrieval_mode`
+- `answer`
+- `answer_type`
+- `grounded`
+- `uncertainty`
+- `evidence_summary`
+- `citations_json`
+- `source_refs_json`
+- `retrieval_debug_json`
+- `created_at`
+- `updated_at`
+
+`POST /api/rag/answer` 默认 `persist=true`，会写入 `rag_answer_runs` 并返回 `answer_run_id`。如果 request 设置 `persist=false`，则只返回即时 grounded answer contract，不写入该表。
+
+隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`rag_answer_runs.citations_json` 只保存短 snippet 和 metadata preview，`source_refs_json` 只保存短 preview，`retrieval_debug_json` 只允许保存 retrieval_mode、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。12B 不接真实 LLM、embedding/vector DB，不自动修改 Interview / Study Plan / Resume / Project / Application。
 
 ## agent_runs
 

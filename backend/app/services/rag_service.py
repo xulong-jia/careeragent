@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
@@ -9,6 +11,7 @@ from app.schemas.rag import (
     RagChunkRecord,
     RagAnswerRequest,
     RagAnswerResult,
+    RagAnswerRunRecord,
     RagDocumentCreateRequest,
     RagDocumentIndexRequest,
     RagDocumentIndexResult,
@@ -31,6 +34,19 @@ ALLOWED_SOURCE_TYPES = {
     "company",
 }
 MAX_SEARCH_TOP_K = 20
+ALLOWED_ANSWER_UNCERTAINTIES = {
+    "grounded",
+    "no_relevant_source",
+    "insufficient_evidence",
+}
+ALLOWED_RETRIEVAL_MODES = {"deterministic_lexical"}
+STORED_TEXT_PREVIEW_CHARS = 240
+SENSITIVE_KEY_PARTS = {
+    "raw_text",
+    "answer_text",
+    "chunk_text",
+    "full_text",
+}
 
 
 def _validation_error(message: str, field: str) -> AppError:
@@ -47,6 +63,49 @@ def _normalize_source_type(source_type: str) -> str:
     if normalized not in ALLOWED_SOURCE_TYPES:
         raise _validation_error("Unsupported RAG source_type.", "source_type")
     return normalized
+
+
+def _validate_answer_run_filter(
+    *,
+    uncertainty: str | None = None,
+    retrieval_mode: str | None = None,
+) -> None:
+    if uncertainty and uncertainty not in ALLOWED_ANSWER_UNCERTAINTIES:
+        raise AppError(
+            code="rag_answer_run_filter_validation_error",
+            message="Unsupported RAG answer uncertainty filter.",
+            status_code=400,
+            details={"field": "uncertainty"},
+        )
+    if retrieval_mode and retrieval_mode not in ALLOWED_RETRIEVAL_MODES:
+        raise AppError(
+            code="rag_answer_run_filter_validation_error",
+            message="Unsupported RAG retrieval_mode filter.",
+            status_code=400,
+            details={"field": "retrieval_mode"},
+        )
+
+
+def _truncate_stored_text(value: str) -> str:
+    if len(value) <= STORED_TEXT_PREVIEW_CHARS:
+        return value
+    return f"{value[: STORED_TEXT_PREVIEW_CHARS - 3].rstrip()}..."
+
+
+def _sanitize_for_answer_run(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, nested_value in value.items():
+            lowered = str(key).lower()
+            if any(part in lowered for part in SENSITIVE_KEY_PARTS):
+                continue
+            sanitized[key] = _sanitize_for_answer_run(nested_value)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_for_answer_run(item) for item in value]
+    if isinstance(value, str):
+        return _truncate_stored_text(value)
+    return value
 
 
 def _validate_document_payload(
@@ -241,4 +300,57 @@ def answer_question(db: Session, payload: RagAnswerRequest) -> RagAnswerResult:
         search_result.sources,
         retrieval_debug=search_result.retrieval_debug,
     )
-    return RagAnswerResult(**answer_payload)
+    result = RagAnswerResult(**answer_payload)
+    if not payload.persist:
+        return result
+
+    filters = payload.filters.model_dump(exclude_none=True) if payload.filters else {}
+    retrieval_debug = result.retrieval_debug.model_dump()
+    answer_run = rag_repository.create_answer_run(
+        db,
+        question=question,
+        filters=dict(_sanitize_for_answer_run(filters)),
+        top_k=search_result.top_k,
+        retrieval_mode=result.retrieval_debug.retrieval_mode,
+        answer=result.answer,
+        answer_type=result.answer_type,
+        grounded=result.grounded,
+        uncertainty=result.uncertainty or "grounded",
+        evidence_summary=list(_sanitize_for_answer_run(result.evidence_summary)),
+        citations=list(
+            _sanitize_for_answer_run(
+                [citation.model_dump() for citation in result.citations]
+            )
+        ),
+        source_refs=list(
+            _sanitize_for_answer_run(
+                [source_ref.model_dump() for source_ref in result.source_refs]
+            )
+        ),
+        retrieval_debug=dict(_sanitize_for_answer_run(retrieval_debug)),
+    )
+    result.answer_run_id = answer_run.answer_run_id
+    return result
+
+
+def list_answer_runs(
+    db: Session,
+    *,
+    grounded: bool | None = None,
+    uncertainty: str | None = None,
+    retrieval_mode: str | None = None,
+) -> list[RagAnswerRunRecord]:
+    _validate_answer_run_filter(
+        uncertainty=uncertainty,
+        retrieval_mode=retrieval_mode,
+    )
+    return rag_repository.list_answer_runs(
+        db,
+        grounded=grounded,
+        uncertainty=uncertainty,
+        retrieval_mode=retrieval_mode,
+    )
+
+
+def get_answer_run(db: Session, answer_run_id: str) -> RagAnswerRunRecord:
+    return rag_repository.get_answer_run(db, answer_run_id)

@@ -651,9 +651,11 @@ export type RagAnswerRequest = {
   question: string;
   top_k: number;
   filters?: RagSearchFilters | null;
+  persist?: boolean;
 };
 
 export type RagAnswerResult = {
+  answer_run_id: string | null;
   question: string;
   answer: string;
   sources: RagSearchSource[];

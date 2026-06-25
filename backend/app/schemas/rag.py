@@ -36,6 +36,7 @@ class RagAnswerRequest(BaseModel):
     question: str
     top_k: int = 5
     filters: RagSearchFilters | None = None
+    persist: bool = True
 
 
 class RagDocumentRecord(BaseModel):
@@ -124,6 +125,7 @@ class RagSearchResult(BaseModel):
 
 
 class RagAnswerResult(BaseModel):
+    answer_run_id: str | None = None
     question: str
     answer: str
     sources: list[RagSearchSource] = Field(default_factory=list)
@@ -134,3 +136,21 @@ class RagAnswerResult(BaseModel):
     citations: list[RagCitation] = Field(default_factory=list)
     source_refs: list[RagSourceRef] = Field(default_factory=list)
     retrieval_debug: RagRetrievalDebug
+
+
+class RagAnswerRunRecord(BaseModel):
+    answer_run_id: str
+    question: str
+    filters: dict[str, object] = Field(default_factory=dict)
+    top_k: int
+    retrieval_mode: str
+    answer: str
+    answer_type: str
+    grounded: bool
+    uncertainty: str
+    evidence_summary: list[str] = Field(default_factory=list)
+    citations: list[RagCitation] = Field(default_factory=list)
+    source_refs: list[RagSourceRef] = Field(default_factory=list)
+    retrieval_debug: RagRetrievalDebug
+    created_at: datetime
+    updated_at: datetime

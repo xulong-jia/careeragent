@@ -44,3 +44,24 @@ def test_build_deterministic_answer_uses_only_source_snippets():
     assert result["source_refs"][0].source_id == source.chunk_id
     assert result["evidence_summary"]
     assert "full chunk text" not in result["answer"]
+
+
+def test_build_deterministic_answer_marks_low_score_as_insufficient_evidence():
+    source = RagSearchSource(
+        doc_id="rag_doc_0001",
+        chunk_id="rag_doc_0001_chunk_0001",
+        title="Synthetic Weak Notes",
+        source_type="manual",
+        section=None,
+        snippet="Weak incidental overlap.",
+        score=0.001,
+        metadata={"topic": "weak"},
+    )
+
+    result = build_deterministic_answer("How should I prepare?", [source])
+
+    assert result["grounded"] is False
+    assert result["uncertainty"] == "insufficient_evidence"
+    assert result["answer"] == "Insufficient retrieved evidence to answer safely."
+    assert result["citations"][0].chunk_id == source.chunk_id
+    assert result["retrieval_debug"].insufficient_reason == "insufficient_evidence"

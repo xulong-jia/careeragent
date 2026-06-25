@@ -531,6 +531,10 @@ export function KnowledgeBasePage({
                   <span>{answerResult.answer_type}</span>
                 </li>
                 <li>
+                  <strong>Answer Run</strong>
+                  <span>{answerResult.answer_run_id ?? "not persisted"}</span>
+                </li>
+                <li>
                   <strong>Citations</strong>
                   <span>{answerResult.citations.length}</span>
                 </li>

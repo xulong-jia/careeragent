@@ -7,6 +7,7 @@ from app.schemas.rag import (
     RagChunkRecord,
     RagAnswerRequest,
     RagAnswerResult,
+    RagAnswerRunRecord,
     RagDocumentCreateRequest,
     RagDocumentIndexRequest,
     RagDocumentIndexResult,
@@ -108,3 +109,36 @@ async def answer_rag_question(
 ) -> dict[str, object]:
     result = rag_service.answer_question(db, payload)
     return {"data": result, "request_id": request.state.request_id}
+
+
+@router.get("/answers", response_model=ApiResponse[ListResponse[RagAnswerRunRecord]])
+async def list_rag_answer_runs(
+    request: Request,
+    grounded: bool | None = Query(default=None),
+    uncertainty: str | None = Query(default=None),
+    retrieval_mode: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    answer_runs = rag_service.list_answer_runs(
+        db,
+        grounded=grounded,
+        uncertainty=uncertainty,
+        retrieval_mode=retrieval_mode,
+    )
+    return {
+        "data": ListResponse(items=answer_runs, total=len(answer_runs)),
+        "request_id": request.state.request_id,
+    }
+
+
+@router.get(
+    "/answers/{answer_run_id}",
+    response_model=ApiResponse[RagAnswerRunRecord],
+)
+async def get_rag_answer_run(
+    request: Request,
+    answer_run_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    answer_run = rag_service.get_answer_run(db, answer_run_id)
+    return {"data": answer_run, "request_id": request.state.request_id}
