@@ -8,6 +8,7 @@ from app.models.profile import Profile
 from app.models.project import Project, ProjectRewrite
 from app.models.rag import RagChunk, RagDocument
 from app.models.resume import Resume, ResumeVersion
+from app.models.study_plan import StudyPlan
 
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "RagDocument",
     "Resume",
     "ResumeVersion",
+    "StudyPlan",
 ]

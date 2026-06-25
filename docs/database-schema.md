@@ -220,6 +220,34 @@ JSON 字段说明：
 
 隐私说明：`answer_text` 可能包含个人经历或面试复盘，仅保存在本地 DB 用于 deterministic scoring；默认 API response、列表、Dashboard 和 stats 不暴露完整回答原文。Dashboard stats 只读取聚合计数、`scores.overall_average` 和 `weakness_tags`，不读取或展示完整 `answer_text`。Scoring 不读取 Resume/JD full raw_text，不调用真实 LLM judge，也不自动写入 Study Plan。
 
+## study_plans
+
+用途：记录 v1.1 Study Plan Center 11A 生成的 deterministic 学习计划。当前只提供 backend generate API，不提供 task status update API、Dashboard study stats 或前端 StudyPlanPage。
+
+关键字段：
+
+- `id`
+- `user_id`
+- `match_report_id`
+- `profile_id`
+- `project_rewrite_id`
+- `target_role`
+- `source_refs`
+- `phases`
+- `status`
+- `created_at`
+- `updated_at`
+
+JSON 字段说明：
+
+- `source_refs`：学习计划来源引用，只允许保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`。
+- `phases`：阶段化学习计划，每个 phase 包含 `phase_id`、`phase`、`goal`、`tasks`、`resources`、`deliverables` 和 `acceptance_criteria`。
+- `tasks`：v1.1 11A 先保存在 `phases` JSON 中，不建独立 `study_tasks` 表。每个 task 包含稳定 `task_id`、`title`、`description`、`source_gap`、`priority`、`status`、`due_hint`、`acceptance_criteria`、`evidence_required` 和 `source_refs`。
+
+状态：`status` 支持 `active`、`completed`、`archived`。11A 只在生成时写入 `active`，后续 task status update 阶段再扩展状态更新。
+
+隐私说明：Study Plan generation 可以读取 Profile、Match gaps、Project Rewrite missing/evidence signals 和 Interview weakness tags，但默认 response 不返回 Resume/JD full raw_text 或完整 `answer_text`。`source_refs` 只保存短 preview 和引用 ID。Study plan tasks 只建议补证据、补学习、写交付物或审计 claim，不自动修改简历、项目、面试答案或投递状态，不编造课程链接、公司经历、指标、上线状态或业务规模。
+
 ## rag_documents
 
 用途：记录 RAG 知识库文档。

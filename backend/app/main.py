@@ -19,6 +19,7 @@ from app.api.projects import router as projects_router
 from app.api.rag import router as rag_router
 from app.api.resume_versions import router as resume_versions_router
 from app.api.resumes import router as resumes_router
+from app.api.study_plans import router as study_plans_router
 from app.core.config import get_settings
 from app.core.errors import (
     AppError,
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(projects_router)
     app.include_router(project_rewrites_router)
     app.include_router(interviews_router)
+    app.include_router(study_plans_router)
     app.include_router(resumes_router)
     app.include_router(resume_versions_router)
     app.include_router(jobs_router)

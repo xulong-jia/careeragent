@@ -24,6 +24,7 @@ CORE_TABLES = {
     "project_rewrites",
     "interview_questions",
     "interview_answers",
+    "study_plans",
 }
 
 

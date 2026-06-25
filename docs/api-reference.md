@@ -189,7 +189,7 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 
 ## Interview APIs
 
-当前为 v1.0 Interview Center 10A/10B/10C/10D 范围：实现表结构、deterministic question generation、question list、answer submit / list、deterministic scoring、InterviewCenterPage 前端工作流和 Dashboard stats。Study Plan 写入、RAG completion 和 LLM judge 尚未实现。
+当前为 v1.0 Interview Center 10A/10B/10C/10D 范围：实现表结构、deterministic question generation、question list、answer submit / list、deterministic scoring、InterviewCenterPage 前端工作流和 Dashboard stats。Study Plan 自动写入、RAG completion 和 LLM judge 尚未实现。
 
 | Method | Path | 说明 |
 | --- | --- | --- |
@@ -272,6 +272,63 @@ Scoring dimensions:
 - `by_difficulty`
 
 Stats 隐私边界：只基于 `interview_questions` / `interview_answers` 做聚合，不返回完整 `answer_text`、Resume raw_text 或 JD raw_text。Dashboard 读取该 API 失败时会回退为空 stats，不阻断其他 workbench 数据加载。
+
+## Study Plan APIs
+
+当前为 v1.1 Study Plan Center 11A 范围：实现 `study_plans` 表、deterministic generate service 和 `POST /api/study-plans/generate`。StudyPlanPage、Dashboard study stats、task status update API、真实 LLM、RAG completion 和 Agent full workflow 尚未实现。
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| POST | `/api/study-plans/generate` | 基于 target role、Profile、Match gaps、Project Rewrite signals、Interview weakness tags 和 request weakness tags 生成 deterministic study plan |
+
+`POST /api/study-plans/generate` request:
+
+- `target_role` optional；为空时可从 `profile_id` 对应 profile 的 `target_roles` 推断。
+- `profile_id` optional
+- `match_report_id` optional
+- `project_rewrite_id` optional
+- `interview_answer_ids` default `[]`
+- `weakness_tags` default `[]`
+- `available_hours_per_week` default `5`
+- `horizon_weeks` default `4`
+
+Response 关键字段：
+
+- `id`
+- `user_id`
+- `match_report_id`
+- `profile_id`
+- `project_rewrite_id`
+- `target_role`
+- `source_refs`
+- `phases`
+- `status`
+- `created_at`
+- `updated_at`
+
+`phases` 内每个 task 包含：
+
+- `task_id`
+- `title`
+- `description`
+- `source_gap`
+- `priority`
+- `status`
+- `due_hint`
+- `acceptance_criteria`
+- `evidence_required`
+- `source_refs`
+
+错误边界：
+
+- `profile_not_found`
+- `match_report_not_found`
+- `project_rewrite_not_found`
+- `interview_answer_not_found`
+- `study_plan_target_role_required`
+- invalid `available_hours_per_week` / `horizon_weeks` 返回统一 `validation_error`
+
+隐私边界：Study Plan generation 不返回 Resume/JD full raw_text，不返回完整 `answer_text`。`source_refs` 只保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`。生成结果只创建学习任务、证据任务和 claim audit 任务，不自动修改简历、项目、面试答案或投递状态，也不编造课程链接、公司经历、指标、上线状态或业务规模。
 
 ## RAG APIs
 
