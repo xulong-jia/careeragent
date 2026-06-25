@@ -1,10 +1,10 @@
 # CareerAgent Final Acceptance Report
 
-本报告记录 v1.2.0 RAG Completion 12D 后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示 v1.2 final tag 已完成。
+本报告记录 v1.2.0 RAG Completion 12E final handoff 后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示 v1.2 final tag 已完成。
 
 ## 1. 验收结论
 
-v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.0 RAG Completion 当前已完成 12A/12B/12C/12D 的 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats 和 optional downstream refs。v1.0.0 `interview-center` 仍作为已完成的上一个稳定里程碑保留在本报告中。
+v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.0 RAG Completion deterministic MVP 已完成 12A/12B/12C/12D/12E 的 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff 文档。v1.0.0 `interview-center` 仍作为已完成的上一个稳定里程碑保留在本报告中。
 
 已完成范围：
 
@@ -22,6 +22,7 @@ v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.
 - 12B RAG answer persistence：新增 `rag_answer_runs`，`POST /api/rag/answer` 默认保存 answer run，并新增 answer run list/detail API。
 - 12C KnowledgeBasePage answer history：前端支持 answer run filters、list/detail、citations/source_refs preview 和 retrieval_debug 展示。
 - 12D Dashboard RAG stats + optional refs：新增 `GET /api/rag/stats`，Dashboard 展示 RAG stats，Interview / Study Plan generation 支持可选 grounded RAG answer run refs。
+- 12E final handoff：新增 `docs/release-notes-v1.2.md`，并完成 README、architecture、API reference、database schema、demo script 和 final acceptance report 最终口径收口。
 
 ## 2. 当前模块状态
 
@@ -34,13 +35,13 @@ v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.
 | Study Plan Center | 已完成 v1.1 11A/11B/11C/11D：study plan generation、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats |
 | JD Center | 已完成 deterministic MVP |
 | Match Report | 已完成 deterministic MVP |
-| RAG Knowledge Base | v1.2 12A/12B/12C/12D 已完成 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats 和 optional downstream refs |
+| RAG Knowledge Base | v1.2 12A/12B/12C/12D/12E 已完成 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff |
 | Agent Runs | 已完成 deterministic state machine prototype |
 | Application Tracking | 已完成手动 tracking MVP |
 | Quality Review / Bad Case | 已完成人工复盘 MVP |
 | Evaluation | 已完成 deterministic smoke evaluation MVP |
 | Docker / Compose | 已完成本地开发配置；build 需在 Docker daemon 可用环境验证 |
-| Docs / Demo | 已完成 v1.1 handoff 文档；v1.2 12D 已更新 README、architecture、API reference、database schema、demo script 和当前 acceptance 口径 |
+| Docs / Demo | 已完成 v1.2 release notes、handoff 文档、demo script 和 final acceptance 口径；未声明 tag 已创建 |
 
 ## 3. v0.9 Project Optimization 能力
 
@@ -137,14 +138,15 @@ Study Plan Center 当前已完成 11A / 11B / 11C / 11D：
 
 Study Plan Center 当前仍不接真实 LLM，不做 Agent full workflow，不接外部学习平台或日历提醒，不自动修改简历、项目、面试答案或投递状态。v1.2 12D 只允许可选 grounded RAG answer run refs 作为学习/证据复核来源；`source_refs` 只保存 preview 和引用 ID；Dashboard study stats 只展示聚合计数和 latest target，不返回 source_refs 细节、Resume/JD raw_text 或完整 `answer_text`。
 
-## 6. v1.2 RAG Completion 当前状态
+## 6. v1.2 RAG Completion Final Handoff
 
-RAG Completion 当前已完成 12A / 12B / 12C / 12D：
+RAG Completion 当前已完成 12A / 12B / 12C / 12D / 12E：
 
 - 12A：RAG answer contract 收紧，保留旧 `sources` 字段，同时新增 `evidence_summary`、`citations`、`source_refs` 和 `retrieval_debug`；grounded 命中返回 `grounded=true` / `uncertainty=grounded`，无来源返回 `no_relevant_source`，低证据返回 `insufficient_evidence`。
-- 12B：新增 `rag_answer_runs` 表和 migration；`POST /api/rag/answer` 支持 `persist`，默认保存 grounded answer run，并新增 `GET /api/rag/answers` / `GET /api/rag/answers/{answer_run_id}`。
+- 12B：新增 `rag_answer_runs` 表和 migration；`POST /api/rag/answer` 支持 `persist`，默认保存 answer run contract，并新增 `GET /api/rag/answers` / `GET /api/rag/answers/{answer_run_id}`。
 - 12C：KnowledgeBasePage 新增 Answer History、grounded / uncertainty / retrieval mode filters、answer run detail、citations、source_refs preview 和折叠 retrieval_debug。
 - 12D：新增 `GET /api/rag/stats`，Dashboard 展示 RAG Documents、Indexed Documents、RAG Chunks、Grounded Answers、Ungrounded Answers、Latest RAG Answer 和 Latest RAG Uncertainty；StudyPlanPage / InterviewCenterPage 支持可选 RAG Answer Run IDs。
+- 12E：新增 `docs/release-notes-v1.2.md`，并完成 README、current architecture、API reference、database schema、demo script 和 final acceptance report 最终一致性检查。
 
 12D stats 字段：
 
@@ -165,7 +167,16 @@ RAG Completion 当前已完成 12A / 12B / 12C / 12D：
 - 更新 `backend/tests/test_study_plan_generate_api.py`，覆盖 grounded / ungrounded / missing RAG answer run refs。
 - 更新 `backend/tests/test_interview_questions_api.py`，覆盖 grounded RAG refs、ungrounded warning 和 missing RAG answer run error。
 
-RAG Completion 当前仍不接真实 LLM、embedding/vector DB、reranker、外部 vector store 或 Agent full workflow；12D optional refs 不自动写入 Interview、Study Plan、Resume、Project 或 Application。
+12E 文档收口：
+
+- README 标记 v1.2 RAG Completion deterministic MVP 已完成，并加入 v1.2 release notes 链接。
+- current architecture 明确 v1.2 RAG Completion 已完成，真实 LLM/vector DB/RAG evaluation dashboard 未完成。
+- API reference 确认 RAG APIs 完整，chunk list 使用真实 `GET /api/rag/chunks` 路由。
+- database schema 确认 `rag_answer_runs` 和 `citations_json` / `source_refs_json` / `retrieval_debug_json` 隐私边界。
+- demo script 确认可演示 create/index document、search、grounded answer、answer history、Dashboard RAG stats、Interview / Study Plan optional RAG Answer Run IDs。
+- release notes 记录能力、API、数据模型、前端、安全边界、测试结果和已知未完成项。
+
+RAG Completion deterministic MVP 已达到 final handoff 状态；当前仍不接真实 LLM、embedding/vector DB、reranker、外部 vector store、RAG evaluation dashboard 或 Agent full workflow；optional refs 不自动写入 Interview、Study Plan、Resume、Project 或 Application。
 
 ## 7. 明确边界
 
@@ -249,10 +260,10 @@ failed to connect to the docker API at unix:///Users/jiaxulong/.docker/run/docke
 
 ## 10. 后续只读验收与 Tag 建议
 
-当前 v1.2 12D 改动完成后，建议提交：
+当前 v1.2 12E final handoff 文档完成后，建议提交：
 
 ```bash
-git commit -m "feat: add rag stats and optional downstream refs"
+git commit -m "docs: finalize v1.2 rag completion handoff"
 ```
 
 提交并完成 v1.2 final handoff / release notes 和最终只读验收后，可考虑创建 v1.2 annotated tag。当前文档只记录建议，不表示 tag 已创建：

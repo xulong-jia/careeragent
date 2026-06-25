@@ -284,7 +284,7 @@ JSON 字段说明：
 
 ## rag_answer_runs
 
-用途：记录 v1.2 12B persisted grounded answer run，供后续 Evaluation、Bad Case 或 Agent 引用 answer run ID。v1.2 12D 中 `GET /api/rag/stats` 基于该表聚合 answer run counts；Interview / Study Plan generation 可选接收 `rag_answer_run_ids`，只把 grounded runs 转换为 preview-first source refs。
+用途：记录 v1.2 12B persisted answer run contract，供后续 Evaluation、Bad Case 或 Agent 引用 answer run ID。记录可以是 grounded 或 ungrounded；v1.2 12D 中 `GET /api/rag/stats` 基于该表聚合 answer run counts；Interview / Study Plan generation 可选接收 `rag_answer_run_ids`，只把 grounded runs 转换为 preview-first source refs。
 
 关键字段：
 
@@ -305,9 +305,9 @@ JSON 字段说明：
 - `created_at`
 - `updated_at`
 
-`POST /api/rag/answer` 默认 `persist=true`，会写入 `rag_answer_runs` 并返回 `answer_run_id`。如果 request 设置 `persist=false`，则只返回即时 grounded answer contract，不写入该表。
+`POST /api/rag/answer` 默认 `persist=true`，会写入 `rag_answer_runs` 并返回 `answer_run_id`。如果 request 设置 `persist=false`，则只返回即时 answer contract，不写入该表。
 
-隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`rag_answer_runs.citations_json` 只保存短 snippet 和 metadata preview，`source_refs_json` 只保存短 preview，`retrieval_debug_json` 只允许保存 retrieval_mode、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。12D stats 只返回聚合计数、latest question preview 和 uncertainty，不返回 citations/source_refs/retrieval_debug。当前不接真实 LLM、embedding/vector DB，不自动修改 Interview / Study Plan / Resume / Project / Application。
+隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`rag_answer_runs.citations_json` 只保存短 snippet 和 metadata preview，`source_refs_json` 只保存短 preview，`retrieval_debug_json` 只允许保存 retrieval_mode、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。12D stats 只返回聚合计数、latest question preview 和 uncertainty，不返回 citations/source_refs/retrieval_debug。v1.2 deterministic RAG Completion MVP 不接真实 LLM、embedding/vector DB，不自动修改 Interview / Study Plan / Resume / Project / Application。
 
 ## agent_runs
 

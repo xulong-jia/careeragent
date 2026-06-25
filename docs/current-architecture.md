@@ -115,7 +115,7 @@ sqlite:///./local_data/careeragent.db
 - Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
-- RAG：deterministic chunking + lexical retrieval + deterministic grounded answer。v1.2 12A/12B/12C/12D 已开始 RAG completion contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs，answer response 在保留 `sources` 的同时补齐 `citations`、`source_refs`、`evidence_summary`、safe `retrieval_debug` 和可选 `answer_run_id`；默认不接真实 LLM、embedding 或 vector DB。
+- RAG：deterministic chunking + lexical retrieval + deterministic grounded answer。v1.2 RAG Completion deterministic MVP 已完成，覆盖 contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs，answer response 在保留 `sources` 的同时补齐 `citations`、`source_refs`、`evidence_summary`、safe `retrieval_debug` 和可选 `answer_run_id`；默认不接真实 LLM、embedding 或 vector DB。
 - Agent：deterministic state machine，不是自由工具调用 Agent。
 - Evaluation：deterministic smoke set，不是 LLM judge。
 
@@ -214,7 +214,7 @@ Dashboard 当前展示：
 | --- | --- |
 | 阶段一 | Resume / JD / Match 最小闭环已完成 |
 | 阶段二 | SQLite + SQLAlchemy + Alembic 持久化与 Resume Version 已完成 |
-| 阶段三 | RAG lexical prototype 已完成 |
+| 阶段三 | RAG lexical prototype 已完成；v1.2 RAG Completion deterministic MVP 已完成 |
 | 阶段四 | Agent deterministic workflow prototype 已完成 |
 | 阶段五 | Application Tracking + Dashboard MVP 已完成 |
 | 阶段六 | Deterministic Evaluation MVP + Bad Case 关联已完成 |
@@ -222,10 +222,11 @@ Dashboard 当前展示：
 | v0.9 Project Optimization 9A / 9B / 9C / 9D / 9E | Project facts backend、deterministic rewrite backend、ProjectOptimizationPage、Dashboard/docs/tests 收口和 final handoff 已完成 |
 | v1.0 Interview Center 10A/10B/10C/10D | Backend interview tables、deterministic question generation、question list、answer submit/list、answer scoring API、InterviewCenterPage、stats API 和 Dashboard training stats 已完成；Study Plan 写入、RAG completion 与 LLM judge 未实现 |
 | v1.1 Study Plan Center 11A/11B/11C/11D | Backend `study_plans` table、deterministic generate API、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats 已完成；v1.1 阶段未做 RAG refs、Agent full workflow、外部学习平台和日历提醒，v1.2 12D 已补 optional grounded RAG answer run refs |
-| v1.2 RAG Completion 12A | RAG grounded answer contract tightening 已开始，标准化 citations/source_refs/retrieval_debug/evidence_summary；仍为 deterministic lexical retrieval，不新增 answer history table，不接真实 LLM、embedding/vector DB 或 Agent full workflow |
-| v1.2 RAG Completion 12B | 新增 `rag_answer_runs` 持久化、answer run list/detail API 和更强 retrieval/privacy tests；answer runs 只保存 grounded contract、短 snippet/preview 和 safe debug，不保存 raw_text/full chunk text，也不做 Interview/Study Plan 深度集成 |
-| v1.2 RAG Completion 12C | KnowledgeBasePage 接入 answer history list/detail、grounded/uncertainty/retrieval_mode filters、citations/source_refs/retrieval_debug 展示；仍不展示 raw_text/full chunk text，不做 RAG evaluation dashboard 或下游深度集成 |
+| v1.2 RAG Completion 12A | RAG grounded answer contract tightening 已完成，标准化 citations/source_refs/retrieval_debug/evidence_summary；仍为 deterministic lexical retrieval，不接真实 LLM、embedding/vector DB 或 Agent full workflow |
+| v1.2 RAG Completion 12B | 新增 `rag_answer_runs` 持久化、answer run list/detail API 和更强 retrieval/privacy tests；answer runs 只保存 grounded contract、短 snippet/preview 和 safe debug，不保存 raw_text/full chunk text |
+| v1.2 RAG Completion 12C | KnowledgeBasePage 接入 answer history list/detail、grounded/uncertainty/retrieval_mode filters、citations/source_refs/retrieval_debug 展示；仍不展示 raw_text/full chunk text，不做 RAG evaluation dashboard |
 | v1.2 RAG Completion 12D | 新增 `GET /api/rag/stats`、Dashboard RAG stats，并为 Interview / Study Plan generation 增加可选 `rag_answer_run_ids`；仅 grounded answer runs 作为 preview-first refs 补充，ungrounded runs 不作为强来源 |
+| v1.2 RAG Completion 12E | 新增 release notes，并完成 README、architecture、API reference、database schema、demo script 和 final acceptance report 最终口径收口；不创建 tag |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做
