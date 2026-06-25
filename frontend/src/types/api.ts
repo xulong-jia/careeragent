@@ -383,6 +383,102 @@ export type InterviewStats = {
   by_difficulty: Record<string, number>;
 };
 
+export type StudyPlanStatus = "active" | "completed" | "archived";
+
+export type StudyTaskStatus =
+  | "todo"
+  | "in_progress"
+  | "done"
+  | "blocked"
+  | "skipped";
+
+export type StudyTaskPriority = "high" | "medium" | "low";
+
+export type StudySourceRef = {
+  source_type: string;
+  source_id: string;
+  field: string;
+  label: string;
+  preview: string;
+};
+
+export type StudyPlanGenerateRequest = {
+  target_role?: string | null;
+  profile_id?: string | null;
+  match_report_id?: string | null;
+  project_rewrite_id?: string | null;
+  interview_answer_ids?: string[];
+  weakness_tags?: string[];
+  available_hours_per_week?: number;
+  horizon_weeks?: number;
+};
+
+export type StudyTask = {
+  task_id: string;
+  title: string;
+  description: string;
+  source_gap: string;
+  priority: StudyTaskPriority;
+  status: StudyTaskStatus;
+  due_hint: string | null;
+  acceptance_criteria: string[];
+  evidence_required: string[];
+  source_refs: StudySourceRef[];
+};
+
+export type StudyPhase = {
+  phase_id: string;
+  phase: string;
+  goal: string;
+  tasks: StudyTask[];
+  resources: Record<string, unknown>[];
+  deliverables: string[];
+  acceptance_criteria: string[];
+};
+
+export type StudyPlanRecord = {
+  id: string;
+  user_id: string;
+  match_report_id: string | null;
+  profile_id: string | null;
+  project_rewrite_id: string | null;
+  target_role: string;
+  source_refs: StudySourceRef[];
+  phases: StudyPhase[];
+  status: StudyPlanStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StudyPlanGenerateResponse = StudyPlanRecord;
+
+export type StudyPlanListFilters = {
+  status?: StudyPlanStatus | "";
+  target_role?: string;
+  profile_id?: string;
+  match_report_id?: string;
+};
+
+export type StudyPlanListResponse = ListResponse<StudyPlanRecord>;
+
+export type StudyTaskStatusUpdateRequest = {
+  status: StudyTaskStatus;
+};
+
+export type StudyPlanStats = {
+  total_plans: number;
+  active_plans: number;
+  completed_plans: number;
+  archived_plans: number;
+  pending_tasks: number;
+  blocked_tasks: number;
+  done_tasks: number;
+  in_progress_tasks: number;
+  skipped_tasks: number;
+  latest_plan_id: string | null;
+  latest_target_role: string | null;
+};
+
 export type JobCreatePayload = {
   company: string;
   job_title: string;

@@ -23,6 +23,7 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { ProjectOptimizationPage } from "./pages/ProjectOptimizationPage";
 import { QualityReviewPage } from "./pages/QualityReviewPage";
 import { ResumeCenterPage } from "./pages/ResumeCenterPage";
+import { StudyPlanPage } from "./pages/StudyPlanPage";
 import type {
   AgentRunRecord,
   ApplicationRecord,
@@ -75,6 +76,11 @@ const navigation: NavigationItem[] = [
     key: "interview",
     label: "Interview Center",
     description: "面试准备",
+  },
+  {
+    key: "study-plan",
+    label: "Study Plan",
+    description: "学习计划",
   },
   {
     key: "knowledge",
@@ -296,6 +302,9 @@ export default function App() {
     }
     if (activePage === "interview") {
       return <InterviewCenterPage />;
+    }
+    if (activePage === "study-plan") {
+      return <StudyPlanPage />;
     }
     if (activePage === "knowledge") {
       return <KnowledgeBasePage onDocumentsChanged={setRagDocuments} />;

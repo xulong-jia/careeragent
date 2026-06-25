@@ -6,6 +6,7 @@ export type PageKey =
   | "match"
   | "project-optimization"
   | "interview"
+  | "study-plan"
   | "knowledge"
   | "agents"
   | "applications"

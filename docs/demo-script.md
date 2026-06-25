@@ -136,6 +136,19 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 当前 Interview Center 只接 deterministic question generation、answer submit/list、scoring API 和 Dashboard training stats；不接真实 LLM，不做 LLM judge，不写入 Study Plan，不展示 Resume/JD full raw_text 或完整已保存 answer_text。请勿输入真实面试复盘或隐私答案。
 
+### Study Plan Center
+
+1. 先完成 Profile、Match、Project Optimization 或 Interview Center 的 synthetic 数据准备，至少准备 target role；可选复制 `profile_id`、`match_report_id`、`project_rewrite_id` 或 `interview_answer_id`。
+2. 打开 Study Plan。
+3. 在 Generate Study Plan 中输入 target role，或输入 profile ID 让后端从 profile target_roles 推断。
+4. 可选输入 match report ID、project rewrite ID、interview answer IDs、weakness tags、available hours per week 和 horizon weeks。
+5. 点击 Generate Study Plan，查看 phases、tasks、resources、deliverables、acceptance criteria 和 source refs preview。
+6. 使用 Plan Filters 按 status、target role、profile ID 或 match report ID 刷新列表。
+7. 选择 plan，查看 detail 中的 task_id、priority、status、source_gap、description、acceptance criteria、evidence required 和 source refs preview。
+8. 修改 task status 为 todo、in progress、done、blocked 或 skipped，确认 detail 中 updated_at 刷新。
+
+当前 Study Plan Center 只接 deterministic generate/list/detail/task status API 和前端 StudyPlanPage；不做 Dashboard 前端接入，不接真实 LLM，不做 RAG completion，不做 Agent full workflow，不展示 Resume/JD full raw_text 或完整 answer_text。
+
 ### Knowledge Base
 
 1. 创建 synthetic RAG document。
@@ -183,6 +196,7 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 - Resume Center parse / risk-check / confirmed version workflow
 - Project Optimization
 - Interview Center
+- Study Plan Center
 - Match Report
 - Knowledge Base
 - Agent Runs
