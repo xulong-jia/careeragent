@@ -32,6 +32,7 @@ class InterviewQuestionGenerateRequest(BaseModel):
     project_rewrite_id: str | None = Field(default=None, max_length=64)
     question_types: list[InterviewQuestionType] | None = None
     max_questions: int = Field(default=6, ge=1, le=12)
+    rag_answer_run_ids: list[str] = Field(default_factory=list)
 
 
 class InterviewQuestionRecord(BaseModel):

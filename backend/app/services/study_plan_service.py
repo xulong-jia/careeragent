@@ -8,7 +8,8 @@ from app.models.interview import InterviewAnswer
 from app.models.match import MatchReport
 from app.models.profile import Profile
 from app.models.project import ProjectRewrite
-from app.repositories import study_plan_repository
+from app.repositories import rag_repository, study_plan_repository
+from app.schemas.rag import RagAnswerRunRecord
 from app.schemas.study_plans import (
     StudyPlanGenerateRequest,
     StudyPlanRecord,
@@ -44,12 +45,14 @@ def generate_study_plan(
     match_report = _get_match_report(db, payload.match_report_id)
     project_rewrite = _get_project_rewrite(db, payload.project_rewrite_id)
     interview_answers = _get_interview_answers(db, payload.interview_answer_ids)
+    rag_answer_runs = _get_rag_answer_runs(db, payload.rag_answer_run_ids)
     target_role = _resolve_target_role(payload.target_role, profile)
 
     candidates: list[TaskCandidate] = []
     candidates.extend(_tasks_from_match(match_report))
     candidates.extend(_tasks_from_project_rewrite(project_rewrite))
     candidates.extend(_tasks_from_interview_answers(interview_answers))
+    candidates.extend(_tasks_from_rag_answer_runs(rag_answer_runs))
     candidates.extend(_tasks_from_request_weakness_tags(payload.weakness_tags))
     candidates.extend(_tasks_from_profile(profile))
     if not candidates:
@@ -58,6 +61,7 @@ def generate_study_plan(
     source_refs = _dedupe_refs(
         [ref for candidate in candidates for ref in candidate.source_refs]
         + _context_refs(profile, match_report, project_rewrite, target_role)
+        + _context_refs_from_rag_answer_runs(rag_answer_runs)
     )
     phases = _build_phases(
         candidates,
@@ -245,6 +249,25 @@ def _get_interview_answers(
     return answers
 
 
+def _get_rag_answer_runs(
+    db: Session, rag_answer_run_ids: list[str]
+) -> list[RagAnswerRunRecord]:
+    answer_runs: list[RagAnswerRunRecord] = []
+    for answer_run_id in _normalize_id_list(rag_answer_run_ids, "rag_answer_run_ids"):
+        try:
+            answer_runs.append(rag_repository.get_answer_run(db, answer_run_id))
+        except AppError as exc:
+            if exc.code == "rag_answer_run_not_found":
+                raise AppError(
+                    code="rag_answer_run_not_found",
+                    message="RAG answer run was not found.",
+                    status_code=404,
+                    details={"rag_answer_run_id": answer_run_id},
+                ) from exc
+            raise
+    return answer_runs
+
+
 def _resolve_target_role(target_role: str | None, profile: Profile | None) -> str:
     normalized = _clean_text(target_role)
     if normalized:
@@ -407,6 +430,48 @@ def _tasks_from_interview_answers(
         low_score_dimensions = _low_score_dimensions(dict(answer.scores or {}))
         for tag in [*weakness_tags, *low_score_dimensions]:
             tasks.append(_task_for_weakness_tag(tag, answer.id, "interview_answer"))
+    return tasks
+
+
+def _tasks_from_rag_answer_runs(
+    answer_runs: list[RagAnswerRunRecord],
+) -> list[TaskCandidate]:
+    tasks: list[TaskCandidate] = []
+    for answer_run in answer_runs:
+        if not answer_run.grounded:
+            continue
+        refs = _source_refs_from_rag_answer_run(answer_run)
+        if not refs:
+            continue
+        summary = _clean_list(answer_run.evidence_summary)
+        preview = summary[0] if summary else answer_run.question
+        tasks.append(
+            TaskCandidate(
+                source_gap="rag_grounded_evidence",
+                title=f"Review RAG evidence: {_short_label(answer_run.question)}",
+                description=(
+                    "Use this grounded RAG answer run as a reference for learning "
+                    "or evidence review. Do not treat it as personal project experience."
+                ),
+                priority="low",
+                category="evidence",
+                acceptance_criteria=[
+                    "Summarize what the RAG source supports and what it does not support.",
+                    "Do not add any claim to resume, project, or interview answers unless separately verified.",
+                ],
+                evidence_required=["RAG answer run source refs and a manual verification note."],
+                source_refs=[
+                    _source_ref(
+                        "rag_answer_run",
+                        answer_run.answer_run_id,
+                        "evidence_summary",
+                        "Grounded RAG answer",
+                        preview,
+                    ),
+                    *refs,
+                ],
+            )
+        )
     return tasks
 
 
@@ -659,6 +724,63 @@ def _context_refs(
                 "rewrite_strategy",
                 "Project rewrite",
                 project_rewrite.rewrite_strategy,
+            )
+        )
+    return refs
+
+
+def _context_refs_from_rag_answer_runs(
+    answer_runs: list[RagAnswerRunRecord],
+) -> list[dict[str, str]]:
+    refs: list[dict[str, str]] = []
+    for answer_run in answer_runs:
+        if answer_run.grounded:
+            refs.append(
+                _source_ref(
+                    "rag_answer_run",
+                    answer_run.answer_run_id,
+                    "question",
+                    "Grounded RAG answer run",
+                    answer_run.question,
+                )
+            )
+        else:
+            refs.append(
+                _source_ref(
+                    "rag_answer_run",
+                    answer_run.answer_run_id,
+                    "uncertainty",
+                    "Ungrounded RAG answer run",
+                    answer_run.uncertainty,
+                )
+            )
+    return refs
+
+
+def _source_refs_from_rag_answer_run(
+    answer_run: RagAnswerRunRecord,
+) -> list[dict[str, str]]:
+    refs: list[dict[str, str]] = []
+    for index, source_ref in enumerate(answer_run.source_refs[:3], start=1):
+        refs.append(
+            _source_ref(
+                source_ref.source_type,
+                source_ref.source_id,
+                source_ref.field,
+                source_ref.label or f"RAG source ref {index}",
+                source_ref.preview,
+            )
+        )
+    if refs:
+        return refs
+    for index, citation in enumerate(answer_run.citations[:3], start=1):
+        refs.append(
+            _source_ref(
+                "rag_chunk",
+                citation.chunk_id,
+                "snippet",
+                citation.label or f"RAG citation {index}",
+                citation.snippet,
             )
         )
     return refs

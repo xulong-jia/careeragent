@@ -154,3 +154,16 @@ class RagAnswerRunRecord(BaseModel):
     retrieval_debug: RagRetrievalDebug
     created_at: datetime
     updated_at: datetime
+
+
+class RagStatsResponse(BaseModel):
+    total_documents: int
+    indexed_documents: int
+    total_chunks: int
+    total_answer_runs: int
+    grounded_answer_runs: int
+    ungrounded_answer_runs: int
+    latest_answer_run_id: str | None = None
+    latest_answer_question_preview: str | None = None
+    latest_answer_uncertainty: str | None = None
+    latest_answer_created_at: datetime | None = None

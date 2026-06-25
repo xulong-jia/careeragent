@@ -21,6 +21,7 @@ type GenerateFormState = {
   resumeVersionId: string;
   projectId: string;
   projectRewriteId: string;
+  ragAnswerRunIds: string;
   questionTypes: string;
   maxQuestions: string;
 };
@@ -60,6 +61,7 @@ function initialGenerateForm(): GenerateFormState {
     resumeVersionId: "",
     projectId: "",
     projectRewriteId: "",
+    ragAnswerRunIds: "",
     questionTypes: "",
     maxQuestions: "6",
   };
@@ -78,6 +80,13 @@ function initialQuestionFilters(): QuestionFiltersState {
 function optionalText(value: string): string | null {
   const normalized = value.trim();
   return normalized || null;
+}
+
+function parseCsv(value: string): string[] {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function parseQuestionTypes(value: string): InterviewQuestionType[] | null {
@@ -266,6 +275,7 @@ export function InterviewCenterPage() {
         resume_version_id: generateForm.resumeVersionId.trim(),
         project_id: optionalText(generateForm.projectId),
         project_rewrite_id: optionalText(generateForm.projectRewriteId),
+        rag_answer_run_ids: parseCsv(generateForm.ragAnswerRunIds),
         question_types: parseQuestionTypes(generateForm.questionTypes),
         max_questions: parseMaxQuestions(generateForm.maxQuestions),
       });
@@ -423,6 +433,19 @@ export function InterviewCenterPage() {
                     }))
                   }
                   value={generateForm.projectRewriteId}
+                />
+              </label>
+              <label>
+                RAG Answer Run IDs optional
+                <input
+                  onChange={(event) =>
+                    setGenerateForm((current) => ({
+                      ...current,
+                      ragAnswerRunIds: event.target.value,
+                    }))
+                  }
+                  placeholder="rag_answer_run_..."
+                  value={generateForm.ragAnswerRunIds}
                 />
               </label>
               <label>

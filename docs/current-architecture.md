@@ -110,12 +110,12 @@ sqlite:///./local_data/careeragent.db
 
 - Profile：manual CRUD + readiness summary，不自动从简历生成画像。
 - Project：manual project facts CRUD + deterministic rewrite backend + ProjectOptimizationPage，可选绑定 profile / resume version，不自动生成项目事实，不接真实 LLM。
-- Interview：v1.0 10A/10B/10C/10D 提供 deterministic question generation / list、answer submit / list、scoring API、stats API、InterviewCenterPage 和 Dashboard training stats，基于 JD profile、structured resume、可选 project facts、project rewrite refs、question expected_points/source_refs 和本地 DB answer，不做 LLM judge。
-- Study Plan：v1.1 11A/11B/11C/11D 提供 `study_plans` 表、`POST /api/study-plans/generate`、list/detail、task status update、stats API、frontend API wrapper、StudyPlanPage 和 Dashboard study stats，基于 Profile target_roles / skill_map、Match gaps / rewrite_priorities、Project Rewrite missing_points / evidence_required、Interview weakness_tags 和 request weakness_tags 生成 deterministic phases/tasks/resources/deliverables/acceptance criteria，不做真实 LLM、RAG completion、Agent full workflow、外部学习平台、日历提醒或自动修改简历/项目/面试答案。
+- Interview：v1.0 10A/10B/10C/10D 提供 deterministic question generation / list、answer submit / list、scoring API、stats API、InterviewCenterPage 和 Dashboard training stats，基于 JD profile、structured resume、可选 project facts、project rewrite refs、可选 grounded RAG answer run refs、question expected_points/source_refs 和本地 DB answer，不做 LLM judge。
+- Study Plan：v1.1 11A/11B/11C/11D 提供 `study_plans` 表、`POST /api/study-plans/generate`、list/detail、task status update、stats API、frontend API wrapper、StudyPlanPage 和 Dashboard study stats，基于 Profile target_roles / skill_map、Match gaps / rewrite_priorities、Project Rewrite missing_points / evidence_required、Interview weakness_tags、可选 grounded RAG answer run refs 和 request weakness_tags 生成 deterministic phases/tasks/resources/deliverables/acceptance criteria，不做真实 LLM、Agent full workflow、外部学习平台、日历提醒或自动修改简历/项目/面试答案。
 - Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
-- RAG：deterministic chunking + lexical retrieval + deterministic grounded answer。v1.2 12A/12B/12C 已开始 RAG completion contract tightening、grounded answer persistence 和 KnowledgeBasePage answer history UI，answer response 在保留 `sources` 的同时补齐 `citations`、`source_refs`、`evidence_summary`、safe `retrieval_debug` 和可选 `answer_run_id`；默认不接真实 LLM、embedding 或 vector DB。
+- RAG：deterministic chunking + lexical retrieval + deterministic grounded answer。v1.2 12A/12B/12C/12D 已开始 RAG completion contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs，answer response 在保留 `sources` 的同时补齐 `citations`、`source_refs`、`evidence_summary`、safe `retrieval_debug` 和可选 `answer_run_id`；默认不接真实 LLM、embedding 或 vector DB。
 - Agent：deterministic state machine，不是自由工具调用 Agent。
 - Evaluation：deterministic smoke set，不是 LLM judge。
 
@@ -166,9 +166,9 @@ Interview 10A/10B/10C/10D 当前链路：
 
 1. `interview_questions` 表保存生成的面试题，绑定 `jd_id` 和 `resume_version_id`，可选绑定 `project_id` / `project_rewrite_id`。
 2. `interview_answers` 表保存用户提交的完整 `answer_text`、`answer_text_preview`、scores、feedback 和 `weakness_tags`。
-3. `POST /api/interviews/questions/generate` 使用 deterministic rules 读取 JD profile、structured resume、可选 project facts 和 project rewrite JSON，生成并持久化 questions。
+3. `POST /api/interviews/questions/generate` 使用 deterministic rules 读取 JD profile、structured resume、可选 project facts、project rewrite JSON 和 v1.2 12D 可选 `rag_answer_run_ids`，生成并持久化 questions。
 4. `GET /api/interviews/questions` 支持按 `jd_id`、`resume_version_id`、`project_id`、`question_type` 和 `difficulty` 筛选。
-5. 每个 question 包含 `expected_points` 和 `source_refs`；`source_refs` 只保存 source type/id/field/label/preview，不保存 Resume/JD full raw_text。
+5. 每个 question 包含 `expected_points` 和 `source_refs`；`source_refs` 只保存 source type/id/field/label/preview，不保存 Resume/JD full raw_text、RAG full chunk text 或完整 answer。只有 grounded RAG answer runs 会补充 source_refs；ungrounded runs 只返回 warning。
 6. `POST /api/interviews/answers` 保存回答，默认 response 只返回 `answer_text_preview`。
 7. `GET /api/interviews/answers` 支持按 `question_id`、`jd_id`、`resume_version_id` 和 `project_id` 查询回答。
 8. `POST /api/interviews/answers/{answer_id}/score` 使用 deterministic rules 生成 `structure`、`technical_depth`、`business_understanding`、`evidence`、`clarity`、`risk_control`、`overall_average`、feedback 和 `weakness_tags`。
@@ -176,25 +176,25 @@ Interview 10A/10B/10C/10D 当前链路：
 10. `GET /api/interviews/stats` 基于 `interview_questions` / `interview_answers` 返回 Dashboard training stats：question count、answer count、scored answer count、latest average score、latest weakness tags、by question type 和 by difficulty。
 11. Dashboard 展示独立 Interview Training stats，不复用 Application Tracking 的 interview status。
 
-当前 Interview 10A/10B/10C/10D 不接真实 LLM，不接 embedding/vector DB，不调用 RAG completion，不自动写入 Study Plan，不自动修改 Resume Version。Scoring 是规则版，不是 LLM judge；默认 API response、InterviewCenterPage 列表和 Dashboard stats 不返回完整 `answer_text`、Resume raw_text 或 JD raw_text。
+当前 Interview 10A/10B/10C/10D 不接真实 LLM，不接 embedding/vector DB，不自动写入 Study Plan，不自动修改 Resume Version。v1.2 12D 只允许可选引用 grounded RAG answer runs 作为 preview-first 来源补充，不做自动写入或深度 RAG workflow。Scoring 是规则版，不是 LLM judge；默认 API response、InterviewCenterPage 列表和 Dashboard stats 不返回完整 `answer_text`、Resume raw_text 或 JD raw_text。
 
 ### Study Plan Center v1.1 11A/11B/11C/11D
 
 Study Plan 11A/11B/11C/11D 当前链路：
 
 1. `study_plans` 表保存生成的学习计划，支持可选关联 `match_report_id`、`profile_id` 和 `project_rewrite_id`。
-2. `POST /api/study-plans/generate` 使用 deterministic rules 读取 Profile、MatchReport、ProjectRewrite、InterviewAnswer weakness tags 和 request weakness tags。
+2. `POST /api/study-plans/generate` 使用 deterministic rules 读取 Profile、MatchReport、ProjectRewrite、InterviewAnswer weakness tags、v1.2 12D 可选 `rag_answer_run_ids` 和 request weakness tags。
 3. `target_role` 可由 request 直接提供；未提供时可从 profile `target_roles` 推断；仍无法确定时报 `study_plan_target_role_required`。
 4. `phases` JSON 保存 phase/task 结构；每个 task 有稳定 `task_id`、source_gap、priority、status、acceptance_criteria、evidence_required 和 source_refs。
 5. `resources` 在没有真实 RAG resource 时使用 `manual_resource_needed` placeholder，不编造课程链接。
-6. `source_refs` 只保存 source type/id/field/label/preview，不保存 Resume/JD full raw_text 或完整 `answer_text`。
+6. `source_refs` 只保存 source type/id/field/label/preview，不保存 Resume/JD full raw_text、完整 `answer_text` 或 RAG full chunk text；grounded RAG answer runs 可生成学习/证据复核任务，ungrounded runs 只记录 uncertainty ref，不作为强来源。
 7. `GET /api/study-plans` 和 `GET /api/study-plans/{study_plan_id}` 提供 backend list/detail。
 8. `PATCH /api/study-plans/{study_plan_id}/tasks/{task_id}` 更新 `phases[*].tasks[*].status` 并刷新 `updated_at`，不自动修改 plan status。
 9. `GET /api/study-plans/stats` 基于 `study_plans.phases` 聚合 plan count 和 task status count，不返回 source_refs 细节或隐私原文。
 10. StudyPlanPage 通过 `frontend/src/api/studyPlans.ts` 调用真实后端 API，支持 generate、list/filter、detail、phase/task 展示、source_refs preview 展示和 task status update。
 11. Dashboard 通过 `getStudyPlanStats` 读取 stats，展示 Study Plans、Active Study Plans、Pending Tasks、Blocked Tasks、Done Tasks、Latest Study Target 和 In Progress Tasks；stats API 失败时 Dashboard 使用 0 / empty state，不影响其他模块数据。
 
-当前 Study Plan 11A/11B/11C/11D 不接真实 LLM，不接 embedding/vector DB，不调用 RAG completion，不做 Agent full workflow，不接外部学习平台或日历提醒，不自动修改简历、项目、面试答案或投递状态。
+当前 Study Plan 11A/11B/11C/11D 不接真实 LLM，不接 embedding/vector DB，不做 Agent full workflow，不接外部学习平台或日历提醒，不自动修改简历、项目、面试答案或投递状态。v1.2 12D 只做 optional grounded RAG answer run refs，不做自动学习资源生成或外部平台同步。
 
 ### Dashboard readiness
 
@@ -205,7 +205,8 @@ Dashboard 当前展示：
 - project count、active project count、latest project name/status。
 - interview training question count、answer count、scored answer count、latest average score 和 latest weakness tags。
 - study plan count、active plan count、pending / blocked / done / in progress task count 和 latest study target。
-- 原有 Resume、JD、Match、RAG、Agent、Application、Bad Case、Evaluation 统计。
+- RAG document count、indexed document count、chunk count、grounded/ungrounded answer count、latest answer preview 和 latest uncertainty。
+- 原有 Resume、JD、Match、Agent、Application、Bad Case、Evaluation 统计。
 
 ## 7. 阶段完成状态
 
@@ -220,10 +221,11 @@ Dashboard 当前展示：
 | v0.8 Resume/Profile Foundation | Resume parser / risk-check APIs + Profile Center MVP 已完成 |
 | v0.9 Project Optimization 9A / 9B / 9C / 9D / 9E | Project facts backend、deterministic rewrite backend、ProjectOptimizationPage、Dashboard/docs/tests 收口和 final handoff 已完成 |
 | v1.0 Interview Center 10A/10B/10C/10D | Backend interview tables、deterministic question generation、question list、answer submit/list、answer scoring API、InterviewCenterPage、stats API 和 Dashboard training stats 已完成；Study Plan 写入、RAG completion 与 LLM judge 未实现 |
-| v1.1 Study Plan Center 11A/11B/11C/11D | Backend `study_plans` table、deterministic generate API、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats 已完成；RAG completion、Agent full workflow、外部学习平台和日历提醒未实现 |
+| v1.1 Study Plan Center 11A/11B/11C/11D | Backend `study_plans` table、deterministic generate API、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats 已完成；v1.1 阶段未做 RAG refs、Agent full workflow、外部学习平台和日历提醒，v1.2 12D 已补 optional grounded RAG answer run refs |
 | v1.2 RAG Completion 12A | RAG grounded answer contract tightening 已开始，标准化 citations/source_refs/retrieval_debug/evidence_summary；仍为 deterministic lexical retrieval，不新增 answer history table，不接真实 LLM、embedding/vector DB 或 Agent full workflow |
 | v1.2 RAG Completion 12B | 新增 `rag_answer_runs` 持久化、answer run list/detail API 和更强 retrieval/privacy tests；answer runs 只保存 grounded contract、短 snippet/preview 和 safe debug，不保存 raw_text/full chunk text，也不做 Interview/Study Plan 深度集成 |
 | v1.2 RAG Completion 12C | KnowledgeBasePage 接入 answer history list/detail、grounded/uncertainty/retrieval_mode filters、citations/source_refs/retrieval_debug 展示；仍不展示 raw_text/full chunk text，不做 RAG evaluation dashboard 或下游深度集成 |
+| v1.2 RAG Completion 12D | 新增 `GET /api/rag/stats`、Dashboard RAG stats，并为 Interview / Study Plan generation 增加可选 `rag_answer_run_ids`；仅 grounded answer runs 作为 preview-first refs 补充，ungrounded runs 不作为强来源 |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做

@@ -47,6 +47,11 @@ export function DashboardPage({
   const studyPlanStats = state.studyPlanStats;
   const latestStudyTarget =
     studyPlanStats?.latest_target_role ?? "No study target";
+  const ragStats = state.ragStats;
+  const latestRagAnswer =
+    ragStats?.latest_answer_question_preview ?? "No RAG answer";
+  const latestRagUncertainty =
+    ragStats?.latest_answer_uncertainty ?? "No uncertainty";
   const metrics = [
     {
       label: "Profile",
@@ -100,10 +105,52 @@ export function DashboardPage({
       page: "match" as const,
     },
     {
-      label: "Knowledge",
-      value: String(state.ragDocuments.length),
+      label: "RAG Documents",
+      value: String(ragStats?.total_documents ?? state.ragDocuments.length),
       detail: "RAG documents",
       tone: "blue",
+      page: "knowledge" as const,
+    },
+    {
+      label: "Indexed Documents",
+      value: String(ragStats?.indexed_documents ?? 0),
+      detail: "RAG indexed docs",
+      tone: "green",
+      page: "knowledge" as const,
+    },
+    {
+      label: "RAG Chunks",
+      value: String(ragStats?.total_chunks ?? 0),
+      detail: "Preview-first chunks",
+      tone: "amber",
+      page: "knowledge" as const,
+    },
+    {
+      label: "Grounded Answers",
+      value: String(ragStats?.grounded_answer_runs ?? 0),
+      detail: "RAG answer runs",
+      tone: "green",
+      page: "knowledge" as const,
+    },
+    {
+      label: "Ungrounded Answers",
+      value: String(ragStats?.ungrounded_answer_runs ?? 0),
+      detail: "Needs source review",
+      tone: "red",
+      page: "knowledge" as const,
+    },
+    {
+      label: "Latest RAG Answer",
+      value: String(ragStats?.total_answer_runs ?? 0),
+      detail: latestRagAnswer,
+      tone: "blue",
+      page: "knowledge" as const,
+    },
+    {
+      label: "Latest RAG Uncertainty",
+      value: latestRagUncertainty,
+      detail: ragStats?.latest_answer_run_id ?? "No answer run",
+      tone: "amber",
       page: "knowledge" as const,
     },
     {
@@ -303,7 +350,23 @@ export function DashboardPage({
             </li>
             <li>
               <strong>Knowledge</strong>
-              <span>{state.ragDocuments.length} documents</span>
+              <span>
+                {ragStats
+                  ? `${ragStats.total_documents} docs / ${ragStats.indexed_documents} indexed / ${ragStats.total_chunks} chunks`
+                  : `${state.ragDocuments.length} docs / 0 indexed / 0 chunks`}
+              </span>
+            </li>
+            <li>
+              <strong>RAG Answers</strong>
+              <span>
+                {ragStats
+                  ? `${ragStats.grounded_answer_runs} grounded / ${ragStats.ungrounded_answer_runs} ungrounded`
+                  : "0 grounded / 0 ungrounded"}
+              </span>
+            </li>
+            <li>
+              <strong>Latest RAG Uncertainty</strong>
+              <span>{latestRagUncertainty}</span>
             </li>
             <li>
               <strong>Agent Runs</strong>

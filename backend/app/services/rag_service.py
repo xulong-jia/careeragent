@@ -20,6 +20,7 @@ from app.schemas.rag import (
     RagSearchRequest,
     RagSearchResult,
     RagSearchSource,
+    RagStatsResponse,
 )
 
 
@@ -354,3 +355,7 @@ def list_answer_runs(
 
 def get_answer_run(db: Session, answer_run_id: str) -> RagAnswerRunRecord:
     return rag_repository.get_answer_run(db, answer_run_id)
+
+
+def get_stats(db: Session) -> RagStatsResponse:
+    return rag_repository.get_stats(db)

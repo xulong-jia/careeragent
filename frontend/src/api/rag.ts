@@ -12,6 +12,7 @@ import type {
   RagDocumentRecord,
   RagSearchRequest,
   RagSearchResult,
+  RagStats,
 } from "../types/api";
 
 type RagChunkFilters = {
@@ -115,4 +116,8 @@ export function getRagAnswerRun(
   answerRunId: string,
 ): Promise<RagAnswerRunRecord> {
   return requestJson<RagAnswerRunRecord>(`/api/rag/answers/${answerRunId}`);
+}
+
+export function getRagStats(): Promise<RagStats> {
+  return requestJson<RagStats>("/api/rag/stats");
 }

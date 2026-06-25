@@ -7,7 +7,8 @@ from app.models.interview import InterviewQuestion
 from app.models.job import JobDescription, JobProfile
 from app.models.project import Project, ProjectRewrite
 from app.models.resume import ResumeVersion
-from app.repositories import interview_repository
+from app.repositories import interview_repository, rag_repository
+from app.schemas.rag import RagAnswerRunRecord
 from app.schemas.interviews import (
     InterviewAnswerCreateRequest,
     InterviewAnswerRecord,
@@ -179,12 +180,21 @@ def generate_questions(
     requested_types = set(payload.question_types or [])
     warnings: list[str] = []
     need_more_info: list[str] = []
+    rag_answer_runs = _get_rag_answer_runs(db, payload.rag_answer_run_ids)
+    rag_source_refs = _source_refs_from_grounded_rag_answer_runs(rag_answer_runs)
+    for answer_run in rag_answer_runs:
+        if not answer_run.grounded:
+            warnings.append(
+                f"RAG answer run {answer_run.answer_run_id} is {answer_run.uncertainty}; it was not used as a reliable interview source."
+            )
     candidates = _build_question_candidates(
         job_profile=job_profile,
         resume_version=resume_version,
         project=project,
         project_rewrite=project_rewrite,
     )
+    if rag_source_refs:
+        candidates = _attach_rag_source_refs(candidates, rag_source_refs)
     if requested_types:
         candidates = [
             candidate
@@ -614,6 +624,82 @@ def _get_project_rewrite(db: Session, rewrite_id: str | None) -> ProjectRewrite:
     return rewrite
 
 
+def _get_rag_answer_runs(
+    db: Session, rag_answer_run_ids: list[str]
+) -> list[RagAnswerRunRecord]:
+    answer_runs: list[RagAnswerRunRecord] = []
+    for answer_run_id in _normalize_id_list(rag_answer_run_ids, "rag_answer_run_ids"):
+        try:
+            answer_runs.append(rag_repository.get_answer_run(db, answer_run_id))
+        except AppError as exc:
+            if exc.code == "rag_answer_run_not_found":
+                raise AppError(
+                    code="rag_answer_run_not_found",
+                    message="RAG answer run was not found.",
+                    status_code=404,
+                    details={"rag_answer_run_id": answer_run_id},
+                ) from exc
+            raise
+    return answer_runs
+
+
+def _normalize_id_list(values: list[str], field_name: str) -> list[str]:
+    normalized_values: list[str] = []
+    for value in values:
+        normalized = str(value).strip()
+        if not normalized:
+            raise AppError(
+                code="validation_error",
+                message=f"{field_name} must not contain empty values.",
+                status_code=400,
+                details={"field": field_name},
+            )
+        normalized_values.append(normalized)
+    return normalized_values
+
+
+def _source_refs_from_grounded_rag_answer_runs(
+    answer_runs: list[RagAnswerRunRecord],
+) -> list[dict[str, str]]:
+    refs: list[dict[str, str]] = []
+    for answer_run in answer_runs:
+        if not answer_run.grounded:
+            continue
+        refs.append(
+            _source_ref(
+                "rag_answer_run",
+                answer_run.answer_run_id,
+                "evidence_summary",
+                "Grounded RAG answer",
+                (answer_run.evidence_summary or [answer_run.question])[0],
+            )
+        )
+        for source_ref in answer_run.source_refs[:2]:
+            refs.append(
+                _source_ref(
+                    source_ref.source_type,
+                    source_ref.source_id,
+                    source_ref.field,
+                    source_ref.label,
+                    source_ref.preview,
+                )
+            )
+    return _dedupe_refs(refs)
+
+
+def _attach_rag_source_refs(
+    candidates: list[dict[str, object]],
+    rag_source_refs: list[dict[str, str]],
+) -> list[dict[str, object]]:
+    updated: list[dict[str, object]] = []
+    for candidate in candidates:
+        refs = list(candidate.get("source_refs") or [])
+        candidate = dict(candidate)
+        candidate["source_refs"] = _dedupe_refs([*refs, *rag_source_refs[:3]])
+        updated.append(candidate)
+    return updated
+
+
 def _build_question_candidates(
     *,
     job_profile: JobProfile,
@@ -974,6 +1060,23 @@ def _source_ref(
         "label": label,
         "preview": _preview(str(preview)),
     }
+
+
+def _dedupe_refs(refs: Iterable[dict[str, str]]) -> list[dict[str, str]]:
+    seen: set[tuple[str, str, str, str]] = set()
+    deduped: list[dict[str, str]] = []
+    for ref in refs:
+        key = (
+            ref["source_type"],
+            ref["source_id"],
+            ref["field"],
+            ref["preview"],
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(ref)
+    return deduped
 
 
 def _preview(value: str) -> str:

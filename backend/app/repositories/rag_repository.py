@@ -7,6 +7,7 @@ from app.schemas.rag import (
     RagAnswerRunRecord,
     RagChunkRecord,
     RagDocumentRecord,
+    RagStatsResponse,
 )
 
 
@@ -331,3 +332,46 @@ def get_answer_run(db: Session, answer_run_id: str) -> RagAnswerRunRecord:
             details={"answer_run_id": answer_run_id},
         )
     return _to_answer_run_record(answer_run)
+
+
+def get_stats(db: Session) -> RagStatsResponse:
+    latest_answer_run = db.scalars(
+        select(RagAnswerRun).order_by(
+            RagAnswerRun.created_at.desc(),
+            RagAnswerRun.id.desc(),
+        )
+    ).first()
+    total_answer_runs = (
+        db.scalar(select(func.count()).select_from(RagAnswerRun)) or 0
+    )
+    grounded_answer_runs = (
+        db.scalar(
+            select(func.count())
+            .select_from(RagAnswerRun)
+            .where(RagAnswerRun.grounded.is_(True))
+        )
+        or 0
+    )
+    return RagStatsResponse(
+        total_documents=db.scalar(select(func.count()).select_from(RagDocument)) or 0,
+        indexed_documents=db.scalar(
+            select(func.count())
+            .select_from(RagDocument)
+            .where(RagDocument.index_status == "indexed")
+        )
+        or 0,
+        total_chunks=db.scalar(select(func.count()).select_from(RagChunk)) or 0,
+        total_answer_runs=total_answer_runs,
+        grounded_answer_runs=grounded_answer_runs,
+        ungrounded_answer_runs=total_answer_runs - grounded_answer_runs,
+        latest_answer_run_id=latest_answer_run.id if latest_answer_run else None,
+        latest_answer_question_preview=(
+            _preview(latest_answer_run.question) if latest_answer_run else None
+        ),
+        latest_answer_uncertainty=(
+            latest_answer_run.uncertainty if latest_answer_run else None
+        ),
+        latest_answer_created_at=(
+            latest_answer_run.created_at if latest_answer_run else None
+        ),
+    )

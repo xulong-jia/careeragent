@@ -106,6 +106,44 @@ def _generate_questions(client, **overrides):
     return response, payload
 
 
+def _create_rag_answer_run(client, *, grounded: bool = True):
+    if grounded:
+        document_response = client.post(
+            "/api/rag/documents",
+            json={
+                "title": "Synthetic Interview RAG Evidence",
+                "source_type": "manual",
+                "source_uri": "synthetic://interview-rag-evidence",
+                "raw_text": (
+                    "FastAPI pytest evidence supports interview preparation. "
+                    + " ".join(["safe preview context"] * 40)
+                    + " PRIVATE_RAG_RAW_TAIL"
+                ),
+                "metadata": {"topic": "interview"},
+            },
+        )
+        assert document_response.status_code == 201
+        document = get_data(document_response)
+        index_response = client.post(
+            f"/api/rag/documents/{document['doc_id']}/index",
+            json={"max_chars": 160, "overlap_chars": 0},
+        )
+        assert index_response.status_code == 200
+        response = client.post(
+            "/api/rag/answer",
+            json={"question": "FastAPI pytest evidence", "top_k": 1},
+        )
+    else:
+        response = client.post(
+            "/api/rag/answer",
+            json={"question": "unrelated blockchain revenue metric", "top_k": 1},
+        )
+    assert response.status_code == 200
+    answer_run = get_data(response)
+    assert answer_run["grounded"] is grounded
+    return answer_run
+
+
 def test_generate_questions_success_with_jd_and_resume_version():
     client = make_client()
 
@@ -187,6 +225,52 @@ def test_generate_questions_with_project_rewrite_adds_risk_or_gap_question():
     )
 
 
+def test_generate_questions_adds_grounded_rag_answer_run_source_refs():
+    client = make_client()
+    answer_run = _create_rag_answer_run(client, grounded=True)
+
+    response, _ = _generate_questions(
+        client,
+        rag_answer_run_ids=[answer_run["answer_run_id"]],
+        max_questions=3,
+    )
+
+    assert response.status_code == 201
+    data = get_data(response)
+    assert data["warnings"] == []
+    assert any(
+        ref["source_type"] == "rag_answer_run"
+        and ref["source_id"] == answer_run["answer_run_id"]
+        for question in data["questions"]
+        for ref in question["source_refs"]
+    )
+    assert "PRIVATE_RAG_RAW_TAIL" not in response.text
+    assert answer_run["answer"] not in response.text
+    _assert_private_safe(data)
+
+
+def test_generate_questions_warns_for_ungrounded_rag_answer_run():
+    client = make_client()
+    answer_run = _create_rag_answer_run(client, grounded=False)
+
+    response, _ = _generate_questions(
+        client,
+        rag_answer_run_ids=[answer_run["answer_run_id"]],
+        max_questions=3,
+    )
+
+    assert response.status_code == 201
+    data = get_data(response)
+    assert data["warnings"] == [
+        f"RAG answer run {answer_run['answer_run_id']} is no_relevant_source; it was not used as a reliable interview source."
+    ]
+    assert not any(
+        ref["source_type"] == "rag_answer_run"
+        for question in data["questions"]
+        for ref in question["source_refs"]
+    )
+
+
 def test_generate_questions_returns_clear_errors_for_missing_refs():
     client = make_client()
     job = _create_job(client)
@@ -216,6 +300,14 @@ def test_generate_questions_returns_clear_errors_for_missing_refs():
             "project_rewrite_id": "missing_project_rewrite",
         },
     )
+    missing_rag_answer_run = client.post(
+        "/api/interviews/questions/generate",
+        json={
+            "jd_id": job["jd_id"],
+            "resume_version_id": resume_version_id,
+            "rag_answer_run_ids": ["missing_answer_run"],
+        },
+    )
 
     assert missing_job.status_code == 404
     assert get_error(missing_job)["code"] == "job_not_found"
@@ -225,6 +317,8 @@ def test_generate_questions_returns_clear_errors_for_missing_refs():
     assert get_error(missing_project)["code"] == "project_not_found"
     assert missing_rewrite.status_code == 404
     assert get_error(missing_rewrite)["code"] == "project_rewrite_not_found"
+    assert missing_rag_answer_run.status_code == 404
+    assert get_error(missing_rag_answer_run)["code"] == "rag_answer_run_not_found"
 
 
 def test_generate_questions_rejects_invalid_question_type_and_max_questions():

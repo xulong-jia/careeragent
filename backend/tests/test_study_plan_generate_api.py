@@ -183,6 +183,44 @@ def _create_scored_interview_answer(client):
     return get_data(score_response)
 
 
+def _create_rag_answer_run(client, *, grounded: bool = True):
+    if grounded:
+        document_response = client.post(
+            "/api/rag/documents",
+            json={
+                "title": "Synthetic Study RAG Evidence",
+                "source_type": "manual",
+                "source_uri": "synthetic://study-rag-evidence",
+                "raw_text": (
+                    "FastAPI pytest evidence supports backend learning tasks. "
+                    + " ".join(["safe preview context"] * 40)
+                    + " PRIVATE_RAG_RAW_TAIL"
+                ),
+                "metadata": {"topic": "study_plan"},
+            },
+        )
+        assert document_response.status_code == 201
+        document = get_data(document_response)
+        index_response = client.post(
+            f"/api/rag/documents/{document['doc_id']}/index",
+            json={"max_chars": 160, "overlap_chars": 0},
+        )
+        assert index_response.status_code == 200
+        response = client.post(
+            "/api/rag/answer",
+            json={"question": "FastAPI pytest evidence", "top_k": 1},
+        )
+    else:
+        response = client.post(
+            "/api/rag/answer",
+            json={"question": "unrelated blockchain revenue metric", "top_k": 1},
+        )
+    assert response.status_code == 200
+    answer_run = get_data(response)
+    assert answer_run["grounded"] is grounded
+    return answer_run
+
+
 def test_generate_study_plan_from_target_role_only_creates_basic_manual_gap_plan():
     client = make_client()
 
@@ -321,6 +359,61 @@ def test_generate_study_plan_from_request_weakness_tags():
     assert {"weak_structure", "shallow_technical_depth"}.issubset(task_gaps)
 
 
+def test_generate_study_plan_uses_grounded_rag_answer_run_as_safe_reference():
+    client = make_client()
+    answer_run = _create_rag_answer_run(client, grounded=True)
+
+    response = client.post(
+        "/api/study-plans/generate",
+        json={
+            "target_role": "Backend AI Engineer",
+            "rag_answer_run_ids": [answer_run["answer_run_id"]],
+        },
+    )
+
+    assert response.status_code == 201
+    plan = get_data(response)
+    _assert_plan_shape(plan)
+    assert any(
+        ref["source_type"] == "rag_answer_run"
+        and ref["source_id"] == answer_run["answer_run_id"]
+        for ref in plan["source_refs"]
+    )
+    assert any(
+        task["source_gap"] == "rag_grounded_evidence"
+        for phase in plan["phases"]
+        for task in phase["tasks"]
+    )
+    assert "PRIVATE_RAG_RAW_TAIL" not in response.text
+    assert answer_run["answer"] not in response.text
+
+
+def test_generate_study_plan_records_ungrounded_rag_run_without_trusting_it():
+    client = make_client()
+    answer_run = _create_rag_answer_run(client, grounded=False)
+
+    response = client.post(
+        "/api/study-plans/generate",
+        json={
+            "target_role": "Backend AI Engineer",
+            "rag_answer_run_ids": [answer_run["answer_run_id"]],
+        },
+    )
+
+    assert response.status_code == 201
+    plan = get_data(response)
+    _assert_plan_shape(plan)
+    assert any(
+        ref["source_type"] == "rag_answer_run" and ref["field"] == "uncertainty"
+        for ref in plan["source_refs"]
+    )
+    assert not any(
+        task["source_gap"] == "rag_grounded_evidence"
+        for phase in plan["phases"]
+        for task in phase["tasks"]
+    )
+
+
 def test_generate_study_plan_missing_refs_return_errors():
     client = make_client()
 
@@ -346,6 +439,13 @@ def test_generate_study_plan_missing_refs_return_errors():
             "interview_answer_ids": ["missing_answer"],
         },
     )
+    missing_rag_answer_run = client.post(
+        "/api/study-plans/generate",
+        json={
+            "target_role": "Backend AI Engineer",
+            "rag_answer_run_ids": ["missing_answer_run"],
+        },
+    )
 
     assert missing_profile.status_code == 404
     assert get_error(missing_profile)["code"] == "profile_not_found"
@@ -355,6 +455,8 @@ def test_generate_study_plan_missing_refs_return_errors():
     assert get_error(missing_rewrite)["code"] == "project_rewrite_not_found"
     assert missing_answer.status_code == 404
     assert get_error(missing_answer)["code"] == "interview_answer_not_found"
+    assert missing_rag_answer_run.status_code == 404
+    assert get_error(missing_rag_answer_run)["code"] == "rag_answer_run_not_found"
 
 
 def test_generate_study_plan_requires_target_role_when_it_cannot_be_inferred():

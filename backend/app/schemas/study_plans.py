@@ -25,6 +25,7 @@ class StudyPlanGenerateRequest(BaseModel):
     match_report_id: str | None = Field(default=None, max_length=64)
     project_rewrite_id: str | None = Field(default=None, max_length=64)
     interview_answer_ids: list[str] = Field(default_factory=list)
+    rag_answer_run_ids: list[str] = Field(default_factory=list)
     weakness_tags: list[str] = Field(default_factory=list)
     available_hours_per_week: int = Field(default=5, ge=1, le=80)
     horizon_weeks: int = Field(default=4, ge=1, le=52)

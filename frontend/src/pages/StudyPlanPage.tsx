@@ -21,6 +21,7 @@ type GenerateFormState = {
   matchReportId: string;
   projectRewriteId: string;
   interviewAnswerIds: string;
+  ragAnswerRunIds: string;
   weaknessTags: string;
   availableHoursPerWeek: string;
   horizonWeeks: string;
@@ -50,6 +51,7 @@ function initialGenerateForm(): GenerateFormState {
     matchReportId: "",
     projectRewriteId: "",
     interviewAnswerIds: "",
+    ragAnswerRunIds: "",
     weaknessTags: "",
     availableHoursPerWeek: "5",
     horizonWeeks: "4",
@@ -292,6 +294,7 @@ export function StudyPlanPage() {
         match_report_id: optionalText(generateForm.matchReportId),
         project_rewrite_id: optionalText(generateForm.projectRewriteId),
         interview_answer_ids: parseCsv(generateForm.interviewAnswerIds),
+        rag_answer_run_ids: parseCsv(generateForm.ragAnswerRunIds),
         weakness_tags: parseCsv(generateForm.weaknessTags),
         available_hours_per_week: parseBoundedInteger(
           generateForm.availableHoursPerWeek,
@@ -445,6 +448,19 @@ export function StudyPlanPage() {
                   }
                   placeholder="interview_answer_..."
                   value={generateForm.interviewAnswerIds}
+                />
+              </label>
+              <label>
+                RAG Answer Run IDs
+                <input
+                  onChange={(event) =>
+                    setGenerateForm((current) => ({
+                      ...current,
+                      ragAnswerRunIds: event.target.value,
+                    }))
+                  }
+                  placeholder="rag_answer_run_..."
+                  value={generateForm.ragAnswerRunIds}
                 />
               </label>
               <label>

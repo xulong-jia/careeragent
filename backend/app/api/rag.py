@@ -14,6 +14,7 @@ from app.schemas.rag import (
     RagDocumentRecord,
     RagSearchRequest,
     RagSearchResult,
+    RagStatsResponse,
 )
 from app.services import rag_service
 
@@ -109,6 +110,15 @@ async def answer_rag_question(
 ) -> dict[str, object]:
     result = rag_service.answer_question(db, payload)
     return {"data": result, "request_id": request.state.request_id}
+
+
+@router.get("/stats", response_model=ApiResponse[RagStatsResponse])
+async def get_rag_stats(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    stats = rag_service.get_stats(db)
+    return {"data": stats, "request_id": request.state.request_id}
 
 
 @router.get("/answers", response_model=ApiResponse[ListResponse[RagAnswerRunRecord]])

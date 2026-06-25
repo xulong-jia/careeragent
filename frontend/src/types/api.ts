@@ -300,6 +300,7 @@ export type InterviewQuestionGenerateRequest = {
   resume_version_id: string;
   project_id?: string | null;
   project_rewrite_id?: string | null;
+  rag_answer_run_ids?: string[];
   question_types?: InterviewQuestionType[] | null;
   max_questions?: number;
 };
@@ -408,6 +409,7 @@ export type StudyPlanGenerateRequest = {
   match_report_id?: string | null;
   project_rewrite_id?: string | null;
   interview_answer_ids?: string[];
+  rag_answer_run_ids?: string[];
   weakness_tags?: string[];
   available_hours_per_week?: number;
   horizon_weeks?: number;
@@ -690,6 +692,19 @@ export type RagAnswerRunFilters = {
   grounded?: boolean | null;
   uncertainty?: string | null;
   retrievalMode?: string | null;
+};
+
+export type RagStats = {
+  total_documents: number;
+  indexed_documents: number;
+  total_chunks: number;
+  total_answer_runs: number;
+  grounded_answer_runs: number;
+  ungrounded_answer_runs: number;
+  latest_answer_run_id: string | null;
+  latest_answer_question_preview: string | null;
+  latest_answer_uncertainty: string | null;
+  latest_answer_created_at: string | null;
 };
 
 export type AgentRunStatus =
@@ -1023,6 +1038,7 @@ export type WorkbenchState = {
   jobs: JobRecord[];
   matches: MatchReport[];
   ragDocuments: RagDocumentRecord[];
+  ragStats: RagStats | null;
   agentRuns: AgentRunRecord[];
   badCases: BadCaseRecord[];
   applications: ApplicationRecord[];

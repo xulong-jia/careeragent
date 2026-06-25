@@ -193,9 +193,9 @@ JSON 字段说明：
 JSON 字段说明：
 
 - `expected_points`：回答应覆盖的结构化要点，不是标准答案。
-- `source_refs`：题目来源引用，只允许保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`。
+- `source_refs`：题目来源引用，只允许保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`。v1.2 12D 可包含 grounded `rag_answer_run` / `rag_chunk` refs，不保存 RAG full chunk text 或完整 answer。
 
-隐私说明：Interview question generation 只读取 JD profile、structured resume、project facts 和 project rewrite JSON，不复制 Resume/JD full raw_text。题目不得诱导用户编造上线、收益、用户量、准确率、公司经历或未提供的项目事实。
+隐私说明：Interview question generation 只读取 JD profile、structured resume、project facts、project rewrite JSON 和可选 grounded RAG answer run refs，不复制 Resume/JD full raw_text。Ungrounded RAG answer runs 只产生 warning，不作为强来源。题目不得诱导用户编造上线、收益、用户量、准确率、公司经历或未提供的项目事实。
 
 ## interview_answers
 
@@ -240,13 +240,13 @@ JSON 字段说明：
 
 JSON 字段说明：
 
-- `source_refs`：学习计划来源引用，只允许保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`。
+- `source_refs`：学习计划来源引用，只允许保存 `source_type`、`source_id`、`field`、`label` 和短 `preview`。v1.2 12D 可包含 grounded `rag_answer_run` / `rag_chunk` refs；ungrounded answer runs 只记录 uncertainty ref，不作为强来源。
 - `phases`：阶段化学习计划，每个 phase 包含 `phase_id`、`phase`、`goal`、`tasks`、`resources`、`deliverables` 和 `acceptance_criteria`。
 - `tasks`：v1.1 11A/11B/11C/11D 先保存在 `phases` JSON 中，不建独立 `study_tasks` 表。每个 task 包含稳定 `task_id`、`title`、`description`、`source_gap`、`priority`、`status`、`due_hint`、`acceptance_criteria`、`evidence_required` 和 `source_refs`。
 
 状态：plan `status` 支持 `active`、`completed`、`archived`。Task `status` 支持 `todo`、`in_progress`、`done`、`blocked`、`skipped`。11B task status update 会定位 `phases[*].tasks[*].task_id`，更新 nested task 后重新赋值整个 `phases` JSON 并刷新 `updated_at`；本阶段不自动把 plan status 改为 completed。11D Dashboard study stats 基于 `study_plans.status` 和 `phases[*].tasks[*].status` 聚合 total/active/completed/archived plan count、pending/in_progress/done/blocked/skipped task count 和 latest target，不读取或返回 `source_refs` 细节、Resume/JD raw_text 或完整 `answer_text`。
 
-隐私说明：Study Plan generation 可以读取 Profile、Match gaps、Project Rewrite missing/evidence signals 和 Interview weakness tags，但默认 response 不返回 Resume/JD full raw_text 或完整 `answer_text`。`source_refs` 只保存短 preview 和引用 ID。Study plan tasks 只建议补证据、补学习、写交付物或审计 claim，不自动修改简历、项目、面试答案或投递状态，不编造课程链接、公司经历、指标、上线状态或业务规模。
+隐私说明：Study Plan generation 可以读取 Profile、Match gaps、Project Rewrite missing/evidence signals、Interview weakness tags 和可选 grounded RAG answer run refs，但默认 response 不返回 Resume/JD full raw_text、完整 `answer_text`、RAG document raw_text 或 full chunk text。`source_refs` 只保存短 preview 和引用 ID。Study plan tasks 只建议补证据、补学习、写交付物或审计 claim，不自动修改简历、项目、面试答案或投递状态，不编造课程链接、公司经历、指标、上线状态或业务规模。
 
 ## rag_documents
 
@@ -284,7 +284,7 @@ JSON 字段说明：
 
 ## rag_answer_runs
 
-用途：记录 v1.2 12B persisted grounded answer run，供后续 Evaluation、Bad Case 或 Agent 引用 answer run ID。
+用途：记录 v1.2 12B persisted grounded answer run，供后续 Evaluation、Bad Case 或 Agent 引用 answer run ID。v1.2 12D 中 `GET /api/rag/stats` 基于该表聚合 answer run counts；Interview / Study Plan generation 可选接收 `rag_answer_run_ids`，只把 grounded runs 转换为 preview-first source refs。
 
 关键字段：
 
@@ -307,7 +307,7 @@ JSON 字段说明：
 
 `POST /api/rag/answer` 默认 `persist=true`，会写入 `rag_answer_runs` 并返回 `answer_run_id`。如果 request 设置 `persist=false`，则只返回即时 grounded answer contract，不写入该表。
 
-隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`rag_answer_runs.citations_json` 只保存短 snippet 和 metadata preview，`source_refs_json` 只保存短 preview，`retrieval_debug_json` 只允许保存 retrieval_mode、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。12B 不接真实 LLM、embedding/vector DB，不自动修改 Interview / Study Plan / Resume / Project / Application。
+隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`rag_answer_runs.citations_json` 只保存短 snippet 和 metadata preview，`source_refs_json` 只保存短 preview，`retrieval_debug_json` 只允许保存 retrieval_mode、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。12D stats 只返回聚合计数、latest question preview 和 uncertainty，不返回 citations/source_refs/retrieval_debug。当前不接真实 LLM、embedding/vector DB，不自动修改 Interview / Study Plan / Resume / Project / Application。
 
 ## agent_runs
 

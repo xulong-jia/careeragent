@@ -9,7 +9,7 @@ import { listJobs } from "./api/jobs";
 import { listMatches } from "./api/matches";
 import { getProfileSummary, listProfiles } from "./api/profiles";
 import { listProjects } from "./api/projects";
-import { listRagDocuments } from "./api/rag";
+import { getRagStats, listRagDocuments } from "./api/rag";
 import { listResumes } from "./api/resumes";
 import { getStudyPlanStats } from "./api/studyPlans";
 import { AgentRunsPage } from "./pages/AgentRunsPage";
@@ -38,6 +38,7 @@ import type {
   ProfileSummary,
   ProjectRecord,
   RagDocumentRecord,
+  RagStats,
   ResumeRecord,
   StudyPlanStats,
 } from "./types/api";
@@ -149,6 +150,14 @@ async function loadStudyPlanStats(): Promise<StudyPlanStats | null> {
   }
 }
 
+async function loadRagStats(): Promise<RagStats | null> {
+  try {
+    return await getRagStats();
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
   const [latestResume, setLatestResume] = useState<ResumeRecord | null>(null);
@@ -162,6 +171,7 @@ export default function App() {
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [matches, setMatches] = useState<MatchReport[]>([]);
   const [ragDocuments, setRagDocuments] = useState<RagDocumentRecord[]>([]);
+  const [ragStats, setRagStats] = useState<RagStats | null>(null);
   const [agentRuns, setAgentRuns] = useState<AgentRunRecord[]>([]);
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [applicationStats, setApplicationStats] =
@@ -187,6 +197,7 @@ export default function App() {
         jobList,
         matchList,
         ragDocumentList,
+        ragStatsData,
         agentRunList,
         applicationList,
         applicationStatsData,
@@ -201,6 +212,7 @@ export default function App() {
           listJobs(),
           listMatches(),
           listRagDocuments(),
+          loadRagStats(),
           listAgentRuns({ limit: 50 }),
           listApplications(),
           getApplicationStats(),
@@ -216,6 +228,7 @@ export default function App() {
       setJobs(jobList.items);
       setMatches(matchList.items);
       setRagDocuments(ragDocumentList.items);
+      setRagStats(ragStatsData);
       setAgentRuns(agentRunList.items);
       setApplications(applicationList.items);
       setApplicationStats(applicationStatsData);
@@ -255,6 +268,7 @@ export default function App() {
     jobs,
     matches,
     ragDocuments,
+    ragStats,
     agentRuns,
     applications,
     applicationStats,
