@@ -189,7 +189,7 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 
 ## Interview APIs
 
-当前为 v1.0 Interview Center 10A/10B backend 范围：实现表结构、deterministic question generation、question list、answer submit / list 和 deterministic scoring。InterviewCenterPage、Study Plan 写入、RAG completion 和 LLM judge 尚未实现。
+当前为 v1.0 Interview Center 10A/10B/10C 范围：实现表结构、deterministic question generation、question list、answer submit / list、deterministic scoring 和 InterviewCenterPage 前端工作流。Study Plan 写入、RAG completion 和 LLM judge 尚未实现。
 
 | Method | Path | 说明 |
 | --- | --- | --- |
@@ -257,6 +257,8 @@ Scoring dimensions:
 - `overall_average`
 
 隐私边界：Answer submit 会在本地 DB 保存完整 `answer_text`，用于后续 deterministic scoring；默认 API response、列表、Dashboard 和 stats 不返回完整 `answer_text`。Scoring 只使用已保存 answer、question、`expected_points` 和 `source_refs`，不读取或返回 Resume/JD full raw_text，不调用真实 LLM judge，不自动写入 Study Plan。
+
+前端流程：InterviewCenterPage 使用 `frontend/src/api/interviews.ts` 调用上述真实 API，支持输入 `jd_id` / `resume_version_id` 生成 questions、按 filters 刷新 questions、选择 question、提交 answer、按 selected question 查询 answers，并对 selected answer 运行 scoring。页面中的 answer list 只展示 `answer_text_preview`，完整 `answer_text` 只保留在当前编辑 textarea 中。
 
 ## RAG APIs
 

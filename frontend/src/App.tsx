@@ -14,6 +14,7 @@ import { AgentRunsPage } from "./pages/AgentRunsPage";
 import { ApplicationTrackerPage } from "./pages/ApplicationTrackerPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EvaluationPage } from "./pages/EvaluationPage";
+import { InterviewCenterPage } from "./pages/InterviewCenterPage";
 import { JDCenterPage } from "./pages/JDCenterPage";
 import { KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 import { MatchReportPage } from "./pages/MatchReportPage";
@@ -67,6 +68,11 @@ const navigation: NavigationItem[] = [
     key: "project-optimization",
     label: "Project Optimization",
     description: "项目优化",
+  },
+  {
+    key: "interview",
+    label: "Interview Center",
+    description: "面试准备",
   },
   {
     key: "knowledge",
@@ -270,6 +276,9 @@ export default function App() {
           projects={projects}
         />
       );
+    }
+    if (activePage === "interview") {
+      return <InterviewCenterPage />;
     }
     if (activePage === "knowledge") {
       return <KnowledgeBasePage onDocumentsChanged={setRagDocuments} />;

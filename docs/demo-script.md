@@ -122,6 +122,19 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 当前 Project Rewrite 是 deterministic suggestions，不接真实 LLM，不自动写回 Resume Version，不新增不存在的项目经历、指标、公司、技术栈、上线成果或业务规模。
 
+### Interview Center
+
+1. 准备一个 synthetic JD ID 和一个 synthetic Resume Version ID。
+2. 打开 Interview Center。
+3. 在 Generate Questions 中输入 `jd_id` 和 `resume_version_id`，可选输入 `project_id`、`project_rewrite_id`、question types 和 max questions。
+4. 点击 Generate Questions，查看 warnings、need more info、question type、difficulty、expected points 和 source refs。
+5. 选择一个 question，在 textarea 中输入 synthetic answer。
+6. 点击 Submit Answer，确认保存后页面只展示 `answer_text_preview`。
+7. 选择 answer 并点击 Score Answer，查看 structure、technical depth、business understanding、evidence、clarity、risk control、overall average、feedback 和 weakness tags。
+8. 使用 question filters 或 answer refresh 确认历史 question / answer 可从 DB-backed API 读取。
+
+当前 Interview Center 只接 deterministic question generation、answer submit/list 和 scoring API；不接真实 LLM，不做 LLM judge，不写入 Study Plan，不展示 Resume/JD full raw_text。请勿输入真实面试复盘或隐私答案。
+
 ### Knowledge Base
 
 1. 创建 synthetic RAG document。
@@ -168,6 +181,7 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 - Resume Center
 - Resume Center parse / risk-check / confirmed version workflow
 - Project Optimization
+- Interview Center
 - Match Report
 - Knowledge Base
 - Agent Runs

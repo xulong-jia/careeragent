@@ -56,13 +56,14 @@ FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、P
 - JD Center
 - Match Report
 - Project Optimization
+- Interview Center
 - Knowledge Base
 - Agent Runs
 - Applications
 - Evaluation
 - Quality Review
 
-InterviewCenterPage 尚未实现；v1.0 10A/10B 只提供后端 tables、question generation / list、answer submit / list 和 deterministic scoring API。
+InterviewCenterPage 已实现；v1.0 10A/10B/10C 已接入后端 tables、question generation / list、answer submit / list 和 deterministic scoring API。
 
 前端 API 封装在 `frontend/src/api/`，通过 `requestJson` 统一解析后端响应。
 
@@ -104,7 +105,7 @@ sqlite:///./local_data/careeragent.db
 
 - Profile：manual CRUD + readiness summary，不自动从简历生成画像。
 - Project：manual project facts CRUD + deterministic rewrite backend + ProjectOptimizationPage，可选绑定 profile / resume version，不自动生成项目事实，不接真实 LLM。
-- Interview：v1.0 10A/10B 提供 deterministic question generation / list、answer submit / list 和 scoring API，基于 JD profile、structured resume、可选 project facts、project rewrite refs、question expected_points/source_refs 和本地 DB answer，不做 LLM judge 或前端页面。
+- Interview：v1.0 10A/10B/10C 提供 deterministic question generation / list、answer submit / list、scoring API 和 InterviewCenterPage，基于 JD profile、structured resume、可选 project facts、project rewrite refs、question expected_points/source_refs 和本地 DB answer，不做 LLM judge。
 - Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
@@ -153,9 +154,9 @@ Project Optimization 当前链路：
 
 当前 Project Rewrite 是规则版，不接真实 LLM，不自动写入 Resume Version，不编造项目经历、指标、公司、技术栈、上线状态或业务规模；risk flags 覆盖 unsupported metric、fabricated skill、missing evidence、overclaim 和 learning-to-business overclaim。ProjectOptimizationPage 只展示建议，不自动修改简历版本或项目事实。
 
-### Interview Center v1.0 10A/10B
+### Interview Center v1.0 10A/10B/10C
 
-Interview 10A/10B 当前链路：
+Interview 10A/10B/10C 当前链路：
 
 1. `interview_questions` 表保存生成的面试题，绑定 `jd_id` 和 `resume_version_id`，可选绑定 `project_id` / `project_rewrite_id`。
 2. `interview_answers` 表保存用户提交的完整 `answer_text`、`answer_text_preview`、scores、feedback 和 `weakness_tags`。
@@ -165,8 +166,9 @@ Interview 10A/10B 当前链路：
 6. `POST /api/interviews/answers` 保存回答，默认 response 只返回 `answer_text_preview`。
 7. `GET /api/interviews/answers` 支持按 `question_id`、`jd_id`、`resume_version_id` 和 `project_id` 查询回答。
 8. `POST /api/interviews/answers/{answer_id}/score` 使用 deterministic rules 生成 `structure`、`technical_depth`、`business_understanding`、`evidence`、`clarity`、`risk_control`、`overall_average`、feedback 和 `weakness_tags`。
+9. InterviewCenterPage 通过 `frontend/src/api/interviews.ts` 调用真实后端 API，支持生成 questions、筛选和选择 question、提交 answer、查看 answer preview、刷新 answer list，并对 selected answer 运行 deterministic scoring。
 
-当前 Interview 10A/10B 不接真实 LLM，不接 embedding/vector DB，不调用 RAG completion，不自动写入 Study Plan，不自动修改 Resume Version，也不实现 InterviewCenterPage。Scoring 是规则版，不是 LLM judge；默认 API response 不返回完整 `answer_text`、Resume raw_text 或 JD raw_text。
+当前 Interview 10A/10B/10C 不接真实 LLM，不接 embedding/vector DB，不调用 RAG completion，不自动写入 Study Plan，不自动修改 Resume Version。Scoring 是规则版，不是 LLM judge；默认 API response 和 InterviewCenterPage 列表不返回完整 `answer_text`、Resume raw_text 或 JD raw_text。
 
 ### Dashboard readiness
 
@@ -189,7 +191,7 @@ Dashboard 当前展示：
 | 阶段六 | Deterministic Evaluation MVP + Bad Case 关联已完成 |
 | v0.8 Resume/Profile Foundation | Resume parser / risk-check APIs + Profile Center MVP 已完成 |
 | v0.9 Project Optimization 9A / 9B / 9C / 9D / 9E | Project facts backend、deterministic rewrite backend、ProjectOptimizationPage、Dashboard/docs/tests 收口和 final handoff 已完成 |
-| v1.0 Interview Center 10A/10B | Backend interview tables、deterministic question generation、question list、answer submit/list 和 answer scoring API 已完成；InterviewCenterPage、Study Plan 写入、RAG completion 与 LLM judge 未实现 |
+| v1.0 Interview Center 10A/10B/10C | Backend interview tables、deterministic question generation、question list、answer submit/list、answer scoring API 和 InterviewCenterPage 已完成；Study Plan 写入、RAG completion 与 LLM judge 未实现 |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做

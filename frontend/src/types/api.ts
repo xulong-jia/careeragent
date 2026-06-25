@@ -277,6 +277,102 @@ export type ProjectRewriteRecord = {
   created_at: string;
 };
 
+export type InterviewQuestionType =
+  | "project_deep_dive"
+  | "technical_depth"
+  | "jd_skill_check"
+  | "risk_or_gap_explanation"
+  | "behavior_or_collaboration"
+  | "resume_challenge";
+
+export type InterviewDifficulty = "easy" | "medium" | "hard";
+
+export type InterviewSourceRef = {
+  source_type: string;
+  source_id: string;
+  field: string;
+  label: string;
+  preview: string;
+};
+
+export type InterviewQuestionGenerateRequest = {
+  jd_id: string;
+  resume_version_id: string;
+  project_id?: string | null;
+  project_rewrite_id?: string | null;
+  question_types?: InterviewQuestionType[] | null;
+  max_questions?: number;
+};
+
+export type InterviewQuestionRecord = {
+  id: string;
+  user_id: string;
+  jd_id: string;
+  resume_version_id: string;
+  project_id: string | null;
+  project_rewrite_id: string | null;
+  question_type: InterviewQuestionType;
+  question: string;
+  expected_points: Record<string, unknown>[];
+  source_refs: InterviewSourceRef[];
+  difficulty: InterviewDifficulty;
+  created_at: string;
+};
+
+export type InterviewQuestionGenerateResponse = {
+  questions: InterviewQuestionRecord[];
+  warnings: string[];
+  need_more_info: string[];
+};
+
+export type InterviewQuestionFilters = {
+  jd_id?: string;
+  resume_version_id?: string;
+  project_id?: string;
+  question_type?: InterviewQuestionType | "";
+  difficulty?: InterviewDifficulty | "";
+};
+
+export type InterviewQuestionListResponse =
+  ListResponse<InterviewQuestionRecord>;
+
+export type InterviewAnswerCreateRequest = {
+  question_id: string;
+  answer_text: string;
+};
+
+export type InterviewScores = {
+  structure?: number;
+  technical_depth?: number;
+  business_understanding?: number;
+  evidence?: number;
+  clarity?: number;
+  risk_control?: number;
+  overall_average?: number;
+};
+
+export type InterviewAnswerRecord = {
+  id: string;
+  question_id: string;
+  user_id: string;
+  answer_text_preview: string;
+  scores: InterviewScores;
+  feedback: string | null;
+  weakness_tags: string[];
+  created_at: string;
+};
+
+export type InterviewAnswerFilters = {
+  question_id?: string;
+  jd_id?: string;
+  resume_version_id?: string;
+  project_id?: string;
+};
+
+export type InterviewAnswerListResponse = ListResponse<InterviewAnswerRecord>;
+
+export type InterviewAnswerScoreResponse = InterviewAnswerRecord;
+
 export type JobCreatePayload = {
   company: string;
   job_title: string;
