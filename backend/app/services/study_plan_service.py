@@ -9,7 +9,12 @@ from app.models.match import MatchReport
 from app.models.profile import Profile
 from app.models.project import ProjectRewrite
 from app.repositories import study_plan_repository
-from app.schemas.study_plans import StudyPlanGenerateRequest, StudyPlanRecord
+from app.schemas.study_plans import (
+    StudyPlanGenerateRequest,
+    StudyPlanRecord,
+    StudyPlanStatsResponse,
+    StudyTaskStatusUpdateRequest,
+)
 
 
 PREVIEW_CHARS = 180
@@ -68,6 +73,111 @@ def generate_study_plan(
         target_role=target_role,
         source_refs=source_refs,
         phases=phases,
+    )
+
+
+def list_study_plans(
+    db: Session,
+    *,
+    status: str | None = None,
+    target_role: str | None = None,
+    profile_id: str | None = None,
+    match_report_id: str | None = None,
+) -> list[StudyPlanRecord]:
+    return study_plan_repository.list_study_plans(
+        db,
+        status=_normalize_optional_id(status, "status"),
+        target_role=_normalize_optional_id(target_role, "target_role"),
+        profile_id=_normalize_optional_id(profile_id, "profile_id"),
+        match_report_id=_normalize_optional_id(match_report_id, "match_report_id"),
+    )
+
+
+def get_study_plan(db: Session, study_plan_id: str) -> StudyPlanRecord:
+    return study_plan_repository.get_study_plan(
+        db,
+        _normalize_required_id(study_plan_id, "study_plan_id"),
+    )
+
+
+def update_task_status(
+    db: Session,
+    study_plan_id: str,
+    task_id: str,
+    payload: StudyTaskStatusUpdateRequest,
+) -> StudyPlanRecord:
+    normalized_plan_id = _normalize_required_id(study_plan_id, "study_plan_id")
+    normalized_task_id = _normalize_required_id(task_id, "task_id")
+    plan = study_plan_repository.get_study_plan_model(db, normalized_plan_id)
+    if not plan:
+        raise AppError(
+            code="study_plan_not_found",
+            message="Study plan was not found.",
+            status_code=404,
+            details={"study_plan_id": normalized_plan_id},
+        )
+
+    phases = _copy_phases(plan.phases)
+    updated = False
+    for phase in phases:
+        tasks = phase.get("tasks")
+        if not isinstance(tasks, list):
+            continue
+        for task in tasks:
+            if not isinstance(task, dict):
+                continue
+            if task.get("task_id") == normalized_task_id:
+                task["status"] = payload.status
+                updated = True
+                break
+        if updated:
+            break
+    if not updated:
+        raise AppError(
+            code="study_plan_task_not_found",
+            message="Study plan task was not found.",
+            status_code=404,
+            details={
+                "study_plan_id": normalized_plan_id,
+                "task_id": normalized_task_id,
+            },
+        )
+
+    return study_plan_repository.update_study_plan_phases(db, plan, phases=phases)
+
+
+def get_stats(db: Session) -> StudyPlanStatsResponse:
+    plans = study_plan_repository.list_study_plan_models(db)
+    task_counts = {
+        "todo": 0,
+        "blocked": 0,
+        "done": 0,
+        "in_progress": 0,
+        "skipped": 0,
+    }
+    for plan in plans:
+        for task in _iter_plan_tasks(plan.phases):
+            status = task.get("status")
+            if isinstance(status, str) and status in task_counts:
+                task_counts[status] += 1
+
+    latest_plan = max(
+        plans,
+        key=lambda plan: (plan.created_at, plan.id),
+        default=None,
+    )
+    return StudyPlanStatsResponse(
+        total_plans=len(plans),
+        active_plans=sum(1 for plan in plans if plan.status == "active"),
+        completed_plans=sum(1 for plan in plans if plan.status == "completed"),
+        archived_plans=sum(1 for plan in plans if plan.status == "archived"),
+        pending_tasks=task_counts["todo"],
+        blocked_tasks=task_counts["blocked"],
+        done_tasks=task_counts["done"],
+        in_progress_tasks=task_counts["in_progress"],
+        skipped_tasks=task_counts["skipped"],
+        latest_plan_id=latest_plan.id if latest_plan else None,
+        latest_target_role=latest_plan.target_role if latest_plan else None,
     )
 
 
@@ -636,6 +746,18 @@ def _normalize_optional_id(value: str | None, field_name: str) -> str | None:
     return normalized
 
 
+def _normalize_required_id(value: str, field_name: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise AppError(
+            code="validation_error",
+            message=f"{field_name} must not be empty.",
+            status_code=400,
+            details={"field": field_name},
+        )
+    return normalized
+
+
 def _normalize_id_list(values: list[str], field_name: str) -> list[str]:
     normalized: list[str] = []
     for value in values:
@@ -680,3 +802,34 @@ def _short_label(value: str) -> str:
 def _is_high_priority_gap(value: str) -> bool:
     lower = value.lower()
     return any(term in lower for term in ("missing", "required", "risk", "evidence"))
+
+
+def _copy_phases(value: object) -> list[dict[str, object]]:
+    phases: list[dict[str, object]] = []
+    if not isinstance(value, list):
+        return phases
+    for phase in value:
+        if not isinstance(phase, dict):
+            continue
+        copied_phase = dict(phase)
+        copied_tasks: list[dict[str, object]] = []
+        for task in list(copied_phase.get("tasks") or []):
+            if isinstance(task, dict):
+                copied_tasks.append(dict(task))
+        copied_phase["tasks"] = copied_tasks
+        phases.append(copied_phase)
+    return phases
+
+
+def _iter_plan_tasks(phases: object) -> Iterable[dict[str, object]]:
+    if not isinstance(phases, list):
+        return
+    for phase in phases:
+        if not isinstance(phase, dict):
+            continue
+        tasks = phase.get("tasks")
+        if not isinstance(tasks, list):
+            continue
+        for task in tasks:
+            if isinstance(task, dict):
+                yield task

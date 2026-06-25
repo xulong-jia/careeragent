@@ -66,7 +66,7 @@ FastAPI app 在 `backend/app/main.py` 注册 Health、DB、Profile、Project、P
 
 InterviewCenterPage 已实现；v1.0 10A/10B/10C/10D 已接入后端 tables、question generation / list、answer submit / list、deterministic scoring API 和 Dashboard stats。
 
-Study Plan Center 当前处于 v1.1 11A：后端 `study_plans` 表和 deterministic generate API 已完成；StudyPlanPage、Dashboard study stats 和 task status update API 尚未实现。
+Study Plan Center 当前处于 v1.1 11A/11B：后端 `study_plans` 表、deterministic generate API、list/detail、task status update 和 stats API 已完成；StudyPlanPage 和 Dashboard 前端接入尚未实现。
 
 前端 API 封装在 `frontend/src/api/`，通过 `requestJson` 统一解析后端响应。
 
@@ -109,7 +109,7 @@ sqlite:///./local_data/careeragent.db
 - Profile：manual CRUD + readiness summary，不自动从简历生成画像。
 - Project：manual project facts CRUD + deterministic rewrite backend + ProjectOptimizationPage，可选绑定 profile / resume version，不自动生成项目事实，不接真实 LLM。
 - Interview：v1.0 10A/10B/10C/10D 提供 deterministic question generation / list、answer submit / list、scoring API、stats API、InterviewCenterPage 和 Dashboard training stats，基于 JD profile、structured resume、可选 project facts、project rewrite refs、question expected_points/source_refs 和本地 DB answer，不做 LLM judge。
-- Study Plan：v1.1 11A 提供 `study_plans` 表和 `POST /api/study-plans/generate`，基于 Profile target_roles / skill_map、Match gaps / rewrite_priorities、Project Rewrite missing_points / evidence_required、Interview weakness_tags 和 request weakness_tags 生成 deterministic phases/tasks/resources/deliverables/acceptance criteria，不做真实 LLM、RAG completion、Agent full workflow 或自动修改简历/项目/面试答案。
+- Study Plan：v1.1 11A/11B 提供 `study_plans` 表、`POST /api/study-plans/generate`、list/detail、task status update 和 stats API，基于 Profile target_roles / skill_map、Match gaps / rewrite_priorities、Project Rewrite missing_points / evidence_required、Interview weakness_tags 和 request weakness_tags 生成 deterministic phases/tasks/resources/deliverables/acceptance criteria，不做真实 LLM、RAG completion、Agent full workflow 或自动修改简历/项目/面试答案。
 - Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
@@ -176,9 +176,9 @@ Interview 10A/10B/10C/10D 当前链路：
 
 当前 Interview 10A/10B/10C/10D 不接真实 LLM，不接 embedding/vector DB，不调用 RAG completion，不自动写入 Study Plan，不自动修改 Resume Version。Scoring 是规则版，不是 LLM judge；默认 API response、InterviewCenterPage 列表和 Dashboard stats 不返回完整 `answer_text`、Resume raw_text 或 JD raw_text。
 
-### Study Plan Center v1.1 11A
+### Study Plan Center v1.1 11A/11B
 
-Study Plan 11A 当前链路：
+Study Plan 11A/11B 当前链路：
 
 1. `study_plans` 表保存生成的学习计划，支持可选关联 `match_report_id`、`profile_id` 和 `project_rewrite_id`。
 2. `POST /api/study-plans/generate` 使用 deterministic rules 读取 Profile、MatchReport、ProjectRewrite、InterviewAnswer weakness tags 和 request weakness tags。
@@ -186,8 +186,11 @@ Study Plan 11A 当前链路：
 4. `phases` JSON 保存 phase/task 结构；每个 task 有稳定 `task_id`、source_gap、priority、status、acceptance_criteria、evidence_required 和 source_refs。
 5. `resources` 在没有真实 RAG resource 时使用 `manual_resource_needed` placeholder，不编造课程链接。
 6. `source_refs` 只保存 source type/id/field/label/preview，不保存 Resume/JD full raw_text 或完整 `answer_text`。
+7. `GET /api/study-plans` 和 `GET /api/study-plans/{study_plan_id}` 提供 backend list/detail。
+8. `PATCH /api/study-plans/{study_plan_id}/tasks/{task_id}` 更新 `phases[*].tasks[*].status` 并刷新 `updated_at`，不自动修改 plan status。
+9. `GET /api/study-plans/stats` 基于 `study_plans.phases` 聚合 plan count 和 task status count，不返回 source_refs 细节或隐私原文。
 
-当前 Study Plan 11A 不做 StudyPlanPage，不做 Dashboard study stats，不做 task status update API，不接真实 LLM，不接 embedding/vector DB，不调用 RAG completion，不做 Agent full workflow，不自动修改简历、项目、面试答案或投递状态。
+当前 Study Plan 11A/11B 不做 StudyPlanPage，不做 Dashboard 前端接入，不接真实 LLM，不接 embedding/vector DB，不调用 RAG completion，不做 Agent full workflow，不自动修改简历、项目、面试答案或投递状态。
 
 ### Dashboard readiness
 
@@ -212,7 +215,7 @@ Dashboard 当前展示：
 | v0.8 Resume/Profile Foundation | Resume parser / risk-check APIs + Profile Center MVP 已完成 |
 | v0.9 Project Optimization 9A / 9B / 9C / 9D / 9E | Project facts backend、deterministic rewrite backend、ProjectOptimizationPage、Dashboard/docs/tests 收口和 final handoff 已完成 |
 | v1.0 Interview Center 10A/10B/10C/10D | Backend interview tables、deterministic question generation、question list、answer submit/list、answer scoring API、InterviewCenterPage、stats API 和 Dashboard training stats 已完成；Study Plan 写入、RAG completion 与 LLM judge 未实现 |
-| v1.1 Study Plan Center 11A | Backend `study_plans` table 和 deterministic generate API 已完成；StudyPlanPage、Dashboard study stats、task status update、RAG completion 与 Agent full workflow 未实现 |
+| v1.1 Study Plan Center 11A/11B | Backend `study_plans` table、deterministic generate API、list/detail、task status update 和 stats API 已完成；StudyPlanPage、Dashboard 前端接入、RAG completion 与 Agent full workflow 未实现 |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做

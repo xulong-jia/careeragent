@@ -70,3 +70,23 @@ class StudyPlanRecord(BaseModel):
 class StudyPlanGenerateResponse(BaseModel):
     data: StudyPlanRecord
     request_id: str
+
+
+class StudyTaskStatusUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: StudyTaskStatus
+
+
+class StudyPlanStatsResponse(BaseModel):
+    total_plans: int
+    active_plans: int
+    completed_plans: int
+    archived_plans: int
+    pending_tasks: int
+    blocked_tasks: int
+    done_tasks: int
+    in_progress_tasks: int
+    skipped_tasks: int
+    latest_plan_id: str | None = None
+    latest_target_role: str | None = None
