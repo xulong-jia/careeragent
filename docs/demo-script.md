@@ -132,8 +132,9 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 6. 点击 Submit Answer，确认保存后页面只展示 `answer_text_preview`。
 7. 选择 answer 并点击 Score Answer，查看 structure、technical depth、business understanding、evidence、clarity、risk control、overall average、feedback 和 weakness tags。
 8. 使用 question filters 或 answer refresh 确认历史 question / answer 可从 DB-backed API 读取。
+9. 回到 Dashboard，查看 Interview Training 的 question count、answer count、scored answer count、latest average score 和 latest weakness tags。
 
-当前 Interview Center 只接 deterministic question generation、answer submit/list 和 scoring API；不接真实 LLM，不做 LLM judge，不写入 Study Plan，不展示 Resume/JD full raw_text。请勿输入真实面试复盘或隐私答案。
+当前 Interview Center 只接 deterministic question generation、answer submit/list、scoring API 和 Dashboard training stats；不接真实 LLM，不做 LLM judge，不写入 Study Plan，不展示 Resume/JD full raw_text 或完整已保存 answer_text。请勿输入真实面试复盘或隐私答案。
 
 ### Knowledge Base
 

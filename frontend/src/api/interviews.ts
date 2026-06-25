@@ -9,6 +9,7 @@ import type {
   InterviewQuestionGenerateRequest,
   InterviewQuestionGenerateResponse,
   InterviewQuestionListResponse,
+  InterviewStats,
 } from "../types/api";
 
 function buildQuery(filters: Record<string, string | undefined>): string {
@@ -90,4 +91,8 @@ export function scoreInterviewAnswer(
       body: JSON.stringify({}),
     },
   );
+}
+
+export function getInterviewStats(): Promise<InterviewStats> {
+  return requestJson<InterviewStats>("/api/interviews/stats");
 }

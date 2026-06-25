@@ -189,7 +189,7 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 
 ## Interview APIs
 
-当前为 v1.0 Interview Center 10A/10B/10C 范围：实现表结构、deterministic question generation、question list、answer submit / list、deterministic scoring 和 InterviewCenterPage 前端工作流。Study Plan 写入、RAG completion 和 LLM judge 尚未实现。
+当前为 v1.0 Interview Center 10A/10B/10C/10D 范围：实现表结构、deterministic question generation、question list、answer submit / list、deterministic scoring、InterviewCenterPage 前端工作流和 Dashboard stats。Study Plan 写入、RAG completion 和 LLM judge 尚未实现。
 
 | Method | Path | 说明 |
 | --- | --- | --- |
@@ -198,6 +198,7 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 | POST | `/api/interviews/answers` | 提交面试回答，保存完整 `answer_text` 到本地 DB，默认 response 只返回 `answer_text_preview` |
 | GET | `/api/interviews/answers` | 查询已提交 answers，可按 `question_id`、`jd_id`、`resume_version_id`、`project_id` 筛选 |
 | POST | `/api/interviews/answers/{answer_id}/score` | 对已保存 answer 运行 deterministic scoring，返回 scores、feedback、weakness_tags 和 preview |
+| GET | `/api/interviews/stats` | 查询 Interview Training 聚合统计，用于 Dashboard |
 
 `POST /api/interviews/questions/generate` request:
 
@@ -259,6 +260,18 @@ Scoring dimensions:
 隐私边界：Answer submit 会在本地 DB 保存完整 `answer_text`，用于后续 deterministic scoring；默认 API response、列表、Dashboard 和 stats 不返回完整 `answer_text`。Scoring 只使用已保存 answer、question、`expected_points` 和 `source_refs`，不读取或返回 Resume/JD full raw_text，不调用真实 LLM judge，不自动写入 Study Plan。
 
 前端流程：InterviewCenterPage 使用 `frontend/src/api/interviews.ts` 调用上述真实 API，支持输入 `jd_id` / `resume_version_id` 生成 questions、按 filters 刷新 questions、选择 question、提交 answer、按 selected question 查询 answers，并对 selected answer 运行 scoring。页面中的 answer list 只展示 `answer_text_preview`，完整 `answer_text` 只保留在当前编辑 textarea 中。
+
+`GET /api/interviews/stats` response 关键字段：
+
+- `total_questions`
+- `total_answers`
+- `scored_answers`
+- `latest_average_score`
+- `latest_weakness_tags`
+- `by_question_type`
+- `by_difficulty`
+
+Stats 隐私边界：只基于 `interview_questions` / `interview_answers` 做聚合，不返回完整 `answer_text`、Resume raw_text 或 JD raw_text。Dashboard 读取该 API 失败时会回退为空 stats，不阻断其他 workbench 数据加载。
 
 ## RAG APIs
 

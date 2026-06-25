@@ -373,6 +373,16 @@ export type InterviewAnswerListResponse = ListResponse<InterviewAnswerRecord>;
 
 export type InterviewAnswerScoreResponse = InterviewAnswerRecord;
 
+export type InterviewStats = {
+  total_questions: number;
+  total_answers: number;
+  scored_answers: number;
+  latest_average_score: number | null;
+  latest_weakness_tags: string[];
+  by_question_type: Record<string, number>;
+  by_difficulty: Record<string, number>;
+};
+
 export type JobCreatePayload = {
   company: string;
   job_title: string;
@@ -856,5 +866,6 @@ export type WorkbenchState = {
   badCases: BadCaseRecord[];
   applications: ApplicationRecord[];
   applicationStats: ApplicationStats | null;
+  interviewStats: InterviewStats | null;
   evaluationStats: EvaluationStats | null;
 };

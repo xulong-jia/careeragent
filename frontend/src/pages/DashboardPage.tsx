@@ -35,6 +35,15 @@ export function DashboardPage({
   const activeProjectCount = state.projects.filter(
     (project) => project.status === "active",
   ).length;
+  const interviewStats = state.interviewStats;
+  const latestInterviewScore =
+    interviewStats?.latest_average_score != null
+      ? interviewStats.latest_average_score.toFixed(2)
+      : "--";
+  const latestWeaknessTags =
+    interviewStats?.latest_weakness_tags.length
+      ? interviewStats.latest_weakness_tags.join(", ")
+      : "No weakness tags";
   const metrics = [
     {
       label: "Profile",
@@ -109,9 +118,30 @@ export function DashboardPage({
       page: "applications" as const,
     },
     {
-      label: "Interviews",
+      label: "Interview Questions",
+      value: String(interviewStats?.total_questions ?? 0),
+      detail: "Interview training",
+      tone: "amber",
+      page: "interview" as const,
+    },
+    {
+      label: "Interview Answers",
+      value: String(interviewStats?.total_answers ?? 0),
+      detail: `${interviewStats?.scored_answers ?? 0} scored`,
+      tone: "blue",
+      page: "interview" as const,
+    },
+    {
+      label: "Latest Interview Score",
+      value: latestInterviewScore,
+      detail: "Deterministic training score",
+      tone: "green",
+      page: "interview" as const,
+    },
+    {
+      label: "App Interview Stages",
       value: String(state.applicationStats?.interview_count ?? 0),
-      detail: "Active interview stages",
+      detail: "Application tracking",
       tone: "amber",
       page: "applications" as const,
     },
@@ -240,6 +270,18 @@ export function DashboardPage({
             <li>
               <strong>Agent Runs</strong>
               <span>{state.agentRuns.length} deterministic runs</span>
+            </li>
+            <li>
+              <strong>Interview Training</strong>
+              <span>
+                {interviewStats
+                  ? `${interviewStats.total_questions} questions / ${interviewStats.total_answers} answers / ${interviewStats.scored_answers} scored`
+                  : "0 questions / 0 answers / 0 scored"}
+              </span>
+            </li>
+            <li>
+              <strong>Latest Weakness Tags</strong>
+              <span>{latestWeaknessTags}</span>
             </li>
             <li>
               <strong>Applications</strong>

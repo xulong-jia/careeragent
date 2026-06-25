@@ -1,11 +1,16 @@
 from uuid import uuid4
+from collections import Counter
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.models.interview import InterviewAnswer, InterviewQuestion
-from app.schemas.interviews import InterviewAnswerRecord, InterviewQuestionRecord
+from app.schemas.interviews import (
+    InterviewAnswerRecord,
+    InterviewQuestionRecord,
+    InterviewStatsResponse,
+)
 
 
 def _next_interview_question_id(db: Session) -> str:
@@ -232,3 +237,41 @@ def update_answer_score(
         raise
     db.refresh(answer)
     return _to_answer_record(answer)
+
+
+def get_stats(db: Session) -> InterviewStatsResponse:
+    questions = db.scalars(select(InterviewQuestion)).all()
+    answers = db.scalars(select(InterviewAnswer)).all()
+    scored_answers = [
+        answer
+        for answer in answers
+        if isinstance(answer.scores, dict)
+        and isinstance(answer.scores.get("overall_average"), int | float)
+    ]
+    latest_scored_answer = max(
+        scored_answers,
+        key=lambda answer: (answer.created_at, answer.id),
+        default=None,
+    )
+    latest_average_score = (
+        float(latest_scored_answer.scores["overall_average"])
+        if latest_scored_answer
+        else None
+    )
+    latest_weakness_tags = (
+        list(latest_scored_answer.weakness_tags or [])
+        if latest_scored_answer
+        else []
+    )
+
+    return InterviewStatsResponse(
+        total_questions=len(questions),
+        total_answers=len(answers),
+        scored_answers=len(scored_answers),
+        latest_average_score=latest_average_score,
+        latest_weakness_tags=latest_weakness_tags,
+        by_question_type=dict(
+            Counter(question.question_type for question in questions)
+        ),
+        by_difficulty=dict(Counter(question.difficulty for question in questions)),
+    )

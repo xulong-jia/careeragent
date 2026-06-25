@@ -79,3 +79,13 @@ class InterviewAnswerRecord(BaseModel):
 
 class InterviewAnswerScoreResponse(BaseModel):
     answer: InterviewAnswerRecord
+
+
+class InterviewStatsResponse(BaseModel):
+    total_questions: int
+    total_answers: int
+    scored_answers: int
+    latest_average_score: float | None = None
+    latest_weakness_tags: list[str] = Field(default_factory=list)
+    by_question_type: dict[str, int] = Field(default_factory=dict)
+    by_difficulty: dict[str, int] = Field(default_factory=dict)

@@ -12,6 +12,7 @@ from app.schemas.interviews import (
     InterviewQuestionGenerateResponse,
     InterviewQuestionRecord,
     InterviewQuestionType,
+    InterviewStatsResponse,
 )
 from app.services import interview_service
 
@@ -97,6 +98,15 @@ async def list_interview_answers(
         "data": ListResponse(items=answers, total=len(answers)),
         "request_id": request.state.request_id,
     }
+
+
+@router.get("/stats", response_model=ApiResponse[InterviewStatsResponse])
+async def get_interview_stats(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    stats = interview_service.get_stats(db)
+    return {"data": stats, "request_id": request.state.request_id}
 
 
 @router.post(

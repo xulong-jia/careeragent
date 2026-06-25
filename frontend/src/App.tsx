@@ -4,6 +4,7 @@ import { AppShell } from "./components/AppShell";
 import { listAgentRuns } from "./api/agents";
 import { getApplicationStats, listApplications } from "./api/applications";
 import { getEvaluationStats, listBadCases } from "./api/evaluations";
+import { getInterviewStats } from "./api/interviews";
 import { listJobs } from "./api/jobs";
 import { listMatches } from "./api/matches";
 import { getProfileSummary, listProfiles } from "./api/profiles";
@@ -28,6 +29,7 @@ import type {
   ApplicationStats,
   BadCaseRecord,
   EvaluationStats,
+  InterviewStats,
   JobRecord,
   MatchReport,
   ProfileRecord,
@@ -123,6 +125,14 @@ async function loadProfileWorkbench(): Promise<{
   }
 }
 
+async function loadInterviewStats(): Promise<InterviewStats | null> {
+  try {
+    return await getInterviewStats();
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
   const [latestResume, setLatestResume] = useState<ResumeRecord | null>(null);
@@ -140,6 +150,9 @@ export default function App() {
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [applicationStats, setApplicationStats] =
     useState<ApplicationStats | null>(null);
+  const [interviewStats, setInterviewStats] = useState<InterviewStats | null>(
+    null,
+  );
   const [badCases, setBadCases] = useState<BadCaseRecord[]>([]);
   const [evaluationStats, setEvaluationStats] = useState<EvaluationStats | null>(
     null,
@@ -158,6 +171,7 @@ export default function App() {
         agentRunList,
         applicationList,
         applicationStatsData,
+        interviewStatsData,
         badCaseList,
         evaluationStatsData,
       ] = await Promise.all([
@@ -170,6 +184,7 @@ export default function App() {
           listAgentRuns({ limit: 50 }),
           listApplications(),
           getApplicationStats(),
+          loadInterviewStats(),
           listBadCases({ limit: 50 }),
           getEvaluationStats(),
         ]);
@@ -183,6 +198,7 @@ export default function App() {
       setAgentRuns(agentRunList.items);
       setApplications(applicationList.items);
       setApplicationStats(applicationStatsData);
+      setInterviewStats(interviewStatsData);
       setBadCases(badCaseList.items);
       setEvaluationStats(evaluationStatsData);
       setLatestResume(
@@ -220,6 +236,7 @@ export default function App() {
     agentRuns,
     applications,
     applicationStats,
+    interviewStats,
     badCases,
     evaluationStats,
   };

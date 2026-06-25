@@ -173,7 +173,7 @@ JSON 字段说明：
 
 ## interview_questions
 
-用途：记录 v1.0 Interview Center 10A 生成的 deterministic 面试题。
+用途：记录 v1.0 Interview Center 10A/10D 使用的 deterministic 面试题；10D Dashboard stats 会基于该表聚合 question count、by question type 和 by difficulty。
 
 关键字段：
 
@@ -199,7 +199,7 @@ JSON 字段说明：
 
 ## interview_answers
 
-用途：保存用户面试回答和 deterministic scoring 结果。v1.0 10B 提供 answer submit / list / score API，但默认 API response 只暴露 preview 和评分结果。
+用途：保存用户面试回答和 deterministic scoring 结果。v1.0 10B 提供 answer submit / list / score API，10D Dashboard stats 基于该表聚合 answer count、scored answer count、latest average score 和 latest weakness tags；默认 API response 只暴露 preview 和评分结果。
 
 关键字段：
 
@@ -218,7 +218,7 @@ JSON 字段说明：
 - `scores`：deterministic scoring 结果，包含 `structure`、`technical_depth`、`business_understanding`、`evidence`、`clarity`、`risk_control` 和 `overall_average`。
 - `weakness_tags`：规则生成的薄弱项标签，例如 `weak_structure`、`shallow_technical_depth`、`missing_evidence`、`overclaim_risk`。
 
-隐私说明：`answer_text` 可能包含个人经历或面试复盘，仅保存在本地 DB 用于 deterministic scoring；默认 API response、列表、Dashboard 和 stats 只使用 `answer_text_preview`，不暴露完整回答原文。Scoring 不读取 Resume/JD full raw_text，不调用真实 LLM judge，也不自动写入 Study Plan。
+隐私说明：`answer_text` 可能包含个人经历或面试复盘，仅保存在本地 DB 用于 deterministic scoring；默认 API response、列表、Dashboard 和 stats 不暴露完整回答原文。Dashboard stats 只读取聚合计数、`scores.overall_average` 和 `weakness_tags`，不读取或展示完整 `answer_text`。Scoring 不读取 Resume/JD full raw_text，不调用真实 LLM judge，也不自动写入 Study Plan。
 
 ## rag_documents
 

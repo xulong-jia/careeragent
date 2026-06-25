@@ -16,6 +16,7 @@ from app.schemas.interviews import (
     InterviewQuestionGenerateRequest,
     InterviewQuestionGenerateResponse,
     InterviewQuestionRecord,
+    InterviewStatsResponse,
     InterviewQuestionType,
 )
 
@@ -296,6 +297,10 @@ def list_answers(
         resume_version_id=_normalize_optional_id(resume_version_id),
         project_id=_normalize_optional_id(project_id),
     )
+
+
+def get_stats(db: Session) -> InterviewStatsResponse:
+    return interview_repository.get_stats(db)
 
 
 def score_answer(
