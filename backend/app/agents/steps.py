@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.agents import state
 from app.core.errors import AppError
+from app.core.versioning import version_metadata
 from app.models.application import Application
 from app.models.job import JobDescription, JobProfile
 from app.models.project import Project
@@ -682,10 +683,12 @@ def build_final_summary(db: Session, context: WorkflowContext) -> StepResult:
     interview_question_ids = list(context.resolved.get("interview_question_ids") or [])
     study_plan_id = context.resolved.get("study_plan_id")
     application_id = context.resolved.get("application_id")
+    metadata = version_metadata()
     final_summary = {
         "total_score": int(context.resolved.get("match_total_score") or 0),
         "top_strengths": list(context.resolved.get("match_strengths") or [])[:3],
         "top_gaps": list(context.resolved.get("match_gaps") or [])[:3],
+        "version_metadata": metadata,
         "rag_context": {
             "has_grounded_context": bool(rag_context_summary.get("has_grounded_context")),
             "source_count": rag_source_count,
@@ -728,6 +731,7 @@ def build_final_summary(db: Session, context: WorkflowContext) -> StepResult:
             "rag_context_warnings": rag_context_warnings,
             "rag_context_summary": rag_context_summary,
             "usable_rag_refs": list(context.resolved.get("usable_rag_refs") or []),
+            "version_metadata": metadata,
             "final_summary": final_summary,
         },
     )

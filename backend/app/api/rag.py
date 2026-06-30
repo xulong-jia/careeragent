@@ -64,6 +64,16 @@ async def get_rag_document(
     return {"data": document, "request_id": request.state.request_id}
 
 
+@router.delete("/documents/{doc_id}", response_model=ApiResponse[dict[str, object]])
+async def delete_rag_document(
+    request: Request,
+    doc_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    result = rag_service.delete_document(db, doc_id)
+    return {"data": result, "request_id": request.state.request_id}
+
+
 @router.post(
     "/documents/{doc_id}/index",
     response_model=ApiResponse[RagDocumentIndexResult],

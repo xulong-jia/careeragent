@@ -15,6 +15,7 @@ from app.schemas.resumes import (
 
 ARCHIVED_STATUS = "archived"
 CONFIRMED_STATUS = "confirmed"
+DELETED_STATUS = "deleted"
 
 
 def _next_resume_id(db: Session) -> str:
@@ -275,6 +276,41 @@ def archive_resume_version(db: Session, version_id: str) -> ResumeVersionRecord:
             raise
         db.refresh(version)
     return _to_resume_version_record(version)
+
+
+def archive_resume(db: Session, resume_id: str) -> dict[str, object]:
+    resume = db.get(Resume, resume_id)
+    if not resume or resume.status != "active":
+        raise AppError(
+            code="resume_not_found",
+            message="Resume was not found.",
+            status_code=404,
+            details={"resume_id": resume_id},
+        )
+
+    archived_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    versions = db.scalars(
+        select(ResumeVersion).where(ResumeVersion.resume_id == resume_id)
+    ).all()
+    try:
+        resume.status = DELETED_STATUS
+        for version in versions:
+            if version.status != ARCHIVED_STATUS:
+                version.status = ARCHIVED_STATUS
+            if version.archived_at is None:
+                version.archived_at = archived_at
+        db.add(resume)
+        for version in versions:
+            db.add(version)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        "resume_id": resume_id,
+        "status": DELETED_STATUS,
+        "archived_version_count": len(versions),
+    }
 
 
 def get_source_resume_version(

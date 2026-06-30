@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.privacy import safe_preview
 from app.repositories import resume_repository
 from app.schemas.resumes import (
     ResumeParseRequest,
@@ -102,7 +103,7 @@ def create_resume(
         text_hash=sha256(content).hexdigest(),
         parse_status="parsed",
         raw_text=raw_text,
-        raw_text_preview=raw_text[:500],
+        raw_text_preview=safe_preview(raw_text),
         structured_resume=structured_resume,
         extraction_status=extraction.extraction_status,
         extraction_method=extraction.extraction_method,
@@ -282,3 +283,7 @@ def clone_resume_version(
 
 def archive_resume_version(db: Session, version_id: str) -> ResumeVersionRecord:
     return resume_repository.archive_resume_version(db, version_id)
+
+
+def archive_resume(db: Session, resume_id: str) -> dict[str, object]:
+    return resume_repository.archive_resume(db, resume_id)

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import {
   createApplication,
+  deleteApplication,
   getApplication,
   getApplicationStats,
   listApplicationStatusHistory,
@@ -450,6 +451,46 @@ export function ApplicationTrackerPage({
       );
     } finally {
       setIsSavingReflection(false);
+    }
+  };
+
+  const handleArchiveApplication = async (applicationId: string) => {
+    if (!window.confirm("Archive this application and hide it from default lists?")) {
+      return;
+    }
+    setIsUpdating(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+    try {
+      const archived = await deleteApplication(applicationId);
+      const loadedItems = await refreshApplications(filters);
+      if (filters.status === "archived") {
+        setSelectedId(archived.application_id);
+        setSelectedApplication(archived);
+        setDetailForm(detailFormFromApplication(archived));
+        setReflectionForm({
+          ...initialReflectionState(),
+          reflection: archived.reflection ?? "",
+          interviewNotes: archived.interview_notes ?? "",
+        });
+        setStatusHistory(archived.status_history ?? []);
+        setStatusUpdate(archived.status);
+      } else if (loadedItems[0]) {
+        await loadApplication(loadedItems[0].application_id);
+      } else {
+        setSelectedId(null);
+        setSelectedApplication(null);
+        setDetailForm(detailFormFromApplication(null));
+        setReflectionForm(initialReflectionState());
+        setStatusHistory([]);
+      }
+      setStatusMessage("Application archived.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "投递记录归档失败。",
+      );
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -1013,6 +1054,14 @@ export function ApplicationTrackerPage({
                   >
                     Detail
                   </button>
+                  <button
+                    className="ghost-action"
+                    disabled={isUpdating || application.status === "archived"}
+                    onClick={() => void handleArchiveApplication(application.application_id)}
+                    type="button"
+                  >
+                    Archive
+                  </button>
                 </li>
               ))}
             </ul>
@@ -1101,6 +1150,9 @@ export function ApplicationTrackerPage({
                   2,
                 )}
               </pre>
+              <p className="hint-text">
+                Notes, interview notes and reflection should stay as short summaries; do not paste full private materials.
+              </p>
               <div className="form-stack detail-edit-panel">
                 <div className="filter-grid">
                   <label>
@@ -1274,6 +1326,16 @@ export function ApplicationTrackerPage({
                   type="button"
                 >
                   {isUpdating ? "Updating..." : "Update status"}
+                </button>
+                <button
+                  className="ghost-action"
+                  disabled={isUpdating || selectedApplication.status === "archived"}
+                  onClick={() =>
+                    void handleArchiveApplication(selectedApplication.application_id)
+                  }
+                  type="button"
+                >
+                  Archive
                 </button>
               </div>
               <div className="form-stack detail-edit-panel">

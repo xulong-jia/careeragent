@@ -107,6 +107,9 @@ class RagSourceRef(BaseModel):
 
 class RagRetrievalDebug(BaseModel):
     retrieval_mode: str
+    retrieval_version: str | None = None
+    schema_version: str | None = None
+    model_version: str | None = None
     query_tokens: list[str] = Field(default_factory=list)
     candidate_count: int
     selected_chunk_ids: list[str] = Field(default_factory=list)

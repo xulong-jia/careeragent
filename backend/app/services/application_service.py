@@ -284,6 +284,20 @@ def get_application(db: Session, application_id: str) -> ApplicationRecord:
     return application_repository.get_application(db, application_id)
 
 
+def archive_application(db: Session, application_id: str) -> ApplicationRecord:
+    application = application_repository.get_application_model(db, application_id)
+    if not application:
+        raise AppError(
+            code="application_not_found",
+            message="Application was not found.",
+            status_code=404,
+            details={"application_id": application_id},
+        )
+    if application.status == "archived":
+        return application_repository.get_application(db, application_id)
+    return application_repository.archive_application(db, application)
+
+
 def update_application(
     db: Session,
     application_id: str,

@@ -96,3 +96,7 @@ def list_jobs(db: Session) -> list[JobRecord]:
 
 def get_job(db: Session, jd_id: str) -> JobRecord:
     return job_repository.get_job(db, jd_id)
+
+
+def archive_job(db: Session, jd_id: str) -> dict[str, object]:
+    return job_repository.archive_job(db, jd_id)

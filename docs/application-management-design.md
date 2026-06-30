@@ -19,7 +19,7 @@
 - 可选关联 `resume_version`、`job_description`、`match_report`、`agent_run`。
 - 记录公司、岗位、岗位类别、状态、投递日期、下一步日期、面试备注、复盘摘要和标签。
 - 支持 application create / list / detail / patch。
-- 支持通过 `status=archived` 归档，不提供单独 archive endpoint。
+- 支持通过 `status=archived` 归档；v1.5C 已补 `DELETE /api/applications/{application_id}` 作为归档语义入口。
 - 支持 ApplicationTrackerPage 最小 UI。
 - 支持 Dashboard application stats。
 - 支持后续与 Quality Review / Bad Case 关联。
@@ -211,8 +211,8 @@ Filters：
 
 归档说明：
 
-- 当前 MVP 未单独实现 archive endpoint。
-- 可通过 `PATCH /api/applications/{application_id}` 设置 `status=archived`。
+- v1.5C 已实现 `DELETE /api/applications/{application_id}`，语义是归档为 `status=archived` 并写 status history，不是物理删除。
+- 仍可通过 `PATCH /api/applications/{application_id}` 设置 `status=archived`。
 - 初期不做提醒、日历、自动投递、招聘网站集成。
 - response 不返回源对象原文。
 

@@ -25,6 +25,14 @@ export function listResumes(): Promise<ListResponse<ResumeRecord>> {
   return requestJson<ListResponse<ResumeRecord>>("/api/resumes");
 }
 
+export function deleteResume(
+  resumeId: string,
+): Promise<Record<string, unknown>> {
+  return requestJson<Record<string, unknown>>(`/api/resumes/${resumeId}`, {
+    method: "DELETE",
+  });
+}
+
 export function listResumeVersions(
   resumeId: string,
 ): Promise<ListResponse<ResumeVersionRecord>> {

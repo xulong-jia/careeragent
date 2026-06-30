@@ -87,6 +87,14 @@ export function updateApplication(
   });
 }
 
+export function deleteApplication(
+  applicationId: string,
+): Promise<ApplicationRecord> {
+  return requestJson<ApplicationRecord>(`/api/applications/${applicationId}`, {
+    method: "DELETE",
+  });
+}
+
 export function updateApplicationReflection(
   applicationId: string,
   payload: ApplicationReflectionPayload,

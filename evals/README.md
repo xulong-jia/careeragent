@@ -20,6 +20,8 @@ python scripts/run_evals.py --dataset regression
 
 The runner writes `summary.md`, `metrics.json`, and `failed_cases.json`.
 
+`metrics.json` includes a non-secret `run_config` with prompt/schema/retrieval/model/code/evaluation version metadata. This is for deterministic regression traceability only; it is not model comparison or LLM judging.
+
 ## Boundaries
 
 Fixtures use synthetic refs, summaries, and short signals only. Do not add resume raw text, JD raw text, full RAG chunk text, full interview answers, credentials, or private application materials.

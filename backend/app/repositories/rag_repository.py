@@ -2,6 +2,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.privacy import safe_preview
 from app.models.rag import RagAnswerRun, RagChunk, RagDocument
 from app.schemas.rag import (
     RagAnswerRunRecord,
@@ -11,7 +12,7 @@ from app.schemas.rag import (
 )
 
 
-PREVIEW_CHARS = 500
+PREVIEW_CHARS = 120
 
 
 def _next_document_id(db: Session) -> str:
@@ -29,7 +30,7 @@ def _next_answer_run_id(db: Session) -> str:
 
 
 def _preview(text: str) -> str:
-    return text[:PREVIEW_CHARS]
+    return safe_preview(text, PREVIEW_CHARS)
 
 
 def _to_document_record(document: RagDocument) -> RagDocumentRecord:
@@ -140,6 +141,22 @@ def get_document_model(db: Session, doc_id: str) -> RagDocument:
 
 def get_document(db: Session, doc_id: str) -> RagDocumentRecord:
     return _to_document_record(get_document_model(db, doc_id))
+
+
+def delete_document(db: Session, doc_id: str) -> dict[str, object]:
+    document = get_document_model(db, doc_id)
+    chunk_count = document.chunk_count
+    try:
+        db.delete(document)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        "doc_id": doc_id,
+        "status": "deleted",
+        "deleted_chunk_count": chunk_count,
+    }
 
 
 def replace_chunks_for_document(

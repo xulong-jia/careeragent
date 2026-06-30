@@ -14,3 +14,9 @@ export function createJob(payload: JobCreatePayload): Promise<JobRecord> {
 export function listJobs(): Promise<ListResponse<JobRecord>> {
   return requestJson<ListResponse<JobRecord>>("/api/jobs");
 }
+
+export function deleteJob(jdId: string): Promise<Record<string, unknown>> {
+  return requestJson<Record<string, unknown>>(`/api/jobs/${jdId}`, {
+    method: "DELETE",
+  });
+}

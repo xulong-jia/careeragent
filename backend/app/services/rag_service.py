@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.versioning import MODEL_VERSION, RETRIEVAL_VERSION, SCHEMA_VERSION
 from app.rag.answering import build_deterministic_answer
 from app.rag.chunking import chunk_document_text
 from app.rag.retriever import rank_chunks, tokenize_text
@@ -154,6 +155,10 @@ def get_document(db: Session, doc_id: str) -> RagDocumentRecord:
     return rag_repository.get_document(db, doc_id)
 
 
+def delete_document(db: Session, doc_id: str) -> dict[str, object]:
+    return rag_repository.delete_document(db, doc_id)
+
+
 def index_document(
     db: Session,
     doc_id: str,
@@ -261,6 +266,9 @@ def search_documents(db: Session, payload: RagSearchRequest) -> RagSearchResult:
     sources = [RagSearchSource(**source) for source in ranked_sources]
     retrieval_debug = RagRetrievalDebug(
         retrieval_mode="deterministic_lexical",
+        retrieval_version=RETRIEVAL_VERSION,
+        schema_version=SCHEMA_VERSION,
+        model_version=MODEL_VERSION,
         query_tokens=tokenize_text(query),
         candidate_count=len(candidates),
         selected_chunk_ids=[source.chunk_id for source in sources],

@@ -2,11 +2,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.privacy import safe_preview
 from app.models.job import JobDescription, JobProfile as JobProfileModel
 from app.schemas.jobs import JobCreateRequest, JobProfile, JobRecord
 
 
-RAW_TEXT_PREVIEW_CHARS = 500
+RAW_TEXT_PREVIEW_CHARS = 120
 
 
 def _next_job_id(db: Session) -> str:
@@ -39,7 +40,7 @@ def _to_job_record(job: JobDescription, profile: JobProfileModel) -> JobRecord:
         company=job.company,
         job_title=job.job_title,
         location=job.location,
-        raw_text_preview=job.raw_text[:RAW_TEXT_PREVIEW_CHARS],
+        raw_text_preview=safe_preview(job.raw_text, RAW_TEXT_PREVIEW_CHARS),
         source_url=job.source_url,
         job_profile=_to_job_profile(profile),
     )
@@ -135,3 +136,22 @@ def get_job(db: Session, jd_id: str) -> JobRecord:
 
 def get_job_with_profile(db: Session, jd_id: str) -> JobRecord:
     return get_job(db, jd_id)
+
+
+def archive_job(db: Session, jd_id: str) -> dict[str, object]:
+    job = db.get(JobDescription, jd_id)
+    if not job or job.status != "active":
+        raise AppError(
+            code="job_not_found",
+            message="JD was not found.",
+            status_code=404,
+            details={"jd_id": jd_id},
+        )
+    try:
+        job.status = "archived"
+        db.add(job)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"jd_id": jd_id, "status": "archived"}

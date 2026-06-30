@@ -1,10 +1,10 @@
 # CareerAgent Final Acceptance Report
 
-本报告记录 v1.5B Bad Case + Evaluation Regression Foundation 后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示任何 v1.5 tag 已完成。
+本报告记录 v1.5C Privacy / Security / Data Governance 开发后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示任何 v1.5 tag 已完成。
 
 ## 1. 验收结论
 
-v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.0 RAG Completion deterministic MVP 已完成 12A/12B/12C/12D/12E 的 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff 文档；v1.3.0 Agent Workflow Baseline + Application Linkage 已完成 deterministic end-to-end workflow orchestration、Application `agent_run_id` linkage、frontend display 和 docs/tests 收口；v1.4 Product Operations / Application Management Hardening 已完成 JD/Resume 强绑定、status history、reflection、Application Board 和 enhanced stats；v1.5B 已完成 Bad Case lifecycle / regression linkage、7 模块 deterministic evaluation、fileized smoke fixtures 和 frontend review/evaluation visibility。v1.0.0 `interview-center` 仍作为已完成的稳定里程碑保留在本报告中。
+v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.0 RAG Completion deterministic MVP 已完成 12A/12B/12C/12D/12E 的 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff 文档；v1.3.0 Agent Workflow Baseline + Application Linkage 已完成 deterministic end-to-end workflow orchestration、Application `agent_run_id` linkage、frontend display 和 docs/tests 收口；v1.4 Product Operations / Application Management Hardening 已完成 JD/Resume 强绑定、status history、reflection、Application Board 和 enhanced stats；v1.5B 已完成 Bad Case lifecycle / regression linkage、7 模块 deterministic evaluation、fileized smoke fixtures 和 frontend review/evaluation visibility；v1.5C 已完成 redaction、delete/archive governance、version metadata tracking、privacy-safe preview 和 frontend governance controls。v1.0.0 `interview-center` 仍作为已完成的稳定里程碑保留在本报告中。
 
 已完成范围：
 
@@ -28,6 +28,7 @@ v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.
 - v1.3 frontend/docs/tests：AgentRunsPage 展示 final summary，ApplicationTrackerPage 支持 `agent_run_id` 创建/筛选/展示，Dashboard 展示 latest agent run score/status 和 linked application 摘要，新增 release notes 和文档收口。
 - v1.4 Application operations：新增运营字段、`application_status_history`、reflection endpoint、status-history endpoint、enhanced stats 和 frontend Application Board / detail edit / reflection / Dashboard operations overview。
 - v1.5B Quality/Evaluation regression：扩展 `bad_cases` lifecycle 字段，新增 direct `/api/bad-cases` stats/add-to-eval，扩展 7 模块 deterministic evaluation、datasets endpoint、failed_case_ids、run_config version metadata、regression pass/fail linkage、fileized smoke fixtures 和 `scripts/run_evals.py`。
+- v1.5C Privacy/Security/Governance：新增 `app.core.privacy` redaction utilities、`app.core.versioning` constants、Resume/JD/Application/RAG delete/archive endpoints、short safe previews、RAG/Agent/Evaluation version metadata、frontend delete/archive controls 和 privacy regression tests。
 
 ## 2. 当前模块状态
 
@@ -44,7 +45,8 @@ v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.
 | Agent Runs | v1.3 已完成 deterministic workflow baseline：11 步 `job_application_preparation`、step timeline、final summary、Project/Interview/Study/Application orchestration |
 | Application Tracking | v1.4 已完成 Product Operations hardening：JD/Resume 强绑定、status history、reflection、board、enhanced stats 和 `agent_run_id` linkage |
 | Quality Review / Bad Case | v1.5B 已完成 lifecycle / root cause / fix strategy / tags / regression eval linkage |
-| Evaluation | v1.5B 已完成 7 模块 deterministic smoke + regression foundation、dataset registry、failed cases 和 fileized runner |
+| Evaluation | v1.5C 已完成 7 模块 deterministic smoke + regression foundation、dataset registry、failed cases、fileized runner 和 version metadata |
+| Privacy / Security / Governance | v1.5C 已完成 redaction、preview 收敛、delete/archive APIs、默认列表隐藏归档数据和安全扫描文档 |
 | Docker / Compose | 已完成本地开发配置；build 需在 Docker daemon 可用环境验证 |
 | Docs / Demo | 已完成 v1.3 release notes、handoff 文档、demo script 和 final acceptance 口径；未声明 tag 已创建 |
 
@@ -327,16 +329,19 @@ docker compose build
 - Agent step payload 和 `final_summary` 只保存 refs、短 metadata、score、next actions 和 created record IDs，不保存 Resume/JD/RAG 原文、完整 answer 或投递材料。
 - Application linkage 只保存 `agent_run_id` ref；Application 仍是 tracking record，不自动投递、不自动状态流转。
 - Bad Case 和 Evaluation Case 不应保存大段隐私原文；v1.5B regression linkage 只保存 refs、短摘要、root cause / fix strategy / tags 和 run/case IDs。
+- v1.5C 新增 `safe_preview` / `redact_text` / `redact_mapping`，用于日志和调试 payload redaction；默认 preview 会 mask email、phone 和 secret。
+- Resume/JD/Application/RAG delete endpoints 采用本地 prototype 级软删除/归档或 document/chunk 删除策略；不声明生产级不可恢复删除、备份擦除或审计证明。
+- RAG retrieval debug、Agent final summary、Evaluation run_config 和 fileized eval metrics 记录版本元数据，不记录 API key 或 secret。
 
 ## 13. 后续只读验收与 Tag 建议
 
-当前 v1.5B development 完成后，建议先提交并推送：
+当前 v1.5C development 完成后，建议先提交并推送：
 
 ```bash
-git commit -m "feat: add bad case evaluation regression foundation"
+git commit -m "feat: add privacy security governance controls"
 ```
 
-提交后建议进入 v1.5B final readonly acceptance。是否创建 v1.5 tag 需单独确认；本文档不建议直接打 tag。
+提交后建议进入 v1.5 Final Readonly Acceptance。是否创建 v1.5 tag 需单独确认；本文档不建议直接打 tag。
 
 只读验收前建议确认：
 

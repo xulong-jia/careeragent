@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { createJob } from "../api/jobs";
+import { createJob, deleteJob } from "../api/jobs";
 import type { JobRecord } from "../types/api";
 
 type JDCenterPageProps = {
@@ -41,6 +41,22 @@ export function JDCenterPage({
       await onRefresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "创建 JD 失败。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (jdId: string) => {
+    if (!window.confirm("Archive this JD and hide it from default lists?")) {
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await deleteJob(jdId);
+      await onRefresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "归档 JD 失败。");
     } finally {
       setIsSubmitting(false);
     }
@@ -171,6 +187,14 @@ export function JDCenterPage({
                 <small>
                   Required: {job.job_profile.required_skills.join(", ") || "[]"}
                 </small>
+                <button
+                  className="ghost-action"
+                  disabled={isSubmitting}
+                  onClick={() => void handleDelete(job.jd_id)}
+                  type="button"
+                >
+                  Delete
+                </button>
               </li>
             ))}
           </ul>

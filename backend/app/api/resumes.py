@@ -14,6 +14,7 @@ from app.schemas.resumes import (
 )
 from app.services.resume_service import (
     check_resume_risk,
+    archive_resume,
     create_resume,
     get_resume as get_resume_record,
     list_resume_versions,
@@ -56,6 +57,14 @@ async def get_resume_detail(
 ) -> dict[str, object]:
     resume = get_resume_record(db, resume_id)
     return {"data": resume, "request_id": request.state.request_id}
+
+
+@router.delete("/{resume_id}", response_model=ApiResponse[dict[str, object]])
+async def delete_resume_record(
+    request: Request, resume_id: str, db: Session = Depends(get_db)
+) -> dict[str, object]:
+    result = archive_resume(db, resume_id)
+    return {"data": result, "request_id": request.state.request_id}
 
 
 @router.post("/{resume_id}/parse", response_model=ApiResponse[ResumeParseResult])

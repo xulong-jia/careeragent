@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-import subprocess
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.versioning import SCHEMA_VERSION, version_metadata
 from app.repositories import evaluation_repository
 from app.schemas.evaluations import (
     BadCaseAddToEvalRequest,
@@ -175,21 +175,6 @@ def _normalize_tags(tags: list[str] | None) -> list[str]:
         if value and value not in normalized:
             normalized.append(value)
     return normalized
-
-
-def _current_code_version() -> str:
-    try:
-        completed = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            check=True,
-            text=True,
-            timeout=2,
-        )
-    except Exception:
-        return "unknown"
-    return completed.stdout.strip() or "unknown"
 
 
 def _contains_private_text_key(value: Any) -> bool:
@@ -1169,7 +1154,7 @@ def list_evaluation_datasets() -> list[EvaluationDatasetRecord]:
                 case_count=synthetic_counts[module],
                 source_type="built-in",
                 description="Deterministic synthetic smoke dataset.",
-                version="v1.5",
+                version=SCHEMA_VERSION,
             )
         )
 
@@ -1239,11 +1224,7 @@ def run_evaluation(
         run_config={
             "requested_module": module,
             "dataset_name": dataset_name,
-            "prompt_version": "deterministic-v1",
-            "schema_version": "v1.5",
-            "retrieval_version": "lexical-v1",
-            "model_version": "none",
-            "code_version": _current_code_version(),
+            **version_metadata(include_evaluation=True),
             "deterministic": True,
             "llm_judge": False,
             "model_comparison": False,

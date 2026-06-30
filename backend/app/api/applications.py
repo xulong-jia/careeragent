@@ -117,6 +117,16 @@ async def update_application(
     return {"data": application, "request_id": request.state.request_id}
 
 
+@router.delete("/{application_id}", response_model=ApiResponse[ApplicationRecord])
+async def delete_application(
+    request: Request,
+    application_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    application = application_service.archive_application(db, application_id)
+    return {"data": application, "request_id": request.state.request_id}
+
+
 @router.post("/{application_id}/reflection", response_model=ApiResponse[ApplicationRecord])
 async def update_application_reflection(
     request: Request,

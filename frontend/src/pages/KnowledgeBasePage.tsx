@@ -4,6 +4,7 @@ import { MarkBadCasePanel } from "../components/MarkBadCasePanel";
 import {
   answerRag,
   createRagDocument,
+  deleteRagDocument,
   getRagAnswerRun,
   getRagDocument,
   indexRagDocument,
@@ -406,6 +407,33 @@ export function KnowledgeBasePage({
     }
   };
 
+  const handleDeleteDocument = async (docId: string) => {
+    if (!window.confirm("Delete this RAG document and its chunks?")) {
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+    try {
+      await deleteRagDocument(docId);
+      const items = await refreshDocuments();
+      if (selectedDocument?.doc_id === docId) {
+        const nextDocument = items[0] ?? null;
+        setSelectedDocument(nextDocument);
+        if (nextDocument) {
+          await loadDocument(nextDocument.doc_id);
+        } else {
+          setChunks([]);
+        }
+      }
+      setStatusMessage("Document deleted. Existing answer runs keep safe refs only.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Document 删除失败。");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSearch = async () => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -540,6 +568,14 @@ export function KnowledgeBasePage({
                   >
                     Select
                   </button>
+                  <button
+                    className="ghost-action"
+                    disabled={isLoading}
+                    onClick={() => void handleDeleteDocument(document.doc_id)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
                 </li>
               ))}
             </ul>
@@ -583,6 +619,9 @@ export function KnowledgeBasePage({
                 sourceId={selectedDocument.doc_id}
                 sourceType="rag_document"
               />
+              <p className="hint-text">
+                Document 和 chunk 仅展示短 preview；删除 document 会移除 chunks，answer history 只保留安全 refs。
+              </p>
               <button className="primary-action" disabled={isLoading} onClick={handleIndex} type="button">
                 Index document
               </button>

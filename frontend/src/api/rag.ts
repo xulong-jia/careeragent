@@ -54,6 +54,14 @@ export function getRagDocument(docId: string): Promise<RagDocumentRecord> {
   return requestJson<RagDocumentRecord>(`/api/rag/documents/${docId}`);
 }
 
+export function deleteRagDocument(
+  docId: string,
+): Promise<Record<string, unknown>> {
+  return requestJson<Record<string, unknown>>(`/api/rag/documents/${docId}`, {
+    method: "DELETE",
+  });
+}
+
 export function indexRagDocument(
   docId: string,
   payload: RagDocumentIndexPayload,

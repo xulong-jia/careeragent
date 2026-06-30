@@ -7,10 +7,15 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "backend"))
+
+from app.core.versioning import version_metadata  # noqa: E402
+
 EVALS_ROOT = REPO_ROOT / "evals"
 DATASET_ROOT = EVALS_ROOT / "datasets"
 EXPECTED_ROOT = EVALS_ROOT / "expected"
@@ -259,7 +264,11 @@ def _load_cases(dataset: str, module: str | None) -> list[tuple[str, dict[str, A
     return cases
 
 
-def _build_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
+def _build_metrics(
+    results: list[dict[str, Any]],
+    *,
+    run_config: dict[str, Any],
+) -> dict[str, Any]:
     total = len(results)
     passed = sum(1 for result in results if result["passed"])
     failed = total - passed
@@ -290,6 +299,7 @@ def _build_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
         ],
         "pass_rate": round(passed / total, 4) if total else 0.0,
         "by_module": by_module,
+        "run_config": run_config,
         "llm_judge": False,
         "model_comparison": False,
     }
@@ -319,7 +329,15 @@ def run(dataset: str, module: str | None, output_dir: Path) -> int:
             }
         )
 
-    metrics = _build_metrics(results)
+    run_config = {
+        "requested_module": module or "all",
+        "dataset_name": dataset,
+        **version_metadata(include_evaluation=True),
+        "deterministic": True,
+        "llm_judge": False,
+        "model_comparison": False,
+    }
+    metrics = _build_metrics(results, run_config=run_config)
     failed_cases = [result for result in results if not result["passed"]]
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "metrics.json").write_text(
@@ -340,6 +358,11 @@ def run(dataset: str, module: str | None, output_dir: Path) -> int:
         f"- passed_count: {metrics['passed_count']}",
         f"- failed_count: {metrics['failed_count']}",
         f"- pass_rate: {metrics['pass_rate']}",
+        f"- prompt_version: {run_config['prompt_version']}",
+        f"- schema_version: {run_config['schema_version']}",
+        f"- retrieval_version: {run_config['retrieval_version']}",
+        f"- model_version: {run_config['model_version']}",
+        f"- evaluation_version: {run_config['evaluation_version']}",
         "- llm_judge: false",
         "- model_comparison: false",
         "",

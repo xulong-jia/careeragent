@@ -632,6 +632,9 @@ export type RagSourceRef = {
 
 export type RagRetrievalDebug = {
   retrieval_mode: string;
+  retrieval_version?: string | null;
+  schema_version?: string | null;
+  model_version?: string | null;
   query_tokens: string[];
   candidate_count: number;
   selected_chunk_ids: string[];

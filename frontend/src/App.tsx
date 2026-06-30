@@ -237,10 +237,17 @@ export default function App() {
       setBadCases(badCaseList.items);
       setEvaluationStats(evaluationStatsData);
       setLatestResume(
-        (current) => current ?? resumeList.items[resumeList.items.length - 1] ?? null,
+        (current) =>
+          current &&
+          resumeList.items.some((item) => item.resume_id === current.resume_id)
+            ? current
+            : resumeList.items[resumeList.items.length - 1] ?? null,
       );
       setLatestJob(
-        (current) => current ?? jobList.items[jobList.items.length - 1] ?? null,
+        (current) =>
+          current && jobList.items.some((item) => item.jd_id === current.jd_id)
+            ? current
+            : jobList.items[jobList.items.length - 1] ?? null,
       );
       setLatestMatch(
         (current) => current ?? matchList.items[matchList.items.length - 1] ?? null,

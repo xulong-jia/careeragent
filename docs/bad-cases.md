@@ -1,4 +1,4 @@
-# CareerAgent v1.5B Bad Cases
+# CareerAgent v1.5B/v1.5C Bad Cases
 
 This document is the stable entrypoint for Bad Case lifecycle and regression linkage. The detailed historical design remains in `docs/quality-review-design.md`.
 
@@ -31,3 +31,10 @@ When a linked regression case passes, the Bad Case can be marked `verified` with
 ## Privacy Boundary
 
 Bad Cases store source refs and summaries. Do not store resume raw text, JD raw text, full RAG chunk text, full interview answers, credentials, private application materials, or other sensitive original content.
+
+## v1.5C Governance Additions
+
+- Bad Case records remain summary/ref based and are suitable for linking to deterministic evaluation cases without copying source raw text.
+- When using Bad Case descriptions, root cause, fix strategy, expected behavior, or actual behavior, write short summaries only.
+- Do not paste Application `interview_notes` / `reflection` full text, RAG chunks, API keys, emails, phones, or private documents into Bad Case fields.
+- Use `app.core.privacy.redact_mapping` before logging or exporting Bad Case-like payloads during local debugging.

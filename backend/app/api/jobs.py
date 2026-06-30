@@ -5,6 +5,7 @@ from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
 from app.schemas.jobs import JobCreateRequest, JobRecord
 from app.services.job_service import (
+    archive_job,
     create_job as create_job_record,
     get_job as get_job_record,
     list_jobs,
@@ -39,3 +40,11 @@ async def get_job_detail(
 ) -> dict[str, object]:
     job = get_job_record(db, jd_id)
     return {"data": job, "request_id": request.state.request_id}
+
+
+@router.delete("/{jd_id}", response_model=ApiResponse[dict[str, object]])
+async def delete_job_record(
+    request: Request, jd_id: str, db: Session = Depends(get_db)
+) -> dict[str, object]:
+    result = archive_job(db, jd_id)
+    return {"data": result, "request_id": request.state.request_id}

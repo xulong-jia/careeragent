@@ -196,6 +196,8 @@ def list_applications(
     statement = select(Application).order_by(Application.created_at, Application.id)
     if status:
         statement = statement.where(Application.status == status)
+    else:
+        statement = statement.where(Application.status != "archived")
     if company:
         statement = statement.where(Application.company.ilike(f"%{company}%"))
     if role_category:
@@ -388,4 +390,14 @@ def update_application(
     return _to_application_record(
         application,
         status_history=list_status_history(db, application.id),
+    )
+
+
+def archive_application(db: Session, application: Application) -> ApplicationRecord:
+    return update_application(
+        db,
+        application,
+        status="archived",
+        status_reason="privacy_governance_delete",
+        status_note="Archived through DELETE /api/applications/{application_id}.",
     )

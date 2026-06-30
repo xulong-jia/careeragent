@@ -460,7 +460,7 @@ JSON 字段说明：
 - `started_at`
 - `finished_at`
 
-`metrics` 包含 `total_count`、`passed_count`、`failed_count`、`failed_case_ids`、`pass_rate` 和 `by_module`。`run_config` 记录 deterministic flags 以及 prompt/schema/retrieval/model/code version metadata。
+`metrics` 包含 `total_count`、`passed_count`、`failed_count`、`failed_case_ids`、`pass_rate` 和 `by_module`。`run_config` 记录 deterministic flags 以及 prompt/schema/retrieval/model/code/evaluation version metadata。
 
 ## evaluation_cases
 
@@ -500,3 +500,17 @@ JSON 字段说明：
 - `error`
 
 当前 score 是 deterministic MVP 下的 0 或 1，不代表模型能力最终评分。
+
+## v1.5C Privacy / Security / Data Governance Notes
+
+v1.5C 没有新增数据库表或 migration，复用现有 schema 实现本地 prototype 级治理：
+
+- `resumes.status`：`DELETE /api/resumes/{resume_id}` 将 resume 标记为 `deleted`；默认 resume list/detail 只返回 `active`。
+- `resume_versions.status` / `archived_at`：删除 resume 时归档该 resume 下所有 versions。
+- `job_descriptions.status`：`DELETE /api/jobs/{jd_id}` 将 JD 标记为 `archived`；默认 JD list/detail 只返回 `active`。
+- `applications.status`：`DELETE /api/applications/{application_id}` 将记录标记为 `archived`，并写入 `application_status_history`。默认 Application list/stats 排除 archived；可显式 `status=archived` 查询。
+- `rag_documents` / `rag_chunks`：`DELETE /api/rag/documents/{doc_id}` 删除 document，并通过已有 relationship cascade 删除 chunks。
+- `rag_answer_runs`：不删除历史 answer run；该表只保留 answer contract、短 citations/source_refs 和 safe retrieval debug，不复制 document raw_text 或 chunk full text。
+- `evaluation_runs.run_config`：记录 prompt/schema/retrieval/model/code/evaluation version metadata，不记录 API key 或 secret。
+
+这些控制不等于生产级隐私删除证明、租户级权限隔离、审计日志、备份擦除或法务合规流程；进入生产化前仍需单独设计 auth、tenant isolation、audit log、retention policy 和 irreversible deletion workflow。

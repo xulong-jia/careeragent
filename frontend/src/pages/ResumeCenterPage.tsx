@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   archiveResumeVersion,
   cloneResumeVersion,
+  deleteResume,
   getResumeVersion,
   listResumeVersions,
   parseResume,
@@ -183,6 +184,29 @@ export function ResumeCenterPage({
       setVersionMessage("Version archived.");
     } catch (error) {
       setVersionMessage(error instanceof Error ? error.message : "归档版本失败。");
+    } finally {
+      setIsVersionBusy(false);
+    }
+  };
+
+  const handleDeleteResume = async (resumeId: string) => {
+    if (!window.confirm("Archive this resume and hide it from default lists?")) {
+      return;
+    }
+    setIsVersionBusy(true);
+    setVersionMessage(null);
+    try {
+      await deleteResume(resumeId);
+      if (selectedResumeId === resumeId) {
+        setSelectedResumeId(null);
+        setVersions([]);
+        setSelectedVersion(null);
+        resetWorkflowState();
+      }
+      await onRefresh();
+      setVersionMessage("Resume archived.");
+    } catch (error) {
+      setVersionMessage(error instanceof Error ? error.message : "归档 Resume 失败。");
     } finally {
       setIsVersionBusy(false);
     }
@@ -403,6 +427,14 @@ export function ResumeCenterPage({
                   type="button"
                 >
                   Versions
+                </button>
+                <button
+                  className="ghost-action"
+                  disabled={isVersionBusy}
+                  onClick={() => void handleDeleteResume(resume.resume_id)}
+                  type="button"
+                >
+                  Delete
                 </button>
               </li>
             ))}
