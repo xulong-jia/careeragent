@@ -152,6 +152,8 @@ CAREERAGENT_API_BASE_URL=http://localhost:8000 python3 scripts/seed_demo_data.py
 - 当前架构：[docs/current-architecture.md](docs/current-architecture.md)
 - API Reference：[docs/api-reference.md](docs/api-reference.md)
 - Database Schema：[docs/database-schema.md](docs/database-schema.md)
+- Evaluation v1.5B：[docs/evaluation.md](docs/evaluation.md)
+- Bad Cases v1.5B：[docs/bad-cases.md](docs/bad-cases.md)
 - Safety / Privacy Checklist：[docs/safety-privacy-checklist.md](docs/safety-privacy-checklist.md)
 - Demo Script：[docs/demo-script.md](docs/demo-script.md)
 - Final Acceptance Report：[docs/final-acceptance-report.md](docs/final-acceptance-report.md)
