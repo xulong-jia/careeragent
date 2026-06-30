@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 import {
+  addBadCaseToEval,
   createBadCase,
+  getBadCaseStats,
   getBadCase,
   listBadCases,
   updateBadCase,
@@ -13,6 +15,7 @@ import type {
   BadCaseRecord,
   BadCaseSeverity,
   BadCaseSourceType,
+  BadCaseStats,
   BadCaseStatus,
   BadCaseUpdatePayload,
 } from "../types/api";
@@ -45,7 +48,13 @@ const categories: BadCaseCategory[] = [
 ];
 
 const severities: BadCaseSeverity[] = ["low", "medium", "high", "critical"];
-const statuses: BadCaseStatus[] = ["open", "reviewing", "fixed", "wont_fix"];
+const statuses: BadCaseStatus[] = [
+  "open",
+  "reviewing",
+  "fixed",
+  "verified",
+  "wont_fix",
+];
 const summaryPlaceholder = "只填写问题摘要，不要粘贴完整原文。";
 
 type QualityReviewPageProps = {
@@ -63,6 +72,9 @@ type BadCaseFormState = {
   expected_behavior: string;
   actual_behavior: string;
   suggested_fix: string;
+  root_cause: string;
+  fix_strategy: string;
+  tags: string;
 };
 
 type BadCaseUpdateFormState = {
@@ -74,6 +86,9 @@ type BadCaseUpdateFormState = {
   expected_behavior: string;
   actual_behavior: string;
   suggested_fix: string;
+  root_cause: string;
+  fix_strategy: string;
+  tags: string;
 };
 
 function formatDate(value: string | null) {
@@ -93,6 +108,13 @@ function normalizeOptionalText(value: string) {
   return trimmed ? trimmed : null;
 }
 
+function normalizeTags(value: string) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
 function toUpdateForm(badCase: BadCaseRecord): BadCaseUpdateFormState {
   return {
     status: badCase.status,
@@ -103,6 +125,9 @@ function toUpdateForm(badCase: BadCaseRecord): BadCaseUpdateFormState {
     expected_behavior: badCase.expected_behavior ?? "",
     actual_behavior: badCase.actual_behavior ?? "",
     suggested_fix: badCase.suggested_fix ?? "",
+    root_cause: badCase.root_cause ?? "",
+    fix_strategy: badCase.fix_strategy ?? "",
+    tags: badCase.tags.join(", "),
   };
 }
 
@@ -126,6 +151,7 @@ export function QualityReviewPage({
   onBadCasesChanged,
 }: QualityReviewPageProps) {
   const [items, setItems] = useState<BadCaseRecord[]>(badCases);
+  const [stats, setStats] = useState<BadCaseStats | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(
     badCases[0]?.id ?? null,
   );
@@ -141,6 +167,9 @@ export function QualityReviewPage({
     expected_behavior: "",
     actual_behavior: "",
     suggested_fix: "",
+    root_cause: "",
+    fix_strategy: "",
+    tags: "",
   });
   const [filters, setFilters] = useState<BadCaseFilters>({ limit: 50 });
   const [updateForm, setUpdateForm] = useState<BadCaseUpdateFormState | null>(
@@ -153,11 +182,21 @@ export function QualityReviewPage({
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLinking, setIsLinking] = useState(false);
+
+  const refreshBadCaseStats = async () => {
+    const nextStats = await getBadCaseStats();
+    setStats(nextStats);
+    return nextStats;
+  };
 
   const refreshBadCases = async (nextFilters = filters) => {
     setIsListLoading(true);
     try {
-      const response = await listBadCases(nextFilters);
+      const [response] = await Promise.all([
+        listBadCases(nextFilters),
+        refreshBadCaseStats(),
+      ]);
       setItems(response.items);
       onBadCasesChanged?.(response.items);
       if (!selectedId && response.items[0]) {
@@ -227,6 +266,9 @@ export function QualityReviewPage({
         expected_behavior: normalizeOptionalText(formState.expected_behavior),
         actual_behavior: normalizeOptionalText(formState.actual_behavior),
         suggested_fix: normalizeOptionalText(formState.suggested_fix),
+        root_cause: normalizeOptionalText(formState.root_cause),
+        fix_strategy: normalizeOptionalText(formState.fix_strategy),
+        tags: normalizeTags(formState.tags),
       };
       const created = await createBadCase(payload);
       setLastCreated(created);
@@ -243,6 +285,9 @@ export function QualityReviewPage({
         expected_behavior: "",
         actual_behavior: "",
         suggested_fix: "",
+        root_cause: "",
+        fix_strategy: "",
+        tags: "",
       }));
     } catch (error) {
       setErrorMessage(
@@ -307,6 +352,9 @@ export function QualityReviewPage({
         expected_behavior: normalizeOptionalText(updateForm.expected_behavior),
         actual_behavior: normalizeOptionalText(updateForm.actual_behavior),
         suggested_fix: normalizeOptionalText(updateForm.suggested_fix),
+        root_cause: normalizeOptionalText(updateForm.root_cause),
+        fix_strategy: normalizeOptionalText(updateForm.fix_strategy),
+        tags: normalizeTags(updateForm.tags),
       };
       const updated = await updateBadCase(selectedBadCase.id, payload);
       setSelectedBadCase(updated);
@@ -319,6 +367,33 @@ export function QualityReviewPage({
       );
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleAddToEval = async () => {
+    if (!selectedBadCase) {
+      setErrorMessage("请先选择 bad case。");
+      return;
+    }
+    setIsLinking(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+    try {
+      const link = await addBadCaseToEval(selectedBadCase.id);
+      setSelectedBadCase(link.bad_case);
+      setUpdateForm(toUpdateForm(link.bad_case));
+      await refreshBadCases();
+      setStatusMessage(
+        link.created
+          ? `Added to regression eval set: ${link.evaluation_case.id}`
+          : `Already linked: ${link.evaluation_case.id}`,
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "加入 eval set 失败。",
+      );
+    } finally {
+      setIsLinking(false);
     }
   };
 
@@ -341,6 +416,29 @@ export function QualityReviewPage({
 
       {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
       {statusMessage ? <p className="hint-text">{statusMessage}</p> : null}
+
+      <div className="metric-grid">
+        <article className="metric-card blue">
+          <span>Bad Cases</span>
+          <strong>{stats?.total ?? items.length}</strong>
+          <small>Total tracked</small>
+        </article>
+        <article className="metric-card amber">
+          <span>Open</span>
+          <strong>{stats?.open_count ?? 0}</strong>
+          <small>open / reviewing</small>
+        </article>
+        <article className="metric-card green">
+          <span>In Eval</span>
+          <strong>{stats?.added_to_eval_set_count ?? 0}</strong>
+          <small>regression-linked</small>
+        </article>
+        <article className="metric-card red">
+          <span>Verified</span>
+          <strong>{stats?.verified_count ?? 0}</strong>
+          <small>passed regression</small>
+        </article>
+      </div>
 
       <div className="two-column wide-left">
         <article className="panel">
@@ -485,6 +583,47 @@ export function QualityReviewPage({
                 }
                 placeholder={summaryPlaceholder}
                 value={formState.suggested_fix}
+              />
+            </label>
+            <label>
+              Root cause
+              <textarea
+                className="metadata-textarea compact-textarea"
+                onChange={(event) =>
+                  setFormState((current) => ({
+                    ...current,
+                    root_cause: event.target.value,
+                  }))
+                }
+                placeholder={summaryPlaceholder}
+                value={formState.root_cause}
+              />
+            </label>
+            <label>
+              Fix strategy
+              <textarea
+                className="metadata-textarea compact-textarea"
+                onChange={(event) =>
+                  setFormState((current) => ({
+                    ...current,
+                    fix_strategy: event.target.value,
+                  }))
+                }
+                placeholder={summaryPlaceholder}
+                value={formState.fix_strategy}
+              />
+            </label>
+            <label>
+              Tags
+              <input
+                onChange={(event) =>
+                  setFormState((current) => ({
+                    ...current,
+                    tags: event.target.value,
+                  }))
+                }
+                placeholder="regression, parser"
+                value={formState.tags}
               />
             </label>
             <button
@@ -717,12 +856,47 @@ export function QualityReviewPage({
                 label="Suggested fix"
                 value={selectedBadCase.suggested_fix}
               />
+              <BadCaseField label="Root cause" value={selectedBadCase.root_cause} />
+              <BadCaseField
+                label="Fix strategy"
+                value={selectedBadCase.fix_strategy}
+              />
+              <BadCaseField
+                label="Tags"
+                value={selectedBadCase.tags.length ? selectedBadCase.tags.join(", ") : null}
+              />
+              <BadCaseField
+                label="Added to eval"
+                value={selectedBadCase.added_to_eval_set ? "Yes" : "No"}
+              />
+              <BadCaseField
+                label="Regression case"
+                value={selectedBadCase.regression_evaluation_case_id}
+              />
+              <BadCaseField
+                label="Regression run"
+                value={selectedBadCase.regression_evaluation_run_id}
+              />
               <BadCaseField label="Created" value={formatDate(selectedBadCase.created_at)} />
               <BadCaseField
                 label="Resolved"
                 value={formatDate(selectedBadCase.resolved_at)}
               />
+              <BadCaseField
+                label="Verified"
+                value={formatDate(selectedBadCase.verified_at)}
+              />
             </ul>
+          ) : null}
+          {selectedBadCase ? (
+            <button
+              className="primary-action"
+              disabled={isLinking}
+              onClick={handleAddToEval}
+              type="button"
+            >
+              {isLinking ? "Linking..." : "Add to regression eval"}
+            </button>
           ) : null}
         </article>
       </div>
@@ -876,6 +1050,48 @@ export function QualityReviewPage({
                 }
                 placeholder={summaryPlaceholder}
                 value={updateForm.suggested_fix}
+              />
+            </label>
+            <label>
+              Root cause
+              <textarea
+                className="metadata-textarea compact-textarea"
+                onChange={(event) =>
+                  setUpdateForm((current) =>
+                    current
+                      ? { ...current, root_cause: event.target.value }
+                      : current,
+                  )
+                }
+                placeholder={summaryPlaceholder}
+                value={updateForm.root_cause}
+              />
+            </label>
+            <label>
+              Fix strategy
+              <textarea
+                className="metadata-textarea compact-textarea"
+                onChange={(event) =>
+                  setUpdateForm((current) =>
+                    current
+                      ? { ...current, fix_strategy: event.target.value }
+                      : current,
+                  )
+                }
+                placeholder={summaryPlaceholder}
+                value={updateForm.fix_strategy}
+              />
+            </label>
+            <label>
+              Tags
+              <input
+                onChange={(event) =>
+                  setUpdateForm((current) =>
+                    current ? { ...current, tags: event.target.value } : current,
+                  )
+                }
+                placeholder="regression, parser"
+                value={updateForm.tags}
               />
             </label>
             <button

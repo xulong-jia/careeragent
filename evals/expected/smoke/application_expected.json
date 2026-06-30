@@ -1,0 +1,13 @@
+{
+  "dataset_name": "smoke",
+  "module": "application",
+  "cases": [
+    {
+      "id": "application_smoke_001",
+      "expected": {
+        "valid_status": "applied",
+        "stats_fields": ["total_applications", "by_status", "active_count"]
+      }
+    }
+  ]
+}

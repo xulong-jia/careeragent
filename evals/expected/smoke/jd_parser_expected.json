@@ -1,0 +1,13 @@
+{
+  "dataset_name": "smoke",
+  "module": "jd_parser",
+  "cases": [
+    {
+      "id": "jd_parser_smoke_001",
+      "expected": {
+        "required_fields": ["role_title", "company", "required_skills", "role_category"],
+        "expected_skills": ["python", "fastapi"]
+      }
+    }
+  ]
+}

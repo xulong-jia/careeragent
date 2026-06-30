@@ -1,0 +1,19 @@
+{
+  "dataset_name": "smoke",
+  "module": "application",
+  "version": "v1.5",
+  "description": "Application operations smoke contract.",
+  "cases": [
+    {
+      "id": "application_smoke_001",
+      "name": "Application tracking keeps status and stats shape",
+      "input": {
+        "company": "Synthetic Company",
+        "role_title": "AI Application Engineer",
+        "status": "applied",
+        "filter_status": "applied"
+      },
+      "tags": ["smoke", "contract"]
+    }
+  ]
+}

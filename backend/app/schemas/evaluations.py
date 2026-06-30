@@ -16,6 +16,9 @@ class BadCaseCreateRequest(BaseModel):
     expected_behavior: str | None = None
     actual_behavior: str | None = None
     suggested_fix: str | None = None
+    root_cause: str | None = None
+    fix_strategy: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class BadCaseUpdateRequest(BaseModel):
@@ -29,6 +32,9 @@ class BadCaseUpdateRequest(BaseModel):
     actual_behavior: str | None = None
     suggested_fix: str | None = None
     category: str | None = None
+    root_cause: str | None = None
+    fix_strategy: str | None = None
+    tags: list[str] | None = None
 
 
 class BadCaseRecord(BaseModel):
@@ -45,9 +51,32 @@ class BadCaseRecord(BaseModel):
     expected_behavior: str | None = None
     actual_behavior: str | None = None
     suggested_fix: str | None = None
+    root_cause: str | None = None
+    fix_strategy: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    added_to_eval_set: bool = False
     status: str
     created_at: datetime
     resolved_at: datetime | None = None
+    verified_at: datetime | None = None
+    regression_evaluation_run_id: str | None = None
+    regression_evaluation_case_id: str | None = None
+
+
+class BadCaseAddToEvalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_name: str = Field(default="regression", min_length=1, max_length=120)
+
+
+class BadCaseStats(BaseModel):
+    total: int
+    by_status: dict[str, int] = Field(default_factory=dict)
+    by_module: dict[str, int] = Field(default_factory=dict)
+    by_case_type: dict[str, int] = Field(default_factory=dict)
+    added_to_eval_set_count: int
+    verified_count: int
+    open_count: int
 
 
 class EvaluationRunCreateRequest(BaseModel):
@@ -86,6 +115,15 @@ class EvaluationRunRecord(BaseModel):
     created_at: datetime
 
 
+class EvaluationDatasetRecord(BaseModel):
+    dataset_name: str
+    module: str
+    case_count: int
+    source_type: str
+    description: str
+    version: str | None = None
+
+
 class EvaluationCaseRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -100,6 +138,12 @@ class EvaluationCaseRecord(BaseModel):
     bad_case_id: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class BadCaseEvaluationLinkResponse(BaseModel):
+    bad_case: BadCaseRecord
+    evaluation_case: EvaluationCaseRecord
+    created: bool
 
 
 class EvaluationResultRecord(BaseModel):

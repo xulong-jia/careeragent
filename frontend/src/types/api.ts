@@ -820,7 +820,12 @@ export type BadCaseCategory =
 
 export type BadCaseSeverity = "low" | "medium" | "high" | "critical";
 
-export type BadCaseStatus = "open" | "reviewing" | "fixed" | "wont_fix";
+export type BadCaseStatus =
+  | "open"
+  | "reviewing"
+  | "fixed"
+  | "verified"
+  | "wont_fix";
 
 export type BadCaseRecord = {
   id: string;
@@ -834,9 +839,16 @@ export type BadCaseRecord = {
   expected_behavior: string | null;
   actual_behavior: string | null;
   suggested_fix: string | null;
+  root_cause: string | null;
+  fix_strategy: string | null;
+  tags: string[];
+  added_to_eval_set: boolean;
   status: BadCaseStatus;
   created_at: string;
   resolved_at: string | null;
+  verified_at: string | null;
+  regression_evaluation_run_id: string | null;
+  regression_evaluation_case_id: string | null;
 };
 
 export type BadCaseCreatePayload = {
@@ -849,6 +861,9 @@ export type BadCaseCreatePayload = {
   expected_behavior?: string | null;
   actual_behavior?: string | null;
   suggested_fix?: string | null;
+  root_cause?: string | null;
+  fix_strategy?: string | null;
+  tags?: string[];
 };
 
 export type BadCaseUpdatePayload = {
@@ -860,6 +875,9 @@ export type BadCaseUpdatePayload = {
   actual_behavior?: string | null;
   suggested_fix?: string | null;
   category?: BadCaseCategory;
+  root_cause?: string | null;
+  fix_strategy?: string | null;
+  tags?: string[];
 };
 
 export type BadCaseFilters = {
@@ -871,7 +889,19 @@ export type BadCaseFilters = {
   limit?: number;
 };
 
+export type BadCaseStats = {
+  total: number;
+  by_status: Record<string, number>;
+  by_module: Record<string, number>;
+  by_case_type: Record<string, number>;
+  added_to_eval_set_count: number;
+  verified_count: number;
+  open_count: number;
+};
+
 export type EvaluationModule =
+  | "jd_parser"
+  | "resume_parser"
   | "match"
   | "rag"
   | "agent"
@@ -934,6 +964,12 @@ export type EvaluationCaseRecord = {
   updated_at: string;
 };
 
+export type BadCaseEvaluationLinkResponse = {
+  bad_case: BadCaseRecord;
+  evaluation_case: EvaluationCaseRecord;
+  created: boolean;
+};
+
 export type EvaluationResultRecord = {
   id: string;
   run_id: string;
@@ -960,6 +996,15 @@ export type EvaluationStats = {
   total_cases: number;
   failed_results: number;
   by_module: Record<EvaluationModule, number>;
+};
+
+export type EvaluationDatasetRecord = {
+  dataset_name: string;
+  module: EvaluationModule;
+  case_count: number;
+  source_type: string;
+  description: string;
+  version: string | null;
 };
 
 export type EvaluationRunFilters = {

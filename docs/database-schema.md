@@ -430,10 +430,19 @@ JSON 字段说明：
 - `expected_behavior`
 - `actual_behavior`
 - `suggested_fix`
+- `root_cause`
+- `fix_strategy`
+- `tags`
+- `added_to_eval_set`
 - `status`
 - `resolved_at`
+- `verified_at`
+- `regression_evaluation_run_id`
+- `regression_evaluation_case_id`
 
-隐私说明：只保存 source refs 和摘要，不粘贴大段隐私原文。
+状态说明：`status` 支持 `open`、`reviewing`、`fixed`、`verified`、`wont_fix`。`added_to_eval_set` 和 regression refs 用于追踪 bad case 是否已进入 deterministic regression evaluation。
+
+隐私说明：只保存 source refs、短摘要、root cause / fix strategy summary 和 tags，不粘贴大段隐私原文。
 
 ## evaluation_runs
 
@@ -451,6 +460,8 @@ JSON 字段说明：
 - `started_at`
 - `finished_at`
 
+`metrics` 包含 `total_count`、`passed_count`、`failed_count`、`failed_case_ids`、`pass_rate` 和 `by_module`。`run_config` 记录 deterministic flags 以及 prompt/schema/retrieval/model/code version metadata。
+
 ## evaluation_cases
 
 用途：记录 synthetic / manual / bad_case 来源的评测 case。
@@ -467,7 +478,9 @@ JSON 字段说明：
 - `source_type`
 - `bad_case_id`
 
-隐私说明：manual case 会拒绝 `raw_text` / `jd_raw_text` 等明显隐私字段；从 Bad Case 创建 case 时只保存 refs 和摘要。
+`module` 当前支持 `jd_parser`、`resume_parser`、`match`、`rag`、`agent`、`application`、`bad_case`。`source_type` 支持 `synthetic`、`bad_case`、`manual`。
+
+隐私说明：manual case 会拒绝 `raw_text` / `jd_raw_text` / `chunk_text` / `full_text` / `resume_text` / `job_text` 等明显隐私字段；从 Bad Case 创建 case 时只保存 refs 和摘要。
 
 ## evaluation_results
 

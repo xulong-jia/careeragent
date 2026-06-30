@@ -1,0 +1,18 @@
+{
+  "dataset_name": "smoke",
+  "module": "resume_parser",
+  "version": "v1.5",
+  "description": "Privacy-safe resume parser smoke contract.",
+  "cases": [
+    {
+      "id": "resume_parser_smoke_001",
+      "name": "Resume parser extracts skills and sections",
+      "input": {
+        "candidate_ref": "synthetic_resume",
+        "skills": ["python", "react", "sql"],
+        "sections": ["experience", "projects", "education"]
+      },
+      "tags": ["smoke", "contract"]
+    }
+  ]
+}

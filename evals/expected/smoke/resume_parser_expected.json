@@ -1,0 +1,13 @@
+{
+  "dataset_name": "smoke",
+  "module": "resume_parser",
+  "cases": [
+    {
+      "id": "resume_parser_smoke_001",
+      "expected": {
+        "required_fields": ["candidate_ref", "skills", "sections"],
+        "expected_skills": ["python", "react"]
+      }
+    }
+  ]
+}

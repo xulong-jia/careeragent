@@ -61,6 +61,9 @@ def create_bad_case(
     expected_behavior: str | None = None,
     actual_behavior: str | None = None,
     suggested_fix: str | None = None,
+    root_cause: str | None = None,
+    fix_strategy: str | None = None,
+    tags: list[str] | None = None,
 ) -> BadCaseRecord:
     bad_case = BadCase(
         id=_next_bad_case_id(db),
@@ -73,6 +76,9 @@ def create_bad_case(
         expected_behavior=expected_behavior,
         actual_behavior=actual_behavior,
         suggested_fix=suggested_fix,
+        root_cause=root_cause,
+        fix_strategy=fix_strategy,
+        tags=tags or [],
     )
     try:
         db.add(bad_case)
@@ -133,8 +139,16 @@ def update_bad_case(
     actual_behavior: str | None = None,
     suggested_fix: str | None = None,
     category: str | None = None,
+    root_cause: str | None = None,
+    fix_strategy: str | None = None,
+    tags: list[str] | None = None,
+    added_to_eval_set: bool | None = None,
     resolved_at: datetime | None = None,
     clear_resolved_at: bool = False,
+    verified_at: datetime | None = None,
+    clear_verified_at: bool = False,
+    regression_evaluation_run_id: str | None = None,
+    regression_evaluation_case_id: str | None = None,
 ) -> BadCaseRecord:
     if status is not None:
         bad_case.status = status
@@ -152,10 +166,26 @@ def update_bad_case(
         bad_case.suggested_fix = suggested_fix
     if category is not None:
         bad_case.category = category
+    if root_cause is not None:
+        bad_case.root_cause = root_cause
+    if fix_strategy is not None:
+        bad_case.fix_strategy = fix_strategy
+    if tags is not None:
+        bad_case.tags = tags
+    if added_to_eval_set is not None:
+        bad_case.added_to_eval_set = added_to_eval_set
     if clear_resolved_at:
         bad_case.resolved_at = None
     elif resolved_at is not None:
         bad_case.resolved_at = resolved_at
+    if clear_verified_at:
+        bad_case.verified_at = None
+    elif verified_at is not None:
+        bad_case.verified_at = verified_at
+    if regression_evaluation_run_id is not None:
+        bad_case.regression_evaluation_run_id = regression_evaluation_run_id
+    if regression_evaluation_case_id is not None:
+        bad_case.regression_evaluation_case_id = regression_evaluation_case_id
 
     try:
         db.add(bad_case)
@@ -310,6 +340,23 @@ def find_evaluation_case(
         .where(EvaluationCase.module == module)
         .where(EvaluationCase.dataset_name == dataset_name)
         .where(EvaluationCase.case_name == case_name)
+        .where(EvaluationCase.source_type == source_type)
+        .limit(1)
+    ).first()
+    return _to_case_record(evaluation_case) if evaluation_case else None
+
+
+def find_evaluation_case_for_bad_case(
+    db: Session,
+    *,
+    bad_case_id: str,
+    dataset_name: str,
+    source_type: str = "bad_case",
+) -> EvaluationCaseRecord | None:
+    evaluation_case = db.scalars(
+        select(EvaluationCase)
+        .where(EvaluationCase.bad_case_id == bad_case_id)
+        .where(EvaluationCase.dataset_name == dataset_name)
         .where(EvaluationCase.source_type == source_type)
         .limit(1)
     ).first()

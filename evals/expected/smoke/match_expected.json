@@ -1,0 +1,14 @@
+{
+  "dataset_name": "smoke",
+  "module": "match",
+  "cases": [
+    {
+      "id": "match_smoke_001",
+      "expected": {
+        "required_fields": ["total_score", "dimension_scores", "strengths", "gaps", "evidence"],
+        "score_min": 0,
+        "score_max": 100
+      }
+    }
+  ]
+}

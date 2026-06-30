@@ -21,6 +21,9 @@ def _payload(**overrides):
         "expected_behavior": "Expected score to reflect missing required skills.",
         "actual_behavior": "Actual score stayed high.",
         "suggested_fix": "Adjust deterministic scoring weights.",
+        "root_cause": "Synthetic root cause summary.",
+        "fix_strategy": "Synthetic fix strategy summary.",
+        "tags": ["regression", "match"],
     }
     payload.update(overrides)
     return payload
@@ -55,6 +58,13 @@ def test_create_bad_case_success_with_defaults_and_safe_response():
     assert data["severity"] == "medium"
     assert data["status"] == "open"
     assert data["resolved_at"] is None
+    assert data["root_cause"] == "Synthetic root cause summary."
+    assert data["fix_strategy"] == "Synthetic fix strategy summary."
+    assert data["tags"] == ["regression", "match"]
+    assert data["added_to_eval_set"] is False
+    assert data["verified_at"] is None
+    assert data["regression_evaluation_case_id"] is None
+    assert data["regression_evaluation_run_id"] is None
     _assert_private_safe(data)
 
 
@@ -139,6 +149,16 @@ def test_patch_bad_case_status_and_resolution_fields():
     assert fixed["suggested_fix"] == "Synthetic fix summary."
     assert fixed["resolved_at"] is not None
 
+    verified_response = client.patch(
+        f"/api/evaluations/bad-cases/{created['id']}",
+        json={"status": "verified"},
+    )
+    assert verified_response.status_code == 200
+    verified = get_data(verified_response)
+    assert verified["status"] == "verified"
+    assert verified["resolved_at"] is not None
+    assert verified["verified_at"] is not None
+
     reopened_response = client.patch(
         f"/api/evaluations/bad-cases/{created['id']}",
         json={"status": "open"},
@@ -147,6 +167,7 @@ def test_patch_bad_case_status_and_resolution_fields():
     reopened = get_data(reopened_response)
     assert reopened["status"] == "open"
     assert reopened["resolved_at"] is None
+    assert reopened["verified_at"] is None
 
 
 def test_patch_bad_case_text_and_category_fields():
@@ -161,6 +182,9 @@ def test_patch_bad_case_text_and_category_fields():
             "description": "Updated synthetic summary.",
             "expected_behavior": "Expected private text to stay hidden.",
             "actual_behavior": "Actual response included too much detail.",
+            "root_cause": "Summary-only root cause.",
+            "fix_strategy": "Summary-only fix strategy.",
+            "tags": ["privacy", "regression"],
         },
     )
 
@@ -171,6 +195,9 @@ def test_patch_bad_case_text_and_category_fields():
     assert data["description"] == "Updated synthetic summary."
     assert data["expected_behavior"] == "Expected private text to stay hidden."
     assert data["actual_behavior"] == "Actual response included too much detail."
+    assert data["root_cause"] == "Summary-only root cause."
+    assert data["fix_strategy"] == "Summary-only fix strategy."
+    assert data["tags"] == ["privacy", "regression"]
 
 
 def test_missing_bad_case_returns_unified_error():
@@ -254,3 +281,49 @@ def test_bad_case_extra_sensitive_fields_are_rejected():
     assert response.status_code == 422
     error = get_error(response)
     assert error["code"] == "validation_error"
+
+
+def test_direct_bad_case_route_and_stats():
+    client = make_client()
+    created = get_data(client.post("/api/bad-cases", json=_payload()))
+
+    stats_response = client.get("/api/bad-cases/stats")
+    list_response = client.get("/api/bad-cases")
+    detail_response = client.get(f"/api/bad-cases/{created['id']}")
+
+    assert stats_response.status_code == 200
+    stats = get_data(stats_response)
+    assert stats["total"] == 1
+    assert stats["open_count"] == 1
+    assert stats["added_to_eval_set_count"] == 0
+    assert stats["verified_count"] == 0
+    assert stats["by_status"]["open"] == 1
+    assert stats["by_module"]["match"] == 1
+    assert stats["by_case_type"]["match_score_inaccurate"] == 1
+    assert list_response.status_code == 200
+    assert get_data(list_response)["items"][0]["id"] == created["id"]
+    assert detail_response.status_code == 200
+    assert get_data(detail_response)["id"] == created["id"]
+
+
+def test_add_bad_case_to_eval_is_idempotent_and_privacy_safe():
+    client = make_client()
+    created = _create_bad_case(client)
+
+    first_response = client.post(f"/api/bad-cases/{created['id']}/add-to-eval")
+    second_response = client.post(f"/api/bad-cases/{created['id']}/add-to-eval")
+
+    assert first_response.status_code == 201
+    first = get_data(first_response)
+    assert first["created"] is True
+    assert first["bad_case"]["added_to_eval_set"] is True
+    assert first["bad_case"]["regression_evaluation_case_id"] == first["evaluation_case"]["id"]
+    assert first["evaluation_case"]["dataset_name"] == "regression"
+    assert first["evaluation_case"]["source_type"] == "bad_case"
+    assert first["evaluation_case"]["bad_case_id"] == created["id"]
+    _assert_private_safe(first)
+
+    assert second_response.status_code == 201
+    second = get_data(second_response)
+    assert second["created"] is False
+    assert second["evaluation_case"]["id"] == first["evaluation_case"]["id"]

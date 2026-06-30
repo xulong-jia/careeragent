@@ -1,0 +1,19 @@
+{
+  "dataset_name": "smoke",
+  "module": "bad_case",
+  "version": "v1.5",
+  "description": "Bad case lifecycle smoke contract.",
+  "cases": [
+    {
+      "id": "bad_case_smoke_001",
+      "name": "Bad case stores refs, summaries and lifecycle fields",
+      "input": {
+        "source_type": "match_report",
+        "source_id": "synthetic_match_report",
+        "category": "match_score_inaccurate",
+        "status": "open"
+      },
+      "tags": ["smoke", "contract"]
+    }
+  ]
+}

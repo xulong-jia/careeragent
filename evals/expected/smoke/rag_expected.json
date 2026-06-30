@@ -1,0 +1,13 @@
+{
+  "dataset_name": "smoke",
+  "module": "rag",
+  "cases": [
+    {
+      "id": "rag_smoke_001",
+      "expected": {
+        "required_fields": ["sources", "snippets", "uncertainty"],
+        "allow_no_evidence": true
+      }
+    }
+  ]
+}

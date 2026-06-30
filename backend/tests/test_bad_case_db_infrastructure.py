@@ -23,6 +23,7 @@ BAD_CASE_INDEXES = {
     "ix_bad_cases_status",
     "ix_bad_cases_severity",
     "ix_bad_cases_category",
+    "ix_bad_cases_added_to_eval_set",
     "ix_bad_cases_source_type_source_id",
 }
 
@@ -53,8 +54,15 @@ def test_alembic_migration_creates_bad_cases_table(tmp_path, monkeypatch):
         "expected_behavior",
         "actual_behavior",
         "suggested_fix",
+        "root_cause",
+        "fix_strategy",
+        "tags",
+        "added_to_eval_set",
         "status",
         "resolved_at",
+        "verified_at",
+        "regression_evaluation_run_id",
+        "regression_evaluation_case_id",
     }.issubset({column["name"] for column in inspector.get_columns("bad_cases")})
     assert BAD_CASE_INDEXES.issubset(
         {index["name"] for index in inspector.get_indexes("bad_cases")}
@@ -74,6 +82,9 @@ def test_bad_case_insert_defaults_and_text_fields(db_session):
         expected_behavior="Expected a lower score for missing Python evidence.",
         actual_behavior="Actual score stayed high despite missing evidence.",
         suggested_fix="Adjust deterministic scoring around missing required skills.",
+        root_cause="Missing weighting edge case.",
+        fix_strategy="Add regression coverage.",
+        tags=["regression"],
     )
 
     db_session.add(bad_case)
@@ -97,7 +108,12 @@ def test_bad_case_insert_defaults_and_text_fields(db_session):
     assert persisted.suggested_fix == (
         "Adjust deterministic scoring around missing required skills."
     )
+    assert persisted.root_cause == "Missing weighting edge case."
+    assert persisted.fix_strategy == "Add regression coverage."
+    assert persisted.tags == ["regression"]
+    assert persisted.added_to_eval_set is False
     assert persisted.resolved_at is None
+    assert persisted.verified_at is None
 
 
 def test_bad_cases_table_does_not_include_private_text_columns():

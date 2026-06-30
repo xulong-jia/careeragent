@@ -1,0 +1,18 @@
+{
+  "dataset_name": "smoke",
+  "module": "jd_parser",
+  "version": "v1.5",
+  "description": "Privacy-safe JD parser smoke contract.",
+  "cases": [
+    {
+      "id": "jd_parser_smoke_001",
+      "name": "JD parser extracts role and required skills",
+      "input": {
+        "job_title": "AI Application Engineer",
+        "company": "Synthetic Company",
+        "required_skills": ["python", "fastapi", "rag"]
+      },
+      "tags": ["smoke", "contract"]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "dataset_name": "smoke",
+  "module": "match",
+  "version": "v1.5",
+  "description": "Deterministic match smoke contract.",
+  "cases": [
+    {
+      "id": "match_smoke_001",
+      "name": "Match report includes scores, strengths, gaps and evidence",
+      "input": {
+        "resume_signals": ["python", "fastapi", "react"],
+        "jd_requirements": ["python", "fastapi", "cloud"]
+      },
+      "tags": ["smoke", "contract"]
+    }
+  ]
+}

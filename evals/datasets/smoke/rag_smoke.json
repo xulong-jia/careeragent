@@ -1,0 +1,17 @@
+{
+  "dataset_name": "smoke",
+  "module": "rag",
+  "version": "v1.5",
+  "description": "Privacy-safe RAG answer smoke contract.",
+  "cases": [
+    {
+      "id": "rag_smoke_001",
+      "name": "RAG answer returns source refs and uncertainty",
+      "input": {
+        "query": "python interview preparation",
+        "expected_keywords": ["python", "interview"]
+      },
+      "tags": ["smoke", "contract"]
+    }
+  ]
+}

@@ -118,7 +118,7 @@ sqlite:///./local_data/careeragent.db
 - Match：deterministic scoring。
 - RAG：deterministic chunking + lexical retrieval + deterministic grounded answer。v1.2 RAG Completion deterministic MVP 已完成，覆盖 contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs，answer response 在保留 `sources` 的同时补齐 `citations`、`source_refs`、`evidence_summary`、safe `retrieval_debug` 和可选 `answer_run_id`；默认不接真实 LLM、embedding 或 vector DB。
 - Agent：v1.3 deterministic workflow baseline，固定 `job_application_preparation` state machine 串联 Resume Version、JD、Match、可选 RAG search、RAG context summary、Project Rewrite、Interview Questions、Study Plan 和 Application linkage；不是自由工具调用 Agent，不自动投递。
-- Evaluation：deterministic smoke set，不是 LLM judge。
+- Evaluation：v1.5B deterministic smoke/regression foundation，包含 7 模块 smoke set、Bad Case regression linkage 和文件化 eval runner，不是 LLM judge。
 
 ### Resume Center v0.8
 
@@ -230,6 +230,20 @@ Application Management 当前处于 v1.4 Product Operations Hardening：
 
 Application 仍是手动运营记录，不自动投递、不接招聘网站、不保存完整投递材料、不自动状态流转。RAG v1.2 contract 和 Agent v1.3 workflow 不因 v1.4 回退。
 
+### Quality / Evaluation v1.5B
+
+v1.5B 当前链路：
+
+1. Bad Case 保存人工问题摘要、root cause、fix strategy、tags、lifecycle status 和 source refs。
+2. `POST /api/bad-cases/{bad_case_id}/add-to-eval` 将 Bad Case 幂等加入默认 `regression` dataset，生成 `source_type=bad_case` 的 evaluation case。
+3. Evaluation runner 支持 `jd_parser`、`resume_parser`、`match`、`rag`、`agent`、`application`、`bad_case` 七个 deterministic modules。
+4. `synthetic_smoke_v1` 覆盖全部模块；`evals/datasets/smoke` 和 `evals/expected/smoke` 提供文件化 smoke fixtures。
+5. `scripts/run_evals.py` 可在本地生成 ignored `evals/results` 下的 summary、metrics 和 failed cases。
+6. Linked regression case pass 会将 Bad Case 标记为 `verified` 并写入 run/case refs；fail 不会编造验证结果。
+7. QualityReviewPage 展示 bad case stats 和 regression linkage；EvaluationPage 展示 dataset registry、run_config、failed cases 和 result detail。
+
+该链路仍不接真实 LLM、不做 LLM judge、不接 embedding/vector DB、不自动投递、不自动修改 Resume/Project/Application，也不保存 raw_text 或 full chunk text。
+
 ### Dashboard readiness
 
 Dashboard 当前展示：
@@ -265,6 +279,7 @@ Dashboard 当前展示：
 | v1.2 RAG Completion 12E | 新增 release notes，并完成 README、architecture、API reference、database schema、demo script 和 final acceptance report 最终口径收口；不创建 tag |
 | v1.3 Agent Workflow Baseline + Application Linkage | `job_application_preparation` 扩展为 11 步 deterministic workflow，串联 Match、RAG context summary、Project Rewrite、Interview、Study Plan 和 Application draft/linkage；AgentRunsPage、ApplicationTrackerPage、Dashboard 和 docs 已接入 `agent_run_id` 与 `final_summary` |
 | v1.4 Product Operations / Application Management Hardening | Application tracking 已补强 JD/Resume 强绑定、status history、reflection、Application Board、enhanced stats 和 Dashboard operations overview；不自动投递、不接招聘网站、不接真实 LLM |
+| v1.5B Bad Case + Evaluation Regression Foundation | Bad Case lifecycle / regression linkage、7 模块 deterministic evaluation、fileized smoke fixtures、run_evals script、QualityReviewPage / EvaluationPage 增强已完成；不接真实 LLM judge 或多模型评测 |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做

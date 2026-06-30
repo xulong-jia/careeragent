@@ -35,6 +35,8 @@ vector_index/
 **/vector_index/
 exports/
 **/exports/
+evals/results/*
+!evals/results/.gitkeep
 logs/
 **/logs/
 cache/

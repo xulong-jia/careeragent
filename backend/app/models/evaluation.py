@@ -25,6 +25,15 @@ class BadCase(Base):
     expected_behavior: Mapped[str | None] = mapped_column(Text)
     actual_behavior: Mapped[str | None] = mapped_column(Text)
     suggested_fix: Mapped[str | None] = mapped_column(Text)
+    root_cause: Mapped[str | None] = mapped_column(Text)
+    fix_strategy: Mapped[str | None] = mapped_column(Text)
+    tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    added_to_eval_set: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        index=True,
+    )
     status: Mapped[str] = mapped_column(
         String(40), default="open", nullable=False, index=True
     )
@@ -32,6 +41,9 @@ class BadCase(Base):
         DateTime, server_default=func.now(), nullable=False
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    regression_evaluation_run_id: Mapped[str | None] = mapped_column(String(64))
+    regression_evaluation_case_id: Mapped[str | None] = mapped_column(String(64))
 
 
 class EvaluationRun(Base):

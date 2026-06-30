@@ -4,11 +4,15 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
 from app.schemas.evaluations import (
+    BadCaseAddToEvalRequest,
     BadCaseCreateRequest,
+    BadCaseEvaluationLinkResponse,
     BadCaseRecord,
+    BadCaseStats,
     BadCaseUpdateRequest,
     EvaluationCaseCreateRequest,
     EvaluationCaseRecord,
+    EvaluationDatasetRecord,
     EvaluationResultRecord,
     EvaluationRunCreateRequest,
     EvaluationRunRecord,
@@ -19,6 +23,7 @@ from app.services import evaluation_service
 
 
 router = APIRouter(prefix="/api/evaluations", tags=["evaluations"])
+bad_cases_router = APIRouter(prefix="/api/bad-cases", tags=["bad-cases"])
 
 
 @router.post(
@@ -118,6 +123,18 @@ async def create_evaluation_case(
     return {"data": evaluation_case, "request_id": request.state.request_id}
 
 
+@router.get(
+    "/datasets",
+    response_model=ApiResponse[ListResponse[EvaluationDatasetRecord]],
+)
+async def list_evaluation_datasets(request: Request) -> dict[str, object]:
+    items = evaluation_service.list_evaluation_datasets()
+    return {
+        "data": ListResponse(items=items, total=len(items)),
+        "request_id": request.state.request_id,
+    }
+
+
 @router.post(
     "/cases/from-bad-case/{case_id}",
     response_model=ApiResponse[EvaluationCaseRecord],
@@ -196,6 +213,91 @@ async def get_bad_case(
 
 @router.patch("/bad-cases/{bad_case_id}", response_model=ApiResponse[BadCaseRecord])
 async def update_bad_case(
+    request: Request,
+    bad_case_id: str,
+    payload: BadCaseUpdateRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    bad_case = evaluation_service.update_bad_case(db, bad_case_id, payload)
+    return {"data": bad_case, "request_id": request.state.request_id}
+
+
+@bad_cases_router.get("/stats", response_model=ApiResponse[BadCaseStats])
+async def get_bad_case_stats(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    stats = evaluation_service.get_bad_case_stats(db)
+    return {"data": stats, "request_id": request.state.request_id}
+
+
+@bad_cases_router.post(
+    "/{bad_case_id}/add-to-eval",
+    response_model=ApiResponse[BadCaseEvaluationLinkResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_bad_case_to_eval(
+    request: Request,
+    bad_case_id: str,
+    payload: BadCaseAddToEvalRequest | None = None,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    link = evaluation_service.add_bad_case_to_eval(db, bad_case_id, payload)
+    return {"data": link, "request_id": request.state.request_id}
+
+
+@bad_cases_router.post(
+    "",
+    response_model=ApiResponse[BadCaseRecord],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_bad_case_direct(
+    request: Request,
+    payload: BadCaseCreateRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    bad_case = evaluation_service.create_bad_case(db, payload)
+    return {"data": bad_case, "request_id": request.state.request_id}
+
+
+@bad_cases_router.get("", response_model=ApiResponse[ListResponse[BadCaseRecord]])
+async def list_bad_cases_direct(
+    request: Request,
+    source_type: str | None = Query(default=None),
+    source_id: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    items = evaluation_service.list_bad_cases(
+        db,
+        source_type=source_type,
+        source_id=source_id,
+        category=category,
+        severity=severity,
+        status=status,
+        limit=limit,
+    )
+    return {
+        "data": ListResponse(items=items, total=len(items)),
+        "request_id": request.state.request_id,
+    }
+
+
+@bad_cases_router.get("/{bad_case_id}", response_model=ApiResponse[BadCaseRecord])
+async def get_bad_case_direct(
+    request: Request,
+    bad_case_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    bad_case = evaluation_service.get_bad_case(db, bad_case_id)
+    return {"data": bad_case, "request_id": request.state.request_id}
+
+
+@bad_cases_router.patch("/{bad_case_id}", response_model=ApiResponse[BadCaseRecord])
+async def update_bad_case_direct(
     request: Request,
     bad_case_id: str,
     payload: BadCaseUpdateRequest,

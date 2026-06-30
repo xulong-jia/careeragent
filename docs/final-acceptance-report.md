@@ -1,10 +1,10 @@
 # CareerAgent Final Acceptance Report
 
-本报告记录 v1.4 Product Operations / Application Management Hardening 后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示任何 v1.4 tag 已完成。
+本报告记录 v1.5B Bad Case + Evaluation Regression Foundation 后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示任何 v1.5 tag 已完成。
 
 ## 1. 验收结论
 
-v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.0 RAG Completion deterministic MVP 已完成 12A/12B/12C/12D/12E 的 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff 文档；v1.3.0 Agent Workflow Baseline + Application Linkage 已完成 deterministic end-to-end workflow orchestration、Application `agent_run_id` linkage、frontend display 和 docs/tests 收口；v1.4 Product Operations / Application Management Hardening 已完成 JD/Resume 强绑定、status history、reflection、Application Board 和 enhanced stats。v1.0.0 `interview-center` 仍作为已完成的稳定里程碑保留在本报告中。
+v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.0 RAG Completion deterministic MVP 已完成 12A/12B/12C/12D/12E 的 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff 文档；v1.3.0 Agent Workflow Baseline + Application Linkage 已完成 deterministic end-to-end workflow orchestration、Application `agent_run_id` linkage、frontend display 和 docs/tests 收口；v1.4 Product Operations / Application Management Hardening 已完成 JD/Resume 强绑定、status history、reflection、Application Board 和 enhanced stats；v1.5B 已完成 Bad Case lifecycle / regression linkage、7 模块 deterministic evaluation、fileized smoke fixtures 和 frontend review/evaluation visibility。v1.0.0 `interview-center` 仍作为已完成的稳定里程碑保留在本报告中。
 
 已完成范围：
 
@@ -27,6 +27,7 @@ v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.
 - v1.3 Application linkage：新增 `applications.agent_run_id`、migration、schema/repository/service/API 支持和 refs 校验。
 - v1.3 frontend/docs/tests：AgentRunsPage 展示 final summary，ApplicationTrackerPage 支持 `agent_run_id` 创建/筛选/展示，Dashboard 展示 latest agent run score/status 和 linked application 摘要，新增 release notes 和文档收口。
 - v1.4 Application operations：新增运营字段、`application_status_history`、reflection endpoint、status-history endpoint、enhanced stats 和 frontend Application Board / detail edit / reflection / Dashboard operations overview。
+- v1.5B Quality/Evaluation regression：扩展 `bad_cases` lifecycle 字段，新增 direct `/api/bad-cases` stats/add-to-eval，扩展 7 模块 deterministic evaluation、datasets endpoint、failed_case_ids、run_config version metadata、regression pass/fail linkage、fileized smoke fixtures 和 `scripts/run_evals.py`。
 
 ## 2. 当前模块状态
 
@@ -42,8 +43,8 @@ v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.
 | RAG Knowledge Base | v1.2 12A/12B/12C/12D/12E 已完成 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff |
 | Agent Runs | v1.3 已完成 deterministic workflow baseline：11 步 `job_application_preparation`、step timeline、final summary、Project/Interview/Study/Application orchestration |
 | Application Tracking | v1.4 已完成 Product Operations hardening：JD/Resume 强绑定、status history、reflection、board、enhanced stats 和 `agent_run_id` linkage |
-| Quality Review / Bad Case | 已完成人工复盘 MVP |
-| Evaluation | 已完成 deterministic smoke evaluation MVP |
+| Quality Review / Bad Case | v1.5B 已完成 lifecycle / root cause / fix strategy / tags / regression eval linkage |
+| Evaluation | v1.5B 已完成 7 模块 deterministic smoke + regression foundation、dataset registry、failed cases 和 fileized runner |
 | Docker / Compose | 已完成本地开发配置；build 需在 Docker daemon 可用环境验证 |
 | Docs / Demo | 已完成 v1.3 release notes、handoff 文档、demo script 和 final acceptance 口径；未声明 tag 已创建 |
 
@@ -218,9 +219,27 @@ v1.4 当前已完成：
 
 v1.4 仍不接真实 LLM，不接 embedding/vector DB，不自动投递，不接招聘网站，不自动状态流转，不保存完整投递材料，也不把 reflection 自动写入 Bad Case / Study Plan。
 
-## 9. 明确边界
+## 9. v1.5B Bad Case + Evaluation Regression Foundation
 
-当前 v1.4 明确不做：
+v1.5B 当前已完成：
+
+- Bad Case 新增 `root_cause`、`fix_strategy`、`tags`、`added_to_eval_set`、`verified_at`、`regression_evaluation_run_id` 和 `regression_evaluation_case_id`。
+- Bad Case status 支持 `verified`。
+- 新增 direct `/api/bad-cases` routes，包含 stats 和 `POST /api/bad-cases/{bad_case_id}/add-to-eval`。
+- 保留 legacy `/api/evaluations/bad-cases` routes。
+- Evaluation modules 扩展为 `jd_parser`、`resume_parser`、`match`、`rag`、`agent`、`application`、`bad_case`。
+- `synthetic_smoke_v1` 覆盖全部 7 个模块。
+- 新增 `GET /api/evaluations/datasets`。
+- Evaluation metrics 新增 `failed_case_ids`，`run_config` 新增 prompt/schema/retrieval/model/code version metadata。
+- linked regression case pass 会将 Bad Case 标记为 `verified`；fail 不会编造验证结果。
+- 新增 `evals/datasets/smoke`、`evals/expected/smoke` 和 `scripts/run_evals.py`。
+- QualityReviewPage 展示 Bad Case stats、lifecycle 字段和 Add to regression eval；EvaluationPage 展示 datasets、run_config、failed cases 和 result detail。
+
+v1.5B 仍不接真实 LLM，不做 LLM judge，不接 embedding/vector DB，不做多模型对比，不自动投递，不接招聘网站，不自动修改 Resume/Project/Application，也不保存 raw_text 或 full chunk text。
+
+## 10. 明确边界
+
+当前 v1.5B 明确不做：
 
 - 不接真实 LLM。
 - 不自动写回 Resume Version。
@@ -239,7 +258,7 @@ v1.4 仍不接真实 LLM，不接 embedding/vector DB，不自动投递，不接
 - 不做认证、多用户权限。
 - 不把 deterministic evaluation 当作模型能力最终评分。
 
-## 10. 测试与检查结果
+## 11. 测试与检查结果
 
 2026-06-30 在当前工作树执行：
 
@@ -247,7 +266,7 @@ v1.4 仍不接真实 LLM，不接 embedding/vector DB，不自动投递，不接
 PYTHONPATH=backend backend/.venv/bin/python -m pytest backend/tests
 ```
 
-结果：256 passed, 6 warnings。
+结果：263 passed, 6 warnings。
 
 ```bash
 cd frontend && npm run build
@@ -262,16 +281,22 @@ docker compose config
 结果：通过，Compose 配置可解析。
 
 ```bash
-PYTHONPATH=backend DATABASE_URL=sqlite:////tmp/careeragent_v14_alembic_check.db backend/.venv/bin/alembic -c backend/alembic.ini upgrade head
+PYTHONPATH=backend DATABASE_URL=sqlite:////tmp/careeragent_v15b_alembic_check.db backend/.venv/bin/alembic -c backend/alembic.ini upgrade head
 ```
 
 结果：通过，所有 Alembic migrations 可从空 SQLite DB 升级到 head。
 
 ```bash
-python3 -m py_compile scripts/seed_demo_data.py
+backend/.venv/bin/python -m py_compile scripts/seed_demo_data.py scripts/run_evals.py
 ```
 
 结果：通过。
+
+```bash
+backend/.venv/bin/python scripts/run_evals.py --dataset smoke
+```
+
+结果：通过，7 total / 7 passed / 0 failed，输出写入 ignored `evals/results/smoke`。
 
 ```bash
 git diff --check
@@ -285,7 +310,7 @@ docker compose build
 
 结果：通过，backend / frontend images 均构建成功。
 
-## 11. 安全与隐私
+## 12. 安全与隐私
 
 - `.env`、真实 API key、local DB、`local_data/`、uploads、vector index、exports、logs、cache、`dist/` 和 `node_modules/` 不进入 Git。
 - Demo 和测试只使用 synthetic data。
@@ -301,23 +326,19 @@ docker compose build
 - Interview / Study Plan optional RAG refs 只使用 grounded answer run 的短 evidence/source preview；ungrounded runs 不作为强来源，不自动写入任何下游模块。
 - Agent step payload 和 `final_summary` 只保存 refs、短 metadata、score、next actions 和 created record IDs，不保存 Resume/JD/RAG 原文、完整 answer 或投递材料。
 - Application linkage 只保存 `agent_run_id` ref；Application 仍是 tracking record，不自动投递、不自动状态流转。
-- Bad Case 和 Evaluation Case 不应保存大段隐私原文。
+- Bad Case 和 Evaluation Case 不应保存大段隐私原文；v1.5B regression linkage 只保存 refs、短摘要、root cause / fix strategy / tags 和 run/case IDs。
 
-## 12. 后续只读验收与 Tag 建议
+## 13. 后续只读验收与 Tag 建议
 
-当前 v1.3 final handoff 文档完成后，建议提交：
-
-```bash
-git commit -m "feat: add v1.3 agent workflow baseline"
-```
-
-提交并完成 v1.3 final handoff / release notes 和最终只读验收后，可考虑创建 v1.3 annotated tag。当前文档只记录建议，不表示 tag 已创建：
+当前 v1.5B development 完成后，建议先提交并推送：
 
 ```bash
-git tag -a v1.3.0-agent-workflow-baseline -m "CareerAgent v1.3.0 Agent workflow baseline"
+git commit -m "feat: add bad case evaluation regression foundation"
 ```
 
-打 tag 前建议确认：
+提交后建议进入 v1.5B final readonly acceptance。是否创建 v1.5 tag 需单独确认；本文档不建议直接打 tag。
+
+只读验收前建议确认：
 
 - `git status --short --branch` clean 且 `main` 与 `origin/main` 同步。
 - 全量 backend tests、frontend build、`docker compose config`、`py_compile` 和 `git diff --check` 通过。

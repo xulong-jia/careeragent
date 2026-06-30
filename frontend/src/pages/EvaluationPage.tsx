@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   getEvaluationRun,
   getEvaluationStats,
+  listEvaluationDatasets,
   listEvaluationCases,
   listEvaluationResults,
   listEvaluationRuns,
@@ -10,6 +11,7 @@ import {
 } from "../api/evaluations";
 import type {
   EvaluationCaseRecord,
+  EvaluationDatasetRecord,
   EvaluationModule,
   EvaluationResultRecord,
   EvaluationRunModule,
@@ -20,6 +22,8 @@ import type {
 
 const moduleOptions: EvaluationRunModule[] = [
   "all",
+  "jd_parser",
+  "resume_parser",
   "match",
   "rag",
   "agent",
@@ -54,7 +58,10 @@ export function EvaluationPage() {
   const [stats, setStats] = useState<EvaluationStats | null>(null);
   const [runs, setRuns] = useState<EvaluationRunRecord[]>([]);
   const [cases, setCases] = useState<EvaluationCaseRecord[]>([]);
+  const [datasets, setDatasets] = useState<EvaluationDatasetRecord[]>([]);
   const [results, setResults] = useState<EvaluationResultRecord[]>([]);
+  const [selectedResult, setSelectedResult] =
+    useState<EvaluationResultRecord | null>(null);
   const [selectedRun, setSelectedRun] = useState<EvaluationRunSummary | null>(
     null,
   );
@@ -78,25 +85,33 @@ export function EvaluationPage() {
     ]);
     setSelectedRun(summary);
     setResults(resultList.items);
+    setSelectedResult(
+      resultList.items.find((result) => !result.passed) ??
+        resultList.items[0] ??
+        null,
+    );
   };
 
   const refreshEvaluationData = async (nextRunId?: string) => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const [runList, caseList] = await Promise.all([
+      const [runList, caseList, datasetList] = await Promise.all([
         listEvaluationRuns({ limit: 50 }),
         listEvaluationCases({ limit: 100 }),
+        listEvaluationDatasets(),
         refreshStats(),
       ]);
       setRuns(runList.items);
       setCases(caseList.items);
+      setDatasets(datasetList.items);
       const runId = nextRunId ?? runList.items[0]?.id ?? null;
       if (runId) {
         await loadRun(runId);
       } else {
         setSelectedRun(null);
         setResults([]);
+        setSelectedResult(null);
       }
     } catch (error) {
       setErrorMessage(
@@ -149,6 +164,7 @@ export function EvaluationPage() {
   };
 
   const selectedMetrics = selectedRun?.run.metrics ?? {};
+  const failedResults = results.filter((result) => !result.passed);
 
   return (
     <section className="page-stack" aria-labelledby="evaluation-title">
@@ -229,6 +245,38 @@ export function EvaluationPage() {
         </div>
       </article>
 
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Datasets</h3>
+          <span className="status-pill muted">{datasets.length} registered</span>
+        </div>
+        {datasets.length ? (
+          <ul className="activity-list evaluation-case-list">
+            {datasets.map((dataset) => (
+              <li
+                key={`${dataset.dataset_name}-${dataset.module}-${dataset.source_type}`}
+              >
+                <div>
+                  <strong>{dataset.dataset_name}</strong>
+                  <small>{dataset.description}</small>
+                </div>
+                <span>{dataset.module}</span>
+                <span>{dataset.case_count} cases</span>
+                <span className={statusClass(dataset.source_type)}>
+                  {dataset.source_type}
+                </span>
+                <span>{dataset.version ?? "None"}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="empty-state compact">
+            <strong>No datasets</strong>
+            <span>Refresh to load dataset metadata.</span>
+          </div>
+        )}
+      </article>
+
       <div className="two-column wide-left">
         <article className="panel">
           <div className="panel-header">
@@ -305,6 +353,9 @@ export function EvaluationPage() {
               <pre className="json-preview compact">
                 {JSON.stringify(selectedRun.run.metrics, null, 2)}
               </pre>
+              <pre className="json-preview compact">
+                {JSON.stringify(selectedRun.run.run_config, null, 2)}
+              </pre>
             </>
           ) : (
             <div className="empty-state compact">
@@ -336,6 +387,13 @@ export function EvaluationPage() {
                   <span className={statusClass(result.status)}>{result.status}</span>
                   <span>{result.score.toFixed(2)}</span>
                   <span>{result.error ?? "None"}</span>
+                  <button
+                    className="ghost-action"
+                    onClick={() => setSelectedResult(result)}
+                    type="button"
+                  >
+                    Detail
+                  </button>
                 </li>
               );
             })}
@@ -348,11 +406,91 @@ export function EvaluationPage() {
         )}
       </article>
 
+      <div className="two-column wide-left">
+        <article className="panel">
+          <div className="panel-header">
+            <h3>Failed Cases</h3>
+            <span className="status-pill muted">{failedResults.length} rows</span>
+          </div>
+          {failedResults.length ? (
+            <ul className="activity-list">
+              {failedResults.map((result) => (
+                <li key={result.id}>
+                  <div>
+                    <strong>{result.case_id}</strong>
+                    <small>{result.error ?? "No error"}</small>
+                  </div>
+                  <span>{result.module}</span>
+                  <button
+                    className="ghost-action"
+                    onClick={() => setSelectedResult(result)}
+                    type="button"
+                  >
+                    Detail
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="empty-state compact">
+              <strong>No failed cases</strong>
+              <span>Selected run has no failing results.</span>
+            </div>
+          )}
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <h3>Result Detail</h3>
+            <span className="status-pill muted">
+              {selectedResult?.id ?? "None"}
+            </span>
+          </div>
+          {selectedResult ? (
+            <>
+              <ul className="activity-list">
+                <li>
+                  <strong>Case</strong>
+                  <span>{selectedResult.case_id}</span>
+                </li>
+                <li>
+                  <strong>Status</strong>
+                  <span className={statusClass(selectedResult.status)}>
+                    {selectedResult.status}
+                  </span>
+                </li>
+                <li>
+                  <strong>Error</strong>
+                  <span>{selectedResult.error ?? "None"}</span>
+                </li>
+              </ul>
+              <pre className="json-preview compact">
+                {JSON.stringify(
+                  {
+                    actual_output: selectedResult.actual_output,
+                    expected_output: selectedResult.expected_output,
+                  },
+                  null,
+                  2,
+                )}
+              </pre>
+            </>
+          ) : (
+            <div className="empty-state compact">
+              <strong>No result selected</strong>
+              <span>Select a result row for detail.</span>
+            </div>
+          )}
+        </article>
+      </div>
+
       <article className="panel">
         <div className="panel-header">
           <h3>Cases</h3>
           <span className="status-pill muted">
-            match {moduleCaseCount(stats?.by_module, "match")} / rag{" "}
+            jd {moduleCaseCount(stats?.by_module, "jd_parser")} / resume{" "}
+            {moduleCaseCount(stats?.by_module, "resume_parser")} / match{" "}
+            {moduleCaseCount(stats?.by_module, "match")} / rag{" "}
             {moduleCaseCount(stats?.by_module, "rag")} / agent{" "}
             {moduleCaseCount(stats?.by_module, "agent")}
           </span>

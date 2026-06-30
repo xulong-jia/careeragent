@@ -1,12 +1,15 @@
 import { requestJson } from "./client";
 import type {
   BadCaseCreatePayload,
+  BadCaseEvaluationLinkResponse,
   BadCaseFilters,
   BadCaseRecord,
+  BadCaseStats,
   BadCaseUpdatePayload,
   EvaluationCaseCreatePayload,
   EvaluationCaseFilters,
   EvaluationCaseRecord,
+  EvaluationDatasetRecord,
   EvaluationResultRecord,
   EvaluationRunCreatePayload,
   EvaluationRunFilters,
@@ -17,7 +20,7 @@ import type {
 } from "../types/api";
 
 const evaluationsPath = "/api/evaluations";
-const badCasesPath = "/api/evaluations/bad-cases";
+const badCasesPath = "/api/bad-cases";
 
 export function runEvaluation(
   payload: EvaluationRunCreatePayload = {},
@@ -109,8 +112,20 @@ export function createEvaluationCaseFromBadCase(
   );
 }
 
+export function listEvaluationDatasets(): Promise<
+  ListResponse<EvaluationDatasetRecord>
+> {
+  return requestJson<ListResponse<EvaluationDatasetRecord>>(
+    `${evaluationsPath}/datasets`,
+  );
+}
+
 export function getEvaluationStats(): Promise<EvaluationStats> {
   return requestJson<EvaluationStats>(`${evaluationsPath}/stats`);
+}
+
+export function getBadCaseStats(): Promise<BadCaseStats> {
+  return requestJson<BadCaseStats>(`${badCasesPath}/stats`);
 }
 
 export function createBadCase(
@@ -168,4 +183,20 @@ export function updateBadCase(
     },
     body: JSON.stringify(payload),
   });
+}
+
+export function addBadCaseToEval(
+  badCaseId: string,
+  datasetName = "regression",
+): Promise<BadCaseEvaluationLinkResponse> {
+  return requestJson<BadCaseEvaluationLinkResponse>(
+    `${badCasesPath}/${badCaseId}/add-to-eval`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ dataset_name: datasetName }),
+    },
+  );
 }

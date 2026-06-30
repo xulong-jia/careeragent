@@ -644,6 +644,10 @@ Application 仍是手动 tracking record。v1.3 允许 Agent Workflow 创建 dra
 | GET | `/api/evaluations/bad-cases` | 查询 bad cases |
 | GET | `/api/evaluations/bad-cases/{bad_case_id}` | 查询 detail |
 | PATCH | `/api/evaluations/bad-cases/{bad_case_id}` | 更新 status/severity/摘要字段 |
+| POST | `/api/bad-cases` | 创建人工 bad case，新直连路径 |
+| GET | `/api/bad-cases` | 查询 bad cases，新直连路径 |
+| GET | `/api/bad-cases/stats` | 查询 Bad Case lifecycle / module / type stats |
+| POST | `/api/bad-cases/{bad_case_id}/add-to-eval` | 将 Bad Case 加入 `regression` evaluation set，幂等 |
 
 关键字段：
 
@@ -653,6 +657,15 @@ Application 仍是手动 tracking record。v1.3 允许 Agent Workflow 创建 dra
 - `severity`
 - `status`
 - `description`
+- `root_cause`
+- `fix_strategy`
+- `tags`
+- `added_to_eval_set`
+- `verified_at`
+- `regression_evaluation_run_id`
+- `regression_evaluation_case_id`
+
+`status` 支持 `open`、`reviewing`、`fixed`、`verified`、`wont_fix`。Bad Case API 只保存 refs 和摘要，不保存 Resume/JD raw text、RAG full chunk text 或完整面试回答。
 
 ## Evaluation APIs
 
@@ -665,13 +678,20 @@ Application 仍是手动 tracking record。v1.3 允许 Agent Workflow 创建 dra
 | GET | `/api/evaluations/cases` | 查询 evaluation cases |
 | POST | `/api/evaluations/cases` | 创建 manual evaluation case |
 | POST | `/api/evaluations/cases/from-bad-case/{case_id}` | 从 Bad Case 创建 evaluation case |
+| GET | `/api/evaluations/datasets` | 查询 built-in / fileized dataset metadata |
 | GET | `/api/evaluations/stats` | 查询 evaluation stats |
 
 关键字段：
 
 - `evaluation_runs.metrics.pass_rate`
+- `evaluation_runs.metrics.failed_case_ids`
+- `evaluation_runs.run_config.prompt_version`
+- `evaluation_runs.run_config.schema_version`
+- `evaluation_runs.run_config.retrieval_version`
+- `evaluation_runs.run_config.model_version`
+- `evaluation_runs.run_config.code_version`
 - `evaluation_cases.bad_case_id`
 - `evaluation_results.passed`
 - `evaluation_results.score`
 
-当前只支持 deterministic smoke / regression tracking，不做 LLM judge。
+当前支持 7 个 deterministic modules：`jd_parser`、`resume_parser`、`match`、`rag`、`agent`、`application`、`bad_case`。内置 `synthetic_smoke_v1` 覆盖全部模块，文件化 smoke fixtures 位于 `evals/datasets/smoke` 和 `evals/expected/smoke`。当前只支持 deterministic smoke / regression tracking，不做 LLM judge，不做多模型对比。

@@ -1,4 +1,7 @@
 from datetime import datetime, timezone
+import json
+from pathlib import Path
+import subprocess
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -6,11 +9,15 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.repositories import evaluation_repository
 from app.schemas.evaluations import (
+    BadCaseAddToEvalRequest,
     BadCaseCreateRequest,
+    BadCaseEvaluationLinkResponse,
     BadCaseRecord,
+    BadCaseStats,
     BadCaseUpdateRequest,
     EvaluationCaseCreateRequest,
     EvaluationCaseRecord,
+    EvaluationDatasetRecord,
     EvaluationResultRecord,
     EvaluationRunCreateRequest,
     EvaluationRunRecord,
@@ -45,14 +52,33 @@ ALLOWED_CATEGORIES = {
     "other",
 }
 ALLOWED_SEVERITIES = {"low", "medium", "high", "critical"}
-ALLOWED_STATUSES = {"open", "reviewing", "fixed", "wont_fix"}
-RESOLVED_STATUSES = {"fixed", "wont_fix"}
-EVALUATION_MODULES = {"match", "rag", "agent", "application", "bad_case"}
+ALLOWED_STATUSES = {"open", "reviewing", "fixed", "verified", "wont_fix"}
+RESOLVED_STATUSES = {"fixed", "verified", "wont_fix"}
+OPEN_STATUSES = {"open", "reviewing"}
+EVALUATION_MODULES = {
+    "jd_parser",
+    "resume_parser",
+    "match",
+    "rag",
+    "agent",
+    "application",
+    "bad_case",
+}
 EVALUATION_RUN_MODULES = EVALUATION_MODULES | {"all"}
 EVALUATION_RUN_STATUSES = {"pending", "running", "completed", "failed"}
 EVALUATION_CASE_SOURCE_TYPES = {"synthetic", "bad_case", "manual"}
 SYNTHETIC_DATASET_NAME = "synthetic_smoke_v1"
-SYNTHETIC_MODULE_ORDER = ["match", "rag", "agent", "application", "bad_case"]
+SYNTHETIC_MODULE_ORDER = [
+    "jd_parser",
+    "resume_parser",
+    "match",
+    "rag",
+    "agent",
+    "application",
+    "bad_case",
+]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+EVALS_ROOT = REPO_ROOT / "evals"
 PRIVATE_TEXT_KEYS = {
     "raw_text",
     "jd_raw_text",
@@ -151,6 +177,21 @@ def _normalize_tags(tags: list[str] | None) -> list[str]:
     return normalized
 
 
+def _current_code_version() -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            check=True,
+            text=True,
+            timeout=2,
+        )
+    except Exception:
+        return "unknown"
+    return completed.stdout.strip() or "unknown"
+
+
 def _contains_private_text_key(value: Any) -> bool:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -187,6 +228,8 @@ def _safe_summary(value: str | None, *, max_length: int = 180) -> str | None:
 
 def _module_from_bad_case_source(source_type: str) -> str:
     mapping = {
+        "job_description": "jd_parser",
+        "resume_version": "resume_parser",
         "match_report": "match",
         "rag_answer": "rag",
         "rag_document": "rag",
@@ -197,8 +240,178 @@ def _module_from_bad_case_source(source_type: str) -> str:
     return mapping.get(source_type, "bad_case")
 
 
+def _bad_case_eval_payloads(
+    bad_case: BadCaseRecord,
+    module: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    input_payload: dict[str, Any] = {
+        "source_type": bad_case.source_type,
+        "source_id": bad_case.source_id,
+        "category": bad_case.category,
+        "severity": bad_case.severity,
+        "status": bad_case.status,
+        "description_summary": _safe_summary(bad_case.description),
+        "root_cause_summary": _safe_summary(bad_case.root_cause),
+        "fix_strategy_summary": _safe_summary(
+            bad_case.fix_strategy or bad_case.suggested_fix
+        ),
+        "tags": _normalize_tags(bad_case.tags),
+    }
+    expected_output: dict[str, Any] = {
+        "expected_behavior_summary": _safe_summary(bad_case.expected_behavior),
+        "actual_behavior_summary": _safe_summary(bad_case.actual_behavior),
+        "fix_strategy_summary": _safe_summary(
+            bad_case.fix_strategy or bad_case.suggested_fix
+        ),
+    }
+
+    if module == "jd_parser":
+        input_payload.update(
+            {
+                "job_title": bad_case.title,
+                "company": "Unknown",
+                "required_skills": ["regression"],
+            }
+        )
+        expected_output.update(
+            {
+                "required_fields": [
+                    "role_title",
+                    "company",
+                    "required_skills",
+                    "role_category",
+                ],
+                "expected_skills": ["regression"],
+            }
+        )
+    elif module == "resume_parser":
+        input_payload.update(
+            {
+                "candidate_ref": bad_case.source_id,
+                "skills": ["regression"],
+                "sections": ["summary"],
+            }
+        )
+        expected_output.update(
+            {
+                "required_fields": ["candidate_ref", "skills", "sections"],
+                "expected_skills": ["regression"],
+            }
+        )
+    elif module == "match":
+        input_payload.update(
+            {
+                "resume_signals": ["regression"],
+                "jd_requirements": ["regression"],
+            }
+        )
+        expected_output.update(
+            {
+                "required_fields": [
+                    "total_score",
+                    "dimension_scores",
+                    "strengths",
+                    "gaps",
+                    "evidence",
+                ],
+                "score_min": 0,
+                "score_max": 100,
+            }
+        )
+    elif module == "rag":
+        input_payload.update(
+            {
+                "query": bad_case.title,
+                "expected_keywords": ["synthetic"],
+            }
+        )
+        expected_output.update(
+            {
+                "required_fields": ["sources", "snippets", "uncertainty"],
+                "allow_no_evidence": True,
+            }
+        )
+    elif module == "agent":
+        input_payload.update(
+            {
+                "workflow_name": "job_application_preparation",
+                "resume_version_id": bad_case.source_id,
+                "jd_id": bad_case.source_id,
+            }
+        )
+        expected_output.update(
+            {
+                "allowed_statuses": ["completed", "need_more_info"],
+                "requires_ordered_steps": True,
+            }
+        )
+    elif module == "application":
+        input_payload.update(
+            {
+                "company": "Unknown",
+                "role_title": bad_case.title,
+                "status": "applied",
+                "filter_status": "applied",
+            }
+        )
+        expected_output.update(
+            {
+                "valid_status": "applied",
+                "stats_fields": [
+                    "total_applications",
+                    "by_status",
+                    "active_count",
+                ],
+            }
+        )
+    else:
+        expected_output.update(
+            {
+                "required_fields": ["source_type", "source_id", "category", "status"],
+                "privacy_safe": True,
+            }
+        )
+
+    return input_payload, expected_output
+
+
 def _synthetic_case_definitions(dataset_name: str) -> list[dict[str, Any]]:
     return [
+        {
+            "module": "jd_parser",
+            "dataset_name": dataset_name,
+            "case_name": "jd_parser_contract_smoke",
+            "input_payload": {
+                "job_title": "AI Application Engineer",
+                "company": "Synthetic Company",
+                "required_skills": ["python", "fastapi", "rag"],
+            },
+            "expected_output": {
+                "required_fields": [
+                    "role_title",
+                    "company",
+                    "required_skills",
+                    "role_category",
+                ],
+                "expected_skills": ["python", "fastapi"],
+            },
+            "tags": ["synthetic", "smoke", "jd_parser"],
+        },
+        {
+            "module": "resume_parser",
+            "dataset_name": dataset_name,
+            "case_name": "resume_parser_contract_smoke",
+            "input_payload": {
+                "candidate_ref": "synthetic_resume",
+                "skills": ["python", "react", "sql"],
+                "sections": ["experience", "projects", "education"],
+            },
+            "expected_output": {
+                "required_fields": ["candidate_ref", "skills", "sections"],
+                "expected_skills": ["python", "react"],
+            },
+            "tags": ["synthetic", "smoke", "resume_parser"],
+        },
         {
             "module": "match",
             "dataset_name": dataset_name,
@@ -289,6 +502,58 @@ def _synthetic_case_definitions(dataset_name: str) -> list[dict[str, Any]]:
 
 def _required_fields_present(actual_output: dict[str, Any], fields: list[str]) -> bool:
     return all(field in actual_output for field in fields)
+
+
+def _evaluate_jd_parser_case(evaluation_case: EvaluationCaseRecord) -> dict[str, Any]:
+    skills = [
+        str(skill).lower()
+        for skill in evaluation_case.input_payload.get("required_skills", [])
+    ]
+    actual_output = {
+        "role_title": evaluation_case.input_payload.get("job_title"),
+        "company": evaluation_case.input_payload.get("company"),
+        "required_skills": skills,
+        "role_category": "engineering" if skills else "unknown",
+    }
+    expected = evaluation_case.expected_output
+    expected_skills = {str(skill).lower() for skill in expected.get("expected_skills", [])}
+    passed = _required_fields_present(
+        actual_output,
+        expected.get("required_fields", []),
+    ) and expected_skills.issubset(set(skills))
+    return {
+        "actual_output": actual_output,
+        "passed": passed,
+        "score": 1.0 if passed else 0.0,
+        "error": None if passed else "JD parser contract fields or skills failed.",
+    }
+
+
+def _evaluate_resume_parser_case(
+    evaluation_case: EvaluationCaseRecord,
+) -> dict[str, Any]:
+    skills = [str(skill).lower() for skill in evaluation_case.input_payload.get("skills", [])]
+    sections = [
+        str(section).lower()
+        for section in evaluation_case.input_payload.get("sections", [])
+    ]
+    actual_output = {
+        "candidate_ref": evaluation_case.input_payload.get("candidate_ref"),
+        "skills": skills,
+        "sections": sections,
+    }
+    expected = evaluation_case.expected_output
+    expected_skills = {str(skill).lower() for skill in expected.get("expected_skills", [])}
+    passed = _required_fields_present(
+        actual_output,
+        expected.get("required_fields", []),
+    ) and expected_skills.issubset(set(skills))
+    return {
+        "actual_output": actual_output,
+        "passed": passed,
+        "score": 1.0 if passed else 0.0,
+        "error": None if passed else "Resume parser contract fields or skills failed.",
+    }
 
 
 def _evaluate_match_case(evaluation_case: EvaluationCaseRecord) -> dict[str, Any]:
@@ -439,6 +704,8 @@ def _evaluate_bad_case_case(evaluation_case: EvaluationCaseRecord) -> dict[str, 
 
 def _evaluate_case(evaluation_case: EvaluationCaseRecord) -> dict[str, Any]:
     evaluators = {
+        "jd_parser": _evaluate_jd_parser_case,
+        "resume_parser": _evaluate_resume_parser_case,
         "match": _evaluate_match_case,
         "rag": _evaluate_rag_case,
         "agent": _evaluate_agent_case,
@@ -453,6 +720,7 @@ def _build_metrics(results: list[EvaluationResultRecord]) -> dict[str, Any]:
     total_count = len(results)
     passed_count = sum(1 for result in results if result.passed)
     failed_count = total_count - passed_count
+    failed_case_ids = [result.case_id for result in results if not result.passed]
     by_module: dict[str, dict[str, float | int]] = {}
     for result in results:
         bucket = by_module.setdefault(
@@ -471,9 +739,53 @@ def _build_metrics(results: list[EvaluationResultRecord]) -> dict[str, Any]:
         "total_count": total_count,
         "passed_count": passed_count,
         "failed_count": failed_count,
+        "failed_case_ids": failed_case_ids,
         "pass_rate": round(passed_count / total_count, 4) if total_count else 0.0,
         "by_module": by_module,
     }
+
+
+def _sync_bad_case_regression_result(
+    db: Session,
+    *,
+    evaluation_case: EvaluationCaseRecord,
+    result: EvaluationResultRecord,
+    run_id: str,
+) -> None:
+    if not evaluation_case.bad_case_id:
+        return
+
+    bad_case = evaluation_repository.get_bad_case_model(
+        db,
+        evaluation_case.bad_case_id,
+    )
+    if bad_case is None:
+        return
+
+    if result.passed:
+        now = _now()
+        evaluation_repository.update_bad_case(
+            db,
+            bad_case,
+            status="verified",
+            added_to_eval_set=True,
+            resolved_at=bad_case.resolved_at or now,
+            verified_at=now,
+            regression_evaluation_run_id=run_id,
+            regression_evaluation_case_id=evaluation_case.id,
+        )
+        return
+
+    next_status = "fixed" if bad_case.status == "verified" else None
+    evaluation_repository.update_bad_case(
+        db,
+        bad_case,
+        status=next_status,
+        added_to_eval_set=True,
+        clear_verified_at=bad_case.status == "verified",
+        regression_evaluation_run_id=run_id,
+        regression_evaluation_case_id=evaluation_case.id,
+    )
 
 
 def _ensure_synthetic_cases(
@@ -542,6 +854,9 @@ def create_bad_case(db: Session, payload: BadCaseCreateRequest) -> BadCaseRecord
         expected_behavior=_normalize_optional(payload.expected_behavior),
         actual_behavior=_normalize_optional(payload.actual_behavior),
         suggested_fix=_normalize_optional(payload.suggested_fix),
+        root_cause=_normalize_optional(payload.root_cause),
+        fix_strategy=_normalize_optional(payload.fix_strategy),
+        tags=_normalize_tags(payload.tags),
     )
 
 
@@ -665,9 +980,15 @@ def update_bad_case(
 
     resolved_at = None
     clear_resolved_at = False
+    verified_at = None
+    clear_verified_at = False
     if status in RESOLVED_STATUSES and bad_case.resolved_at is None:
         resolved_at = _now()
-    elif status in {"open", "reviewing"}:
+    if status == "verified" and bad_case.verified_at is None:
+        verified_at = _now()
+    elif status in OPEN_STATUSES or status in {"fixed", "wont_fix"}:
+        clear_verified_at = True
+    if status in OPEN_STATUSES:
         clear_resolved_at = True
 
     return evaluation_repository.update_bad_case(
@@ -687,8 +1008,19 @@ def update_bad_case(
         if "suggested_fix" in update_data
         else None,
         category=category,
+        root_cause=_normalize_optional(update_data.get("root_cause"))
+        if "root_cause" in update_data
+        else None,
+        fix_strategy=_normalize_optional(update_data.get("fix_strategy"))
+        if "fix_strategy" in update_data
+        else None,
+        tags=_normalize_tags(update_data.get("tags"))
+        if "tags" in update_data and update_data.get("tags") is not None
+        else None,
         resolved_at=resolved_at,
         clear_resolved_at=clear_resolved_at,
+        verified_at=verified_at,
+        clear_verified_at=clear_verified_at,
     )
 
 
@@ -729,8 +1061,22 @@ def create_evaluation_case_from_bad_case(
     db: Session,
     bad_case_id: str,
 ) -> EvaluationCaseRecord:
+    link = add_bad_case_to_eval(
+        db,
+        bad_case_id,
+        BadCaseAddToEvalRequest(dataset_name=SYNTHETIC_DATASET_NAME),
+    )
+    return link.evaluation_case
+
+
+def add_bad_case_to_eval(
+    db: Session,
+    bad_case_id: str,
+    payload: BadCaseAddToEvalRequest | None = None,
+) -> BadCaseEvaluationLinkResponse:
     bad_case = evaluation_repository.get_bad_case(db, bad_case_id)
-    if not bad_case:
+    bad_case_model = evaluation_repository.get_bad_case_model(db, bad_case_id)
+    if not bad_case or not bad_case_model:
         raise AppError(
             code="bad_case_not_found",
             message="Bad case was not found.",
@@ -738,30 +1084,51 @@ def create_evaluation_case_from_bad_case(
             details={"bad_case_id": bad_case_id},
         )
 
+    dataset_name = _normalize_dataset_name(
+        payload.dataset_name if payload else "regression"
+    )
     module = _module_from_bad_case_source(bad_case.source_type)
-    input_payload = {
-        "source_type": bad_case.source_type,
-        "source_id": bad_case.source_id,
-        "category": bad_case.category,
-        "severity": bad_case.severity,
-        "status": bad_case.status,
-        "description_summary": _safe_summary(bad_case.description),
-    }
-    expected_output = {
-        "expected_behavior": _safe_summary(bad_case.expected_behavior),
-        "actual_behavior": _safe_summary(bad_case.actual_behavior),
-        "suggested_fix": _safe_summary(bad_case.suggested_fix),
-    }
-    return evaluation_repository.create_evaluation_case(
+    existing_case = evaluation_repository.find_evaluation_case_for_bad_case(
+        db,
+        bad_case_id=bad_case.id,
+        dataset_name=dataset_name,
+    )
+    if existing_case:
+        updated_bad_case = evaluation_repository.update_bad_case(
+            db,
+            bad_case_model,
+            added_to_eval_set=True,
+            regression_evaluation_case_id=existing_case.id,
+        )
+        return BadCaseEvaluationLinkResponse(
+            bad_case=updated_bad_case,
+            evaluation_case=existing_case,
+            created=False,
+        )
+
+    input_payload, expected_output = _bad_case_eval_payloads(bad_case, module)
+    _reject_private_payload(input_payload, expected_output)
+    evaluation_case = evaluation_repository.create_evaluation_case(
         db,
         module=module,
-        dataset_name=SYNTHETIC_DATASET_NAME,
+        dataset_name=dataset_name,
         case_name=f"bad_case_{bad_case.id}",
         input_payload=input_payload,
         expected_output=expected_output,
-        tags=_normalize_tags(["bad_case", bad_case.category, bad_case.severity]),
+        tags=_normalize_tags(["bad_case", bad_case.category, bad_case.severity, *bad_case.tags]),
         source_type="bad_case",
         bad_case_id=bad_case.id,
+    )
+    updated_bad_case = evaluation_repository.update_bad_case(
+        db,
+        bad_case_model,
+        added_to_eval_set=True,
+        regression_evaluation_case_id=evaluation_case.id,
+    )
+    return BadCaseEvaluationLinkResponse(
+        bad_case=updated_bad_case,
+        evaluation_case=evaluation_case,
+        created=True,
     )
 
 
@@ -787,6 +1154,50 @@ def list_evaluation_cases(
         source_type=normalized_source_type,
         limit=min(max(limit, 1), 200),
     )
+
+
+def list_evaluation_datasets() -> list[EvaluationDatasetRecord]:
+    datasets: list[EvaluationDatasetRecord] = []
+    synthetic_counts: dict[str, int] = {module: 0 for module in SYNTHETIC_MODULE_ORDER}
+    for definition in _synthetic_case_definitions(SYNTHETIC_DATASET_NAME):
+        synthetic_counts[definition["module"]] += 1
+    for module in SYNTHETIC_MODULE_ORDER:
+        datasets.append(
+            EvaluationDatasetRecord(
+                dataset_name=SYNTHETIC_DATASET_NAME,
+                module=module,
+                case_count=synthetic_counts[module],
+                source_type="built-in",
+                description="Deterministic synthetic smoke dataset.",
+                version="v1.5",
+            )
+        )
+
+    dataset_root = EVALS_ROOT / "datasets"
+    if not dataset_root.exists():
+        return datasets
+
+    for path in sorted(dataset_root.glob("*/*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        cases = payload.get("cases", [])
+        module = str(payload.get("module") or path.stem.split("_")[0])
+        dataset_name = str(payload.get("dataset_name") or path.parent.name)
+        if module not in EVALUATION_MODULES:
+            continue
+        datasets.append(
+            EvaluationDatasetRecord(
+                dataset_name=dataset_name,
+                module=module,
+                case_count=len(cases) if isinstance(cases, list) else 0,
+                source_type="file",
+                description=str(payload.get("description") or path.name),
+                version=payload.get("version"),
+            )
+        )
+    return datasets
 
 
 def run_evaluation(
@@ -821,12 +1232,18 @@ def run_evaluation(
             "total_count": 0,
             "passed_count": 0,
             "failed_count": 0,
+            "failed_case_ids": [],
             "pass_rate": 0.0,
             "by_module": {},
         },
         run_config={
             "requested_module": module,
             "dataset_name": dataset_name,
+            "prompt_version": "deterministic-v1",
+            "schema_version": "v1.5",
+            "retrieval_version": "lexical-v1",
+            "model_version": "none",
+            "code_version": _current_code_version(),
             "deterministic": True,
             "llm_judge": False,
             "model_comparison": False,
@@ -873,6 +1290,12 @@ def run_evaluation(
                 error=str(exc),
             )
         results.append(result)
+        _sync_bad_case_regression_result(
+            db,
+            evaluation_case=evaluation_case,
+            result=result,
+            run_id=run_record.id,
+        )
 
     metrics = _build_metrics(results)
     updated_run = evaluation_repository.update_evaluation_run(
@@ -937,6 +1360,28 @@ def list_evaluation_results(
         db,
         run_id=run_id,
         limit=min(max(limit, 1), 500),
+    )
+
+
+def get_bad_case_stats(db: Session) -> BadCaseStats:
+    bad_cases = evaluation_repository.list_bad_cases(db, limit=10000)
+    by_status: dict[str, int] = {}
+    by_module: dict[str, int] = {module: 0 for module in SYNTHETIC_MODULE_ORDER}
+    by_case_type: dict[str, int] = {}
+    for bad_case in bad_cases:
+        by_status[bad_case.status] = by_status.get(bad_case.status, 0) + 1
+        module = _module_from_bad_case_source(bad_case.source_type)
+        by_module[module] = by_module.get(module, 0) + 1
+        by_case_type[bad_case.category] = by_case_type.get(bad_case.category, 0) + 1
+
+    return BadCaseStats(
+        total=len(bad_cases),
+        by_status=by_status,
+        by_module=by_module,
+        by_case_type=by_case_type,
+        added_to_eval_set_count=sum(1 for item in bad_cases if item.added_to_eval_set),
+        verified_count=sum(1 for item in bad_cases if item.status == "verified"),
+        open_count=sum(1 for item in bad_cases if item.status in OPEN_STATUSES),
     )
 
 

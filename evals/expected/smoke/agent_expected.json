@@ -1,0 +1,13 @@
+{
+  "dataset_name": "smoke",
+  "module": "agent",
+  "cases": [
+    {
+      "id": "agent_smoke_001",
+      "expected": {
+        "allowed_statuses": ["completed", "need_more_info"],
+        "requires_ordered_steps": true
+      }
+    }
+  ]
+}

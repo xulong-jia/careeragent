@@ -1,0 +1,18 @@
+{
+  "dataset_name": "smoke",
+  "module": "agent",
+  "version": "v1.5",
+  "description": "Agent workflow smoke contract.",
+  "cases": [
+    {
+      "id": "agent_smoke_001",
+      "name": "Agent workflow emits ordered baseline steps",
+      "input": {
+        "workflow_name": "job_application_preparation",
+        "resume_version_id": "resume_version_smoke",
+        "jd_id": "jd_smoke"
+      },
+      "tags": ["smoke", "contract"]
+    }
+  ]
+}

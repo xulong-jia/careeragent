@@ -1,0 +1,13 @@
+{
+  "dataset_name": "smoke",
+  "module": "bad_case",
+  "cases": [
+    {
+      "id": "bad_case_smoke_001",
+      "expected": {
+        "required_fields": ["source_type", "source_id", "category", "status"],
+        "privacy_safe": true
+      }
+    }
+  ]
+}

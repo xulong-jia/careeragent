@@ -11,6 +11,8 @@
 
 本设计文档保留阶段五边界：当前只做人工 review record，不接真实 LLM reviewer，不做自动评估，不做自动投递，不做正式 Evaluation Center。
 
+v1.5B 更新：Quality Review 仍是人工 review record，但 Bad Case 已可加入 deterministic `regression` eval set。该 linkage 只保存 source refs、摘要、root cause / fix strategy / tags 和 evaluation case/run IDs，不保存 Resume/JD raw text、RAG full chunk text 或完整面试回答。
+
 ## 1. 阶段五目标
 
 阶段五目标是建立质量复查和 bad case 闭环，让 CareerAgent 不只能够生成 Match Report、RAG Answer 和 Agent Run，也能够记录这些结果的问题、风险和改进线索。
@@ -80,9 +82,16 @@
 | expected_behavior | text nullable | 期望行为摘要。 |
 | actual_behavior | text nullable | 实际行为摘要。 |
 | suggested_fix | text nullable | 改进建议。 |
+| root_cause | text nullable | 根因摘要。 |
+| fix_strategy | text nullable | 修复策略摘要。 |
+| tags | JSON | 标签集合。 |
+| added_to_eval_set | boolean | 是否已加入 regression evaluation set。 |
 | status | string | 默认 `open`。 |
 | created_at | datetime | 创建时间。 |
 | resolved_at | datetime nullable | 关闭或修复时间。 |
+| verified_at | datetime nullable | 回归通过验证时间。 |
+| regression_evaluation_run_id | string nullable | 最近一次回归 run ref。 |
+| regression_evaluation_case_id | string nullable | 对应 regression case ref。 |
 
 设计说明：
 
@@ -170,6 +179,7 @@ Status：
 - `open`
 - `reviewing`
 - `fixed`
+- `verified`
 - `wont_fix`
 
 设计说明：
@@ -257,6 +267,20 @@ Filters：
 用途：
 
 - 更新 `status`、`severity`、`suggested_fix`、`notes` 等安全字段。
+
+### POST /api/bad-cases/{bad_case_id}/add-to-eval
+
+用途：
+
+- 将 bad case 幂等加入默认 `regression` eval set。
+- 返回更新后的 `bad_case`、`evaluation_case` 和 `created` 标记。
+- 不复制源对象原文，只保存 refs 和短摘要。
+
+### GET /api/bad-cases/stats
+
+用途：
+
+- 查询 lifecycle、module、case type、added-to-eval 和 verified 聚合统计。
 
 输出：
 
