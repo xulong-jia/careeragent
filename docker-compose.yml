@@ -12,6 +12,9 @@ services:
       APP_NAME: ${APP_NAME:-CareerAgent API}
       APP_ENV: ${APP_ENV:-development}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-}
+      AUTH_TOKEN_EXPIRE_MINUTES: ${AUTH_TOKEN_EXPIRE_MINUTES:-60}
+      API_RATE_LIMIT_PER_MINUTE: ${API_RATE_LIMIT_PER_MINUTE:-0}
       DATABASE_URL: ${DATABASE_URL:-sqlite:////app/backend/local_data/careeragent.db}
       AI_PROVIDER_MODE: ${AI_PROVIDER_MODE:-deterministic}
       LLM_PROVIDER: ${LLM_PROVIDER:-deterministic}

@@ -92,7 +92,7 @@ def _create_rag_document(client):
 
 
 def test_redaction_helpers_mask_sensitive_values():
-    secret = "OPENAI_API_KEY=sk-testsecret123456789 alice@example.com +1 415 555 1212"
+    secret = "api_key: sk-testsecret123 alice@example.com +1 415 555 1212"
     assert "alice@example.com" not in safe_preview(secret)
     assert "sk-testsecret" not in safe_preview(secret)
 
@@ -104,7 +104,7 @@ def test_redaction_helpers_mask_sensitive_values():
     payload = {
         "raw_text": PRIVATE_RESUME_TEXT,
         "nested": {
-            "api_key": "sk-nestedsecret123456789",
+            "api_key": "sk-nestedsecret123",
             "summary": "contact alice@example.com",
         },
     }

@@ -10,6 +10,12 @@ class MatchReport(Base):
     __tablename__ = "match_reports"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), default="default", nullable=False, index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     resume_version_id: Mapped[str] = mapped_column(
         ForeignKey("resume_versions.id", ondelete="CASCADE"),
         nullable=False,

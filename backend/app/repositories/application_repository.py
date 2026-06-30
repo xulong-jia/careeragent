@@ -5,6 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    is_owned,
+    owner_filter,
+)
 from app.models.application import Application, ApplicationStatusHistory
 from app.schemas.applications import ApplicationRecord, ApplicationStatusHistoryRecord
 
@@ -133,7 +139,8 @@ def create_application(
     application_id = _next_application_id(db)
     application = Application(
         id=application_id,
-        user_id="default",
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         company=company,
         role_title=role_title,
         role_category=role_category,
@@ -193,7 +200,11 @@ def list_applications(
     next_step_date_from=None,
     next_step_date_to=None,
 ) -> list[ApplicationRecord]:
-    statement = select(Application).order_by(Application.created_at, Application.id)
+    statement = (
+        select(Application)
+        .where(*owner_filter(Application))
+        .order_by(Application.created_at, Application.id)
+    )
     if status:
         statement = statement.where(Application.status == status)
     else:
@@ -226,7 +237,8 @@ def list_applications(
 
 
 def get_application_model(db: Session, application_id: str) -> Application | None:
-    return db.get(Application, application_id)
+    application = db.get(Application, application_id)
+    return application if application and is_owned(application) else None
 
 
 def list_status_history(

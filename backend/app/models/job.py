@@ -11,6 +11,9 @@ class JobDescription(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(64), default="default", nullable=False)
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     company: Mapped[str] = mapped_column(String(160), nullable=False)
     job_title: Mapped[str] = mapped_column(String(200), nullable=False)
     location: Mapped[str | None] = mapped_column(String(160))

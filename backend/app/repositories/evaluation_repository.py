@@ -6,6 +6,12 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    is_owned,
+    owner_filter,
+)
 from app.models.evaluation import BadCase, EvaluationCase, EvaluationResult, EvaluationRun
 from app.schemas.evaluations import (
     BadCaseRecord,
@@ -67,6 +73,8 @@ def create_bad_case(
 ) -> BadCaseRecord:
     bad_case = BadCase(
         id=_next_bad_case_id(db),
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         source_type=source_type,
         source_id=source_id,
         category=category,
@@ -91,7 +99,8 @@ def create_bad_case(
 
 
 def get_bad_case_model(db: Session, bad_case_id: str) -> BadCase | None:
-    return db.get(BadCase, bad_case_id)
+    bad_case = db.get(BadCase, bad_case_id)
+    return bad_case if bad_case and is_owned(bad_case) else None
 
 
 def get_bad_case(db: Session, bad_case_id: str) -> BadCaseRecord | None:
@@ -109,7 +118,7 @@ def list_bad_cases(
     status: str | None = None,
     limit: int = 50,
 ) -> list[BadCaseRecord]:
-    statement = select(BadCase)
+    statement = select(BadCase).where(*owner_filter(BadCase))
     if source_type:
         statement = statement.where(BadCase.source_type == source_type)
     if source_id:
@@ -211,6 +220,8 @@ def create_evaluation_run(
 ) -> EvaluationRunRecord:
     run = EvaluationRun(
         id=_next_model_id(db, EvaluationRun, "eval_run"),
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         name=name,
         module=module,
         dataset_name=dataset_name,
@@ -231,7 +242,8 @@ def create_evaluation_run(
 
 
 def get_evaluation_run_model(db: Session, run_id: str) -> EvaluationRun | None:
-    return db.get(EvaluationRun, run_id)
+    run = db.get(EvaluationRun, run_id)
+    return run if run and is_owned(run) else None
 
 
 def get_evaluation_run(db: Session, run_id: str) -> EvaluationRunRecord | None:
@@ -246,7 +258,7 @@ def list_evaluation_runs(
     dataset_name: str | None = None,
     limit: int = 50,
 ) -> list[EvaluationRunRecord]:
-    statement = select(EvaluationRun)
+    statement = select(EvaluationRun).where(*owner_filter(EvaluationRun))
     if module:
         statement = statement.where(EvaluationRun.module == module)
     if dataset_name:
@@ -295,6 +307,8 @@ def create_evaluation_case(
 ) -> EvaluationCaseRecord:
     evaluation_case = EvaluationCase(
         id=_next_model_id(db, EvaluationCase, "eval_case"),
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         module=module,
         dataset_name=dataset_name,
         case_name=case_name,
@@ -317,7 +331,8 @@ def create_evaluation_case(
 def get_evaluation_case_model(
     db: Session, evaluation_case_id: str
 ) -> EvaluationCase | None:
-    return db.get(EvaluationCase, evaluation_case_id)
+    evaluation_case = db.get(EvaluationCase, evaluation_case_id)
+    return evaluation_case if evaluation_case and is_owned(evaluation_case) else None
 
 
 def get_evaluation_case(
@@ -337,6 +352,7 @@ def find_evaluation_case(
 ) -> EvaluationCaseRecord | None:
     evaluation_case = db.scalars(
         select(EvaluationCase)
+        .where(*owner_filter(EvaluationCase))
         .where(EvaluationCase.module == module)
         .where(EvaluationCase.dataset_name == dataset_name)
         .where(EvaluationCase.case_name == case_name)
@@ -355,6 +371,7 @@ def find_evaluation_case_for_bad_case(
 ) -> EvaluationCaseRecord | None:
     evaluation_case = db.scalars(
         select(EvaluationCase)
+        .where(*owner_filter(EvaluationCase))
         .where(EvaluationCase.bad_case_id == bad_case_id)
         .where(EvaluationCase.dataset_name == dataset_name)
         .where(EvaluationCase.source_type == source_type)
@@ -371,7 +388,7 @@ def list_evaluation_cases(
     source_type: str | None = None,
     limit: int = 100,
 ) -> list[EvaluationCaseRecord]:
-    statement = select(EvaluationCase)
+    statement = select(EvaluationCase).where(*owner_filter(EvaluationCase))
     if module:
         statement = statement.where(EvaluationCase.module == module)
     if dataset_name:
@@ -400,6 +417,8 @@ def create_evaluation_result(
 ) -> EvaluationResultRecord:
     result = EvaluationResult(
         id=_next_model_id(db, EvaluationResult, "eval_result"),
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         run_id=run_id,
         case_id=case_id,
         module=module,
@@ -427,7 +446,7 @@ def list_evaluation_results(
     module: str | None = None,
     limit: int = 200,
 ) -> list[EvaluationResultRecord]:
-    statement = select(EvaluationResult)
+    statement = select(EvaluationResult).where(*owner_filter(EvaluationResult))
     if run_id:
         statement = statement.where(EvaluationResult.run_id == run_id)
     if module:
@@ -439,11 +458,23 @@ def list_evaluation_results(
 
 
 def count_evaluation_runs(db: Session) -> int:
-    return db.scalar(select(func.count()).select_from(EvaluationRun)) or 0
+    return (
+        db.scalar(
+            select(func.count()).select_from(EvaluationRun).where(*owner_filter(EvaluationRun))
+        )
+        or 0
+    )
 
 
 def count_evaluation_cases(db: Session) -> int:
-    return db.scalar(select(func.count()).select_from(EvaluationCase)) or 0
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(EvaluationCase)
+            .where(*owner_filter(EvaluationCase))
+        )
+        or 0
+    )
 
 
 def count_failed_results(db: Session) -> int:
@@ -451,6 +482,7 @@ def count_failed_results(db: Session) -> int:
         db.scalar(
             select(func.count())
             .select_from(EvaluationResult)
+            .where(*owner_filter(EvaluationResult))
             .where(EvaluationResult.passed.is_(False))
         )
         or 0

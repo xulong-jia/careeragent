@@ -159,6 +159,14 @@ button:disabled {
   gap: 16px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .workspace-header h1,
 .page-heading h2,
 .panel h3 {
@@ -543,6 +551,48 @@ button:disabled {
   color: var(--green);
   font-weight: 800;
   padding: 8px 11px;
+}
+
+.auth-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-panel {
+  display: grid;
+  width: min(440px, 100%);
+  gap: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.auth-tab {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font-weight: 800;
+  padding: 10px 12px;
+}
+
+.auth-tab.active,
+.auth-tab:focus-visible,
+.auth-tab:hover {
+  border-color: #b9cbbf;
+  background: #edf5ef;
+  color: var(--green);
+  outline: none;
 }
 
 .inline-form {
@@ -1328,6 +1378,10 @@ button:disabled {
   .panel-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
   }
 
   .nav-list {

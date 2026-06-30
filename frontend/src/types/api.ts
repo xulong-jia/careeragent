@@ -17,6 +17,33 @@ export type ListResponse<T> = {
   total: number;
 };
 
+export type AuthUser = {
+  id: string;
+  email: string;
+  display_name: string | null;
+  role: string;
+  is_active: boolean;
+};
+
+export type AuthWorkspace = {
+  id: string;
+  name: string;
+  role: string;
+};
+
+export type AuthSession = {
+  access_token: string;
+  token_type: "bearer";
+  expires_at: string;
+  user: AuthUser;
+  workspace: AuthWorkspace;
+};
+
+export type AuthMe = {
+  user: AuthUser;
+  workspace: AuthWorkspace;
+};
+
 export type StructuredResume = {
   basic_info: Record<string, unknown>;
   education: Record<string, unknown>[];

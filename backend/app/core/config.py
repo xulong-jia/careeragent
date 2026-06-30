@@ -24,6 +24,9 @@ class Settings:
     backend_port: int
     cors_origins: tuple[str, ...]
     database_url: str
+    auth_jwt_secret: str
+    auth_token_expire_minutes: int
+    rate_limit_per_minute: int
     ai_provider_mode: str
     llm_provider: str
     llm_api_base_url: str
@@ -51,6 +54,9 @@ def get_settings() -> Settings:
         backend_port=int(os.getenv("BACKEND_PORT", "8000")),
         cors_origins=_csv_env("BACKEND_CORS_ORIGINS", "http://localhost:5173"),
         database_url=os.getenv("DATABASE_URL", "sqlite:///./local_data/careeragent.db"),
+        auth_jwt_secret=os.getenv("AUTH_JWT_SECRET", "").strip(),
+        auth_token_expire_minutes=int(os.getenv("AUTH_TOKEN_EXPIRE_MINUTES", "60")),
+        rate_limit_per_minute=int(os.getenv("API_RATE_LIMIT_PER_MINUTE", "0")),
         ai_provider_mode=os.getenv("AI_PROVIDER_MODE", "deterministic").strip().lower(),
         llm_provider=os.getenv("LLM_PROVIDER", "deterministic").strip().lower(),
         llm_api_base_url=os.getenv("LLM_API_BASE_URL", "").strip(),

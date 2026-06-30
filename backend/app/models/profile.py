@@ -13,6 +13,9 @@ class Profile(Base):
     user_id: Mapped[str] = mapped_column(
         String(64), default="default", nullable=False, index=True
     )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     target_roles: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     target_industries: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     target_locations: Mapped[list] = mapped_column(JSON, nullable=False, default=list)

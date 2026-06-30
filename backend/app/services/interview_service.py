@@ -3,10 +3,11 @@ from collections.abc import Iterable
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import require_owned
 from app.models.interview import InterviewQuestion
 from app.models.job import JobDescription, JobProfile
 from app.models.project import Project, ProjectRewrite
-from app.models.resume import ResumeVersion
+from app.models.resume import Resume, ResumeVersion
 from app.repositories import interview_repository, rag_repository
 from app.schemas.rag import RagAnswerRunRecord
 from app.schemas.interviews import (
@@ -562,6 +563,12 @@ def _get_active_job_with_profile(
 ) -> tuple[JobDescription, JobProfile]:
     normalized = jd_id.strip()
     job = db.get(JobDescription, normalized)
+    require_owned(
+        job,
+        code="job_not_found",
+        message="JD was not found.",
+        details={"jd_id": normalized},
+    )
     if not job or job.status != "active":
         raise AppError(
             code="job_not_found",
@@ -588,6 +595,13 @@ def _get_active_job_with_profile(
 def _get_resume_version(db: Session, resume_version_id: str) -> ResumeVersion:
     normalized = resume_version_id.strip()
     version = db.get(ResumeVersion, normalized)
+    resume = db.get(Resume, version.resume_id) if version else None
+    require_owned(
+        resume,
+        code="resume_version_not_found",
+        message="Resume version was not found.",
+        details={"resume_version_id": normalized},
+    )
     if not version:
         raise AppError(
             code="resume_version_not_found",
@@ -601,6 +615,12 @@ def _get_resume_version(db: Session, resume_version_id: str) -> ResumeVersion:
 def _get_project(db: Session, project_id: str | None) -> Project:
     normalized = (project_id or "").strip()
     project = db.get(Project, normalized)
+    require_owned(
+        project,
+        code="project_not_found",
+        message="Project was not found.",
+        details={"project_id": normalized},
+    )
     if not project:
         raise AppError(
             code="project_not_found",
@@ -614,6 +634,12 @@ def _get_project(db: Session, project_id: str | None) -> Project:
 def _get_project_rewrite(db: Session, rewrite_id: str | None) -> ProjectRewrite:
     normalized = (rewrite_id or "").strip()
     rewrite = db.get(ProjectRewrite, normalized)
+    require_owned(
+        rewrite,
+        code="project_rewrite_not_found",
+        message="Project rewrite was not found.",
+        details={"project_rewrite_id": normalized},
+    )
     if not rewrite:
         raise AppError(
             code="project_rewrite_not_found",

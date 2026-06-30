@@ -1,6 +1,70 @@
 # CareerAgent Database Schema
 
-当前数据库是 SQLite + SQLAlchemy + Alembic 原型。表结构以 `backend/app/models/` 和 `backend/alembic/versions/` 为准。
+当前数据库是 SQLite + SQLAlchemy + Alembic 原型。P1 已新增 Auth / Workspace / Data Isolation schema，并补 PostgreSQL driver readiness；默认本地运行仍使用 SQLite。表结构以 `backend/app/models/` 和 `backend/alembic/versions/` 为准。
+
+## P1 ownership model
+
+P1 使用 `users`、`workspaces`、`workspace_memberships` 表表达当前账号和 workspace scope。核心业务表新增或补齐 owner 字段，repository/service 通过当前认证上下文过滤：
+
+- `user_id`：业务数据所属 user。
+- `workspace_id`：业务数据所属 workspace。
+
+Owned tables 包括 `resumes`、`resume_versions`、`profiles`、`projects`、`project_rewrites`、`interview_questions`、`interview_answers`、`study_plans`、`job_descriptions`、`match_reports`、`rag_documents`、`rag_answer_runs`、`agent_runs`、`applications`、`bad_cases`、`evaluation_runs`、`evaluation_cases`、`evaluation_results`。P1 migration 对历史本地数据使用默认 owner/workspace 补值，便于原型库继续升级；production 数据迁移需要单独设计真实用户映射。
+
+## users
+
+用途：记录可登录用户。
+
+关键字段：
+
+- `id`
+- `email`
+- `password_hash`
+- `display_name`
+- `role`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+隐私说明：`password_hash` 使用 PBKDF2 hash，不保存明文密码。`AUTH_JWT_SECRET` 不在数据库保存。
+
+## workspaces
+
+用途：记录 workspace/tenant scope。
+
+关键字段：
+
+- `id`
+- `name`
+- `created_at`
+- `updated_at`
+
+## workspace_memberships
+
+用途：记录 user 与 workspace 的关系和 role。
+
+关键字段：
+
+- `id`
+- `user_id`
+- `workspace_id`
+- `role`
+- `created_at`
+
+## audit_logs
+
+用途：记录 P1 privacy delete-all 等基础审计事件。
+
+关键字段：
+
+- `id`
+- `user_id`
+- `workspace_id`
+- `action`
+- `metadata_json`
+- `created_at`
+
+隐私说明：audit metadata 只保存 action、counts 和 refs，不保存 raw resume/JD/RAG/interview/application payload。
 
 ## resumes
 
@@ -10,6 +74,7 @@
 
 - `id`
 - `user_id`
+- `workspace_id`
 - `filename`
 - `file_type`
 - `source_file_hash`
@@ -26,6 +91,7 @@
 
 - `id`
 - `resume_id`
+- `workspace_id`
 - `version_name`
 - `version_number`
 - `target_role`
@@ -51,6 +117,7 @@
 
 - `id`
 - `user_id`
+- `workspace_id`
 - `target_roles`
 - `target_industries`
 - `target_locations`
@@ -62,7 +129,7 @@
 
 隐私说明：只保存求职目标、技能结构、偏好和可选 resume version ref，不复制 resume raw_text。
 
-当前无认证系统，`user_id` 使用默认值 `default`；Profile 不应保存身份证、详细住址、政治、健康等敏感身份信息。
+P1 后 `user_id` / `workspace_id` 由认证上下文写入并用于过滤；旧本地数据可能仍带默认 owner。Profile 不应保存身份证、详细住址、政治、健康等敏感身份信息。
 
 ## projects
 
@@ -72,6 +139,7 @@
 
 - `id`
 - `user_id`
+- `workspace_id`
 - `profile_id`
 - `resume_version_id`
 - `name`
@@ -95,6 +163,8 @@
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `project_id`
 - `jd_id`
 - `resume_version_id`
@@ -127,6 +197,8 @@ JSON 字段说明：
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `company`
 - `job_title`
 - `location`
@@ -160,6 +232,8 @@ JSON 字段说明：
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `resume_version_id`
 - `jd_id`
 - `job_profile_id`
@@ -179,6 +253,7 @@ JSON 字段说明：
 
 - `id`
 - `user_id`
+- `workspace_id`
 - `jd_id`
 - `resume_version_id`
 - `project_id`
@@ -206,6 +281,7 @@ JSON 字段说明：
 - `id`
 - `question_id`
 - `user_id`
+- `workspace_id`
 - `answer_text`
 - `answer_text_preview`
 - `scores`
@@ -228,6 +304,7 @@ JSON 字段说明：
 
 - `id`
 - `user_id`
+- `workspace_id`
 - `match_report_id`
 - `profile_id`
 - `project_rewrite_id`
@@ -255,6 +332,8 @@ JSON 字段说明：
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `title`
 - `source_type`
 - `source_uri`
@@ -282,6 +361,8 @@ JSON 字段说明：
 
 v1.6 后 `embedding_id` 保存 deterministic embedding id，用于 local vector/hybrid retrieval readiness；当前不保存真实外部 embedding vector，也不要求 FAISS、pgvector 或 remote vector store。
 
+隔离说明：`rag_chunks` 不直接保存 owner 字段，按 `document_id -> rag_documents.id` 继承 document 的 user/workspace scope；search/list 会先过滤当前 owner 的 documents，再读取 chunks。
+
 ## rag_answer_runs
 
 用途：记录 v1.2 12B persisted answer run contract，供后续 Evaluation、Bad Case 或 Agent 引用 answer run ID。记录可以是 grounded 或 ungrounded；v1.2 12D 中 `GET /api/rag/stats` 基于该表聚合 answer run counts；Interview / Study Plan generation 可选接收 `rag_answer_run_ids`，只把 grounded runs 转换为 preview-first source refs。
@@ -290,6 +371,7 @@ v1.6 后 `embedding_id` 保存 deterministic embedding id，用于 local vector/
 
 - `id`
 - `user_id`
+- `workspace_id`
 - `question`
 - `filters_json`
 - `top_k`
@@ -316,6 +398,8 @@ v1.6 后 `embedding_id` 保存 deterministic embedding id，用于 local vector/
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `workflow_name`
 - `status`
 - `input_refs`
@@ -362,6 +446,8 @@ JSON 字段说明：
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `company`
 - `role_title`
 - `role_category`
@@ -421,6 +507,8 @@ JSON 字段说明：
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `source_type`
 - `source_id`
 - `category`
@@ -451,6 +539,8 @@ JSON 字段说明：
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `name`
 - `module`
 - `dataset_name`
@@ -469,6 +559,8 @@ JSON 字段说明：
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `module`
 - `dataset_name`
 - `case_name`
@@ -489,6 +581,8 @@ JSON 字段说明：
 关键字段：
 
 - `id`
+- `user_id`
+- `workspace_id`
 - `run_id`
 - `case_id`
 - `module`
@@ -513,4 +607,8 @@ v1.5C 没有新增数据库表或 migration，复用现有 schema 实现本地 p
 - `rag_answer_runs`：不删除历史 answer run；该表只保留 answer contract、短 citations/source_refs 和 safe retrieval debug，不复制 document raw_text 或 chunk full text。
 - `evaluation_runs.run_config`：记录 prompt/schema/retrieval/model/code/evaluation version metadata，不记录 API key 或 secret。
 
-这些控制不等于生产级隐私删除证明、租户级权限隔离、审计日志、备份擦除或法务合规流程；进入生产化前仍需单独设计 auth、tenant isolation、audit log、retention policy 和 irreversible deletion workflow。
+## P1 Production Foundation Notes
+
+P1 migration `20260630_0018_add_auth_workspace_isolation` 新增 auth/workspace/audit 表，并为 owned business tables 补 owner columns 和 indexes。后端当前用 application-level repository/service filters 实现隔离；这已经覆盖 P1 checkpoint 的基础 data isolation tests，但还不是数据库 RLS、完整 RBAC、SSO、MFA、refresh token rotation、centralized audit/SIEM、retention policy、backup erasure 或 irreversible deletion workflow。
+
+P1 privacy delete-all 会清理当前 user/workspace 的业务数据并保留 audit log counts；它不声明生产级合规删除证明。

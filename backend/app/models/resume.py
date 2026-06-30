@@ -11,6 +11,9 @@ class Resume(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(64), default="default", nullable=False)
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[str] = mapped_column(String(40), nullable=False)

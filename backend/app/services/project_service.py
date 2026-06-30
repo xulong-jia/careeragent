@@ -1,8 +1,9 @@
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import require_owned
 from app.models.profile import Profile
-from app.models.resume import ResumeVersion
+from app.models.resume import Resume, ResumeVersion
 from app.repositories import project_repository
 from app.schemas.projects import (
     ProjectCreateRequest,
@@ -132,7 +133,14 @@ def update_project(
 def _validate_profile(db: Session, profile_id: str | None) -> None:
     if profile_id is None:
         return
-    if db.get(Profile, profile_id) is None:
+    profile = db.get(Profile, profile_id)
+    require_owned(
+        profile,
+        code="profile_not_found",
+        message="Profile was not found.",
+        details={"profile_id": profile_id},
+    )
+    if profile is None:
         raise AppError(
             code="profile_not_found",
             message="Profile was not found.",
@@ -144,7 +152,15 @@ def _validate_profile(db: Session, profile_id: str | None) -> None:
 def _validate_resume_version(db: Session, resume_version_id: str | None) -> None:
     if resume_version_id is None:
         return
-    if db.get(ResumeVersion, resume_version_id) is None:
+    version = db.get(ResumeVersion, resume_version_id)
+    resume = db.get(Resume, version.resume_id) if version else None
+    require_owned(
+        resume,
+        code="resume_version_not_found",
+        message="Resume version was not found.",
+        details={"version_id": resume_version_id},
+    )
+    if version is None:
         raise AppError(
             code="resume_version_not_found",
             message="Resume version was not found.",

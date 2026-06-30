@@ -4,6 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    is_owned,
+    owner_filter,
+)
 from app.models.profile import Profile
 from app.schemas.profiles import ProfileRecord
 
@@ -48,7 +54,8 @@ def create_profile(
 ) -> ProfileRecord:
     profile = Profile(
         id=_next_profile_id(db),
-        user_id="default",
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         target_roles=target_roles,
         target_industries=target_industries,
         target_locations=target_locations,
@@ -68,13 +75,16 @@ def create_profile(
 
 def list_profiles(db: Session) -> list[ProfileRecord]:
     profiles = db.scalars(
-        select(Profile).order_by(Profile.created_at, Profile.id)
+        select(Profile)
+        .where(*owner_filter(Profile))
+        .order_by(Profile.created_at, Profile.id)
     ).all()
     return [_to_profile_record(profile) for profile in profiles]
 
 
 def get_profile_model(db: Session, profile_id: str) -> Profile | None:
-    return db.get(Profile, profile_id)
+    profile = db.get(Profile, profile_id)
+    return profile if profile and is_owned(profile) else None
 
 
 def get_profile(db: Session, profile_id: str) -> ProfileRecord:

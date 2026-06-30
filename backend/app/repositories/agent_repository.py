@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenant import current_user_id, current_workspace_id, is_owned, owner_filter
 from app.models.agent import AgentRun, AgentStep
 from app.schemas.agents import AgentRunRecord, AgentStepRecord
 
@@ -42,6 +43,8 @@ def create_run(
 ) -> AgentRun:
     run = AgentRun(
         id=_next_run_id(db),
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         workflow_name=workflow_name,
         input_refs=input_refs,
         output_refs={},
@@ -53,7 +56,8 @@ def create_run(
 
 
 def get_run_model(db: Session, run_id: str) -> AgentRun | None:
-    return db.get(AgentRun, run_id)
+    run = db.get(AgentRun, run_id)
+    return run if run and is_owned(run) else None
 
 
 def get_run(db: Session, run_id: str) -> AgentRunRecord | None:
@@ -68,7 +72,7 @@ def list_runs(
     status: str | None = None,
     limit: int = 50,
 ) -> list[AgentRunRecord]:
-    statement = select(AgentRun)
+    statement = select(AgentRun).where(*owner_filter(AgentRun))
     if workflow_name:
         statement = statement.where(AgentRun.workflow_name == workflow_name)
     if status:
@@ -223,6 +227,9 @@ def update_step_error(
 
 
 def list_steps_for_run(db: Session, run_id: str) -> list[AgentStepRecord]:
+    run = get_run_model(db, run_id)
+    if not run:
+        return []
     steps = db.scalars(
         select(AgentStep)
         .where(AgentStep.run_id == run_id)

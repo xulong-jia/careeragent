@@ -4,6 +4,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    is_owned,
+    owner_filter,
+    require_owned,
+)
 from app.models.project import Project, ProjectRewrite
 from app.schemas.projects import ProjectRecord, ProjectRewriteRecord
 
@@ -90,7 +97,8 @@ def create_project(
 ) -> ProjectRecord:
     project = Project(
         id=_next_project_id(db),
-        user_id="default",
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         profile_id=profile_id,
         resume_version_id=resume_version_id,
         name=name,
@@ -131,6 +139,8 @@ def create_project_rewrite(
 ) -> ProjectRewriteRecord:
     record = ProjectRewrite(
         id=_next_project_rewrite_id(db),
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         project_id=project_id,
         jd_id=jd_id,
         resume_version_id=resume_version_id,
@@ -161,7 +171,7 @@ def list_projects(
     resume_version_id: str | None = None,
     status: str | None = None,
 ) -> list[ProjectRecord]:
-    statement = select(Project)
+    statement = select(Project).where(*owner_filter(Project))
     if profile_id is not None:
         statement = statement.where(Project.profile_id == profile_id)
     if resume_version_id is not None:
@@ -173,7 +183,8 @@ def list_projects(
 
 
 def get_project_model(db: Session, project_id: str) -> Project | None:
-    return db.get(Project, project_id)
+    project = db.get(Project, project_id)
+    return project if project and is_owned(project) else None
 
 
 def get_project(db: Session, project_id: str) -> ProjectRecord:
@@ -190,6 +201,12 @@ def get_project(db: Session, project_id: str) -> ProjectRecord:
 
 def get_project_rewrite(db: Session, rewrite_id: str) -> ProjectRewriteRecord:
     record = db.get(ProjectRewrite, rewrite_id)
+    require_owned(
+        record,
+        code="project_rewrite_not_found",
+        message="Project rewrite was not found.",
+        details={"rewrite_id": rewrite_id},
+    )
     if not record:
         raise AppError(
             code="project_rewrite_not_found",

@@ -2,6 +2,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    owner_filter,
+    require_owned,
+)
 from app.models.match import MatchReport as MatchReportModel
 from app.schemas.matches import MatchEvidence, MatchReport
 
@@ -47,6 +53,8 @@ def create_match_report(
 ) -> MatchReport:
     record = MatchReportModel(
         id=_next_match_report_id(db),
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         resume_version_id=resume_version_id,
         jd_id=jd_id,
         job_profile_id=job_profile_id,
@@ -75,9 +83,10 @@ def list_match_reports(
     jd_id: str | None = None,
     resume_version_id: str | None = None,
 ) -> list[MatchReport]:
-    statement = select(MatchReportModel).order_by(
-        MatchReportModel.created_at,
-        MatchReportModel.id,
+    statement = (
+        select(MatchReportModel)
+        .where(*owner_filter(MatchReportModel))
+        .order_by(MatchReportModel.created_at, MatchReportModel.id)
     )
     if jd_id:
         statement = statement.where(MatchReportModel.jd_id == jd_id)
@@ -100,6 +109,12 @@ def list_match_reports_by_resume_version_id(
 
 def get_match_report(db: Session, match_report_id: str) -> MatchReport:
     record = db.get(MatchReportModel, match_report_id)
+    require_owned(
+        record,
+        code="match_report_not_found",
+        message="Match report was not found.",
+        details={"match_report_id": match_report_id},
+    )
     if not record:
         raise AppError(
             code="match_report_not_found",

@@ -19,6 +19,9 @@ class StudyPlan(Base):
     user_id: Mapped[str] = mapped_column(
         String(64), default="default", nullable=False, index=True
     )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     match_report_id: Mapped[str | None] = mapped_column(
         ForeignKey("match_reports.id", ondelete="SET NULL"),
         index=True,

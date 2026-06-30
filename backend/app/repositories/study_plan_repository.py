@@ -5,6 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    is_owned,
+    owner_filter,
+)
 from app.models.study_plan import StudyPlan
 from app.schemas.study_plans import StudyPlanRecord
 
@@ -52,7 +58,8 @@ def create_study_plan(
     now = datetime.now(UTC)
     plan = StudyPlan(
         id=_next_study_plan_id(db),
-        user_id="default",
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         match_report_id=match_report_id,
         profile_id=profile_id,
         project_rewrite_id=project_rewrite_id,
@@ -81,7 +88,7 @@ def list_study_plans(
     profile_id: str | None = None,
     match_report_id: str | None = None,
 ) -> list[StudyPlanRecord]:
-    statement = select(StudyPlan)
+    statement = select(StudyPlan).where(*owner_filter(StudyPlan))
     if status is not None:
         statement = statement.where(StudyPlan.status == status)
     if target_role is not None:
@@ -95,11 +102,16 @@ def list_study_plans(
 
 
 def list_study_plan_models(db: Session) -> list[StudyPlan]:
-    return db.scalars(select(StudyPlan).order_by(StudyPlan.created_at, StudyPlan.id)).all()
+    return db.scalars(
+        select(StudyPlan)
+        .where(*owner_filter(StudyPlan))
+        .order_by(StudyPlan.created_at, StudyPlan.id)
+    ).all()
 
 
 def get_study_plan_model(db: Session, study_plan_id: str) -> StudyPlan | None:
-    return db.get(StudyPlan, study_plan_id)
+    plan = db.get(StudyPlan, study_plan_id)
+    return plan if plan and is_owned(plan) else None
 
 
 def get_study_plan(db: Session, study_plan_id: str) -> StudyPlanRecord:

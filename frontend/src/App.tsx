@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { AppShell } from "./components/AppShell";
+import { getMe, logout as logoutUser } from "./api/auth";
+import { clearAuthToken, getAuthToken } from "./api/client";
 import { listAgentRuns } from "./api/agents";
 import { getApplicationStats, listApplications } from "./api/applications";
 import { getEvaluationStats, listBadCases } from "./api/evaluations";
@@ -14,6 +16,7 @@ import { listResumes } from "./api/resumes";
 import { getStudyPlanStats } from "./api/studyPlans";
 import { AgentRunsPage } from "./pages/AgentRunsPage";
 import { ApplicationTrackerPage } from "./pages/ApplicationTrackerPage";
+import { AuthPage } from "./pages/AuthPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EvaluationPage } from "./pages/EvaluationPage";
 import { InterviewCenterPage } from "./pages/InterviewCenterPage";
@@ -27,6 +30,8 @@ import { ResumeCenterPage } from "./pages/ResumeCenterPage";
 import { StudyPlanPage } from "./pages/StudyPlanPage";
 import type {
   AgentRunRecord,
+  AuthMe,
+  AuthSession,
   ApplicationRecord,
   ApplicationStats,
   BadCaseRecord,
@@ -159,6 +164,8 @@ async function loadRagStats(): Promise<RagStats | null> {
 }
 
 export default function App() {
+  const [auth, setAuth] = useState<AuthMe | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
   const [latestResume, setLatestResume] = useState<ResumeRecord | null>(null);
   const [latestJob, setLatestJob] = useState<JobRecord | null>(null);
@@ -261,8 +268,50 @@ export default function App() {
   };
 
   useEffect(() => {
-    void refreshWorkbench();
+    const handleExpired = () => {
+      setAuth(null);
+      setLoadError("Session expired. Please sign in again.");
+    };
+    window.addEventListener("careeragent:auth-expired", handleExpired);
+    if (!getAuthToken()) {
+      setAuthChecked(true);
+      return () => {
+        window.removeEventListener("careeragent:auth-expired", handleExpired);
+      };
+    }
+    getMe()
+      .then((me) => {
+        setAuth(me);
+      })
+      .catch(() => {
+        clearAuthToken();
+        setAuth(null);
+      })
+      .finally(() => setAuthChecked(true));
+    return () => {
+      window.removeEventListener("careeragent:auth-expired", handleExpired);
+    };
   }, []);
+
+  useEffect(() => {
+    if (auth) {
+      void refreshWorkbench();
+    }
+  }, [auth]);
+
+  const handleAuthenticated = (session: AuthSession) => {
+    setAuth({
+      user: session.user,
+      workspace: session.workspace,
+    });
+    setLoadError(null);
+  };
+
+  const handleLogout = async () => {
+    await logoutUser();
+    setAuth(null);
+    setActivePage("dashboard");
+  };
 
   const workbenchState = {
     latestResume,
@@ -385,11 +434,26 @@ export default function App() {
     );
   };
 
+  if (!authChecked) {
+    return (
+      <main className="auth-screen">
+        <p className="stage-badge">Loading session</p>
+      </main>
+    );
+  }
+
+  if (!auth) {
+    return <AuthPage onAuthenticated={handleAuthenticated} />;
+  }
+
   return (
     <AppShell
       activePage={activePage}
       navigation={navigation}
       onNavigate={setActivePage}
+      onLogout={handleLogout}
+      userEmail={auth.user.email}
+      workspaceName={auth.workspace.name}
     >
       {renderPage()}
     </AppShell>

@@ -14,6 +14,9 @@ class BadCase(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(64), default="default", nullable=False)
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     source_type: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
     source_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     category: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
@@ -50,6 +53,12 @@ class EvaluationRun(Base):
     __tablename__ = "evaluation_runs"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), default="default", nullable=False, index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     module: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     dataset_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
@@ -69,6 +78,12 @@ class EvaluationCase(Base):
     __tablename__ = "evaluation_cases"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), default="default", nullable=False, index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     module: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     dataset_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     case_name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
@@ -94,6 +109,12 @@ class EvaluationResult(Base):
     __tablename__ = "evaluation_results"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), default="default", nullable=False, index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     run_id: Mapped[str] = mapped_column(
         ForeignKey("evaluation_runs.id", ondelete="CASCADE"),
         nullable=False,

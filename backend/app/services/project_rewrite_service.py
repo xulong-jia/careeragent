@@ -4,11 +4,12 @@ from typing import Iterable
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import require_owned
 from app.models.job import JobDescription, JobProfile
 from app.models.match import MatchReport
 from app.models.profile import Profile
 from app.models.project import Project
-from app.models.resume import ResumeVersion
+from app.models.resume import Resume, ResumeVersion
 from app.repositories import project_repository
 from app.schemas.projects import (
     ProjectEvidenceRequired,
@@ -154,6 +155,12 @@ def _get_project(db: Session, project_id: str) -> Project:
 
 def _latest_job_profile(db: Session, jd_id: str) -> tuple[JobDescription, JobProfile]:
     job = db.get(JobDescription, jd_id.strip())
+    require_owned(
+        job,
+        code="job_not_found",
+        message="JD was not found.",
+        details={"jd_id": jd_id},
+    )
     if not job or job.status != "active":
         raise AppError(
             code="job_not_found",
@@ -181,7 +188,15 @@ def _validate_resume_version(db: Session, resume_version_id: str | None) -> str 
     normalized = _normalize_optional_id(resume_version_id, "resume_version_id")
     if normalized is None:
         return None
-    if db.get(ResumeVersion, normalized) is None:
+    version = db.get(ResumeVersion, normalized)
+    resume = db.get(Resume, version.resume_id) if version else None
+    require_owned(
+        resume,
+        code="resume_version_not_found",
+        message="Resume version was not found.",
+        details={"resume_version_id": normalized},
+    )
+    if version is None:
         raise AppError(
             code="resume_version_not_found",
             message="Resume version was not found.",
@@ -195,7 +210,14 @@ def _validate_match_report(db: Session, match_report_id: str | None) -> str | No
     normalized = _normalize_optional_id(match_report_id, "match_report_id")
     if normalized is None:
         return None
-    if db.get(MatchReport, normalized) is None:
+    match_report = db.get(MatchReport, normalized)
+    require_owned(
+        match_report,
+        code="match_report_not_found",
+        message="Match report was not found.",
+        details={"match_report_id": normalized},
+    )
+    if match_report is None:
         raise AppError(
             code="match_report_not_found",
             message="Match report was not found.",
@@ -209,7 +231,14 @@ def _validate_profile(db: Session, profile_id: str | None) -> str | None:
     normalized = _normalize_optional_id(profile_id, "profile_id")
     if normalized is None:
         return None
-    if db.get(Profile, normalized) is None:
+    profile = db.get(Profile, normalized)
+    require_owned(
+        profile,
+        code="profile_not_found",
+        message="Profile was not found.",
+        details={"profile_id": normalized},
+    )
+    if profile is None:
         raise AppError(
             code="profile_not_found",
             message="Profile was not found.",

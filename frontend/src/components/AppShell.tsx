@@ -3,14 +3,20 @@ import type { NavigationItem, PageKey } from "../types/navigation";
 type AppShellProps = {
   activePage: PageKey;
   navigation: NavigationItem[];
+  userEmail: string;
+  workspaceName: string;
   onNavigate: (page: PageKey) => void;
+  onLogout: () => void;
   children: React.ReactNode;
 };
 
 export function AppShell({
   activePage,
   navigation,
+  userEmail,
+  workspaceName,
   onNavigate,
+  onLogout,
   children,
 }: AppShellProps) {
   return (
@@ -44,10 +50,17 @@ export function AppShell({
       <main className="workspace">
         <header className="workspace-header">
           <div>
-            <p className="eyebrow">v0.9 Project Optimization</p>
+            <p className="eyebrow">P1 Production Foundation in progress</p>
             <h1>Career Operating System</h1>
           </div>
-          <div className="stage-badge">CareerAgent Workbench</div>
+          <div className="header-actions">
+            <div className="stage-badge">
+              {workspaceName} · {userEmail}
+            </div>
+            <button className="ghost-action" onClick={onLogout} type="button">
+              Logout
+            </button>
+          </div>
         </header>
 
         {children}

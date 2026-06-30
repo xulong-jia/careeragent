@@ -3,6 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.core.privacy import safe_preview
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    owner_filter,
+    require_owned,
+)
 from app.models.rag import RagAnswerRun, RagChunk, RagDocument
 from app.schemas.rag import (
     RagAnswerRunRecord,
@@ -93,7 +99,8 @@ def create_document(
 ) -> RagDocumentRecord:
     document = RagDocument(
         id=_next_document_id(db),
-        user_id="default",
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         title=title,
         source_type=source_type,
         source_uri=source_uri,
@@ -118,7 +125,7 @@ def list_documents(
     source_type: str | None = None,
     index_status: str | None = None,
 ) -> list[RagDocumentRecord]:
-    statement = select(RagDocument)
+    statement = select(RagDocument).where(*owner_filter(RagDocument))
     if source_type:
         statement = statement.where(RagDocument.source_type == source_type)
     if index_status:
@@ -129,6 +136,12 @@ def list_documents(
 
 def get_document_model(db: Session, doc_id: str) -> RagDocument:
     document = db.get(RagDocument, doc_id)
+    require_owned(
+        document,
+        code="rag_document_not_found",
+        message="RAG document was not found.",
+        details={"doc_id": doc_id},
+    )
     if not document:
         raise AppError(
             code="rag_document_not_found",
@@ -206,7 +219,7 @@ def list_chunks(
     doc_id: str | None = None,
     source_type: str | None = None,
 ) -> list[RagChunkRecord]:
-    statement = select(RagChunk).join(RagDocument)
+    statement = select(RagChunk).join(RagDocument).where(*owner_filter(RagDocument))
     if doc_id:
         statement = statement.where(RagChunk.document_id == doc_id)
     if source_type:
@@ -227,6 +240,7 @@ def list_indexed_chunks_for_search(
         select(RagChunk, RagDocument)
         .join(RagDocument, RagChunk.document_id == RagDocument.id)
         .where(RagDocument.index_status == "indexed")
+        .where(*owner_filter(RagDocument))
     )
     if source_type:
         statement = statement.where(RagDocument.source_type == source_type)
@@ -295,7 +309,8 @@ def create_answer_run(
 ) -> RagAnswerRunRecord:
     answer_run = RagAnswerRun(
         id=_next_answer_run_id(db),
-        user_id="default",
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         question=question,
         filters_json=filters,
         top_k=top_k,
@@ -326,7 +341,7 @@ def list_answer_runs(
     uncertainty: str | None = None,
     retrieval_mode: str | None = None,
 ) -> list[RagAnswerRunRecord]:
-    statement = select(RagAnswerRun)
+    statement = select(RagAnswerRun).where(*owner_filter(RagAnswerRun))
     if grounded is not None:
         statement = statement.where(RagAnswerRun.grounded == grounded)
     if uncertainty:
@@ -341,6 +356,12 @@ def list_answer_runs(
 
 def get_answer_run(db: Session, answer_run_id: str) -> RagAnswerRunRecord:
     answer_run = db.get(RagAnswerRun, answer_run_id)
+    require_owned(
+        answer_run,
+        code="rag_answer_run_not_found",
+        message="RAG answer run was not found.",
+        details={"answer_run_id": answer_run_id},
+    )
     if not answer_run:
         raise AppError(
             code="rag_answer_run_not_found",
@@ -353,31 +374,47 @@ def get_answer_run(db: Session, answer_run_id: str) -> RagAnswerRunRecord:
 
 def get_stats(db: Session) -> RagStatsResponse:
     latest_answer_run = db.scalars(
-        select(RagAnswerRun).order_by(
+        select(RagAnswerRun).where(*owner_filter(RagAnswerRun)).order_by(
             RagAnswerRun.created_at.desc(),
             RagAnswerRun.id.desc(),
         )
     ).first()
     total_answer_runs = (
-        db.scalar(select(func.count()).select_from(RagAnswerRun)) or 0
+        db.scalar(
+            select(func.count())
+            .select_from(RagAnswerRun)
+            .where(*owner_filter(RagAnswerRun))
+        )
+        or 0
     )
     grounded_answer_runs = (
         db.scalar(
             select(func.count())
             .select_from(RagAnswerRun)
+            .where(*owner_filter(RagAnswerRun))
             .where(RagAnswerRun.grounded.is_(True))
         )
         or 0
     )
     return RagStatsResponse(
-        total_documents=db.scalar(select(func.count()).select_from(RagDocument)) or 0,
+        total_documents=db.scalar(
+            select(func.count()).select_from(RagDocument).where(*owner_filter(RagDocument))
+        )
+        or 0,
         indexed_documents=db.scalar(
             select(func.count())
             .select_from(RagDocument)
+            .where(*owner_filter(RagDocument))
             .where(RagDocument.index_status == "indexed")
         )
         or 0,
-        total_chunks=db.scalar(select(func.count()).select_from(RagChunk)) or 0,
+        total_chunks=db.scalar(
+            select(func.count())
+            .select_from(RagChunk)
+            .join(RagDocument)
+            .where(*owner_filter(RagDocument))
+        )
+        or 0,
         total_answer_runs=total_answer_runs,
         grounded_answer_runs=grounded_answer_runs,
         ungrounded_answer_runs=total_answer_runs - grounded_answer_runs,

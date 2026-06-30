@@ -3,6 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.core.privacy import safe_preview
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    owner_filter,
+    require_owned,
+)
 from app.models.job import JobDescription, JobProfile as JobProfileModel
 from app.schemas.jobs import JobCreateRequest, JobProfile, JobRecord
 
@@ -65,7 +71,8 @@ def create_job_with_profile(
     profile_version = 1
     job = JobDescription(
         id=jd_id,
-        user_id="default",
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         company=payload.company,
         job_title=payload.job_title,
         location=payload.location,
@@ -104,6 +111,7 @@ def list_jobs(db: Session) -> list[JobRecord]:
     jobs = db.scalars(
         select(JobDescription)
         .where(JobDescription.status == "active")
+        .where(*owner_filter(JobDescription))
         .order_by(JobDescription.created_at)
     ).all()
     records: list[JobRecord] = []
@@ -116,6 +124,12 @@ def list_jobs(db: Session) -> list[JobRecord]:
 
 def get_job(db: Session, jd_id: str) -> JobRecord:
     job = db.get(JobDescription, jd_id)
+    require_owned(
+        job,
+        code="job_not_found",
+        message="JD was not found.",
+        details={"jd_id": jd_id},
+    )
     if not job or job.status != "active":
         raise AppError(
             code="job_not_found",
@@ -140,6 +154,12 @@ def get_job_with_profile(db: Session, jd_id: str) -> JobRecord:
 
 def archive_job(db: Session, jd_id: str) -> dict[str, object]:
     job = db.get(JobDescription, jd_id)
+    require_owned(
+        job,
+        code="job_not_found",
+        message="JD was not found.",
+        details={"jd_id": jd_id},
+    )
     if not job or job.status != "active":
         raise AppError(
             code="job_not_found",

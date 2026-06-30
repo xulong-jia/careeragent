@@ -24,10 +24,22 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 ## API Key
 
 - [ ] `.env.example` 只保留空 placeholder。
+- [ ] `AUTH_JWT_SECRET` 在 `.env.example` 中只能是 placeholder；production 必须通过 secret manager 或部署环境注入足够长的真实 secret。
 - [ ] `LLM_API_KEY`、`EMBEDDING_API_KEY` 和 `OPENAI_API_KEY` 当前默认不需要填写。
 - [ ] 默认 deterministic MVP 不依赖任何真实 LLM 或外部 embedding provider。
 - [ ] 只有本地 `.env` 或部署平台 secret manager 注入真实 key；不把 key 写入 docs、tests、eval artifacts 或 Docker image。
 - [ ] `/health` 只返回 provider mode、model/store/mode 和 enable flags，不返回 API key、Authorization header 或 provider request payload。
+
+## Auth / Workspace / Data Isolation
+
+- [ ] `POST /api/auth/register` 和 `POST /api/auth/login` 是公开入口；除 `GET /health` 外，工作台 `/api/*` 默认要求 bearer token。
+- [ ] 无 token、无效 token、过期 token 和 inactive user 返回 401，不返回业务对象信息。
+- [ ] 新建业务数据写入当前 `user_id` / `workspace_id`。
+- [ ] list/detail/update/delete/search/stats API 按当前 user/workspace 过滤，不跨账号返回数据。
+- [ ] RAG search 先过滤当前 owner 的 documents/chunks，再做 ranking。
+- [ ] Agent steps、Applications、Bad Cases、Evaluation runs/cases/results 只允许当前 owner 读取。
+- [ ] 前端未登录时不加载工作台数据；401 会清理 local token 并回到登录态。
+- [ ] P1 是基础 token auth + workspace isolation，不声明完整 production RBAC/SSO/MFA/refresh-token/SIEM。
 
 ## Provider / Vector Readiness
 
@@ -74,6 +86,9 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] `DELETE /api/applications/{application_id}` 归档投递记录，不物理删除运营历史。
 - [ ] `DELETE /api/rag/documents/{doc_id}` 删除 document/chunks，answer history 只保留 safe refs。
 - [ ] 缺失记录返回明确 404 error code，不吞错、不伪造成功。
+- [ ] `GET /api/privacy/export` 只导出当前 user/workspace 的 preview/ref/summary，不返回 secret 或大段 raw payload。
+- [ ] `DELETE /api/privacy/delete-all` 只删除当前 user/workspace 的业务数据，并写入 audit log counts。
+- [ ] `GET /api/privacy/audit-log` 只返回当前 user/workspace 的 audit events。
 
 ## Bad Case
 
@@ -109,7 +124,7 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 ```bash
 git status --short
 git ls-files | grep -E '(^|/)(\.env|local_data|node_modules|dist|__pycache__|\.pytest_cache|.*\.db|.*\.sqlite|.*\.pyc)$' || true
-grep -R "OPENAI_API_KEY\|LLM_API_KEY\|EMBEDDING_API_KEY\|sk-" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.venv || true
+grep -R "OPENAI_API_KEY\|LLM_API_KEY\|EMBEDDING_API_KEY\|AUTH_JWT_SECRET=.*[A-Za-z0-9]\{32,\}\|sk-" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.venv || true
 grep -R "raw_text\|answer_text\|chunk.text\|interview_notes\|reflection" backend/app/api backend/app/schemas backend/app/services backend/app/agents scripts evals -n || true
 ```
 

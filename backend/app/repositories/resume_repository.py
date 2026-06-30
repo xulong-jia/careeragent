@@ -4,6 +4,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    owner_filter,
+    require_owned,
+)
 from app.models.resume import Resume, ResumeVersion
 from app.schemas.resumes import (
     ResumeRecord,
@@ -98,7 +104,8 @@ def create_resume_with_initial_version(
     resume_id = _next_resume_id(db)
     resume = Resume(
         id=resume_id,
-        user_id="default",
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         title=filename,
         original_filename=filename,
         file_type=file_type,
@@ -137,7 +144,10 @@ def create_resume_with_initial_version(
 
 def list_resumes(db: Session) -> list[ResumeRecord]:
     resumes = db.scalars(
-        select(Resume).where(Resume.status == "active").order_by(Resume.created_at)
+        select(Resume)
+        .where(Resume.status == "active")
+        .where(*owner_filter(Resume))
+        .order_by(Resume.created_at)
     ).all()
     records: list[ResumeRecord] = []
     for resume in resumes:
@@ -149,6 +159,12 @@ def list_resumes(db: Session) -> list[ResumeRecord]:
 
 def get_resume(db: Session, resume_id: str) -> ResumeRecord:
     resume = db.get(Resume, resume_id)
+    require_owned(
+        resume,
+        code="resume_not_found",
+        message="Resume was not found.",
+        details={"resume_id": resume_id},
+    )
     if not resume or resume.status != "active":
         raise AppError(
             code="resume_not_found",
@@ -173,6 +189,12 @@ def get_resume_with_latest_version(db: Session, resume_id: str) -> ResumeRecord:
 
 def list_resume_versions(db: Session, resume_id: str) -> list[ResumeVersionRecord]:
     resume = db.get(Resume, resume_id)
+    require_owned(
+        resume,
+        code="resume_not_found",
+        message="Resume was not found.",
+        details={"resume_id": resume_id},
+    )
     if not resume or resume.status != "active":
         raise AppError(
             code="resume_not_found",
@@ -190,6 +212,13 @@ def list_resume_versions(db: Session, resume_id: str) -> list[ResumeVersionRecor
 
 def get_resume_version(db: Session, version_id: str) -> ResumeVersionRecord:
     version = db.get(ResumeVersion, version_id)
+    resume = db.get(Resume, version.resume_id) if version else None
+    require_owned(
+        resume,
+        code="resume_version_not_found",
+        message="Resume version was not found.",
+        details={"version_id": version_id},
+    )
     if not version:
         raise AppError(
             code="resume_version_not_found",
@@ -208,6 +237,13 @@ def clone_resume_version(
     target_role: str | None = None,
 ) -> ResumeVersionRecord:
     source = db.get(ResumeVersion, version_id)
+    resume = db.get(Resume, source.resume_id) if source else None
+    require_owned(
+        resume,
+        code="resume_version_not_found",
+        message="Resume version was not found.",
+        details={"version_id": version_id},
+    )
     if not source:
         raise AppError(
             code="resume_version_not_found",
@@ -258,6 +294,13 @@ def clone_resume_version(
 
 def archive_resume_version(db: Session, version_id: str) -> ResumeVersionRecord:
     version = db.get(ResumeVersion, version_id)
+    resume = db.get(Resume, version.resume_id) if version else None
+    require_owned(
+        resume,
+        code="resume_version_not_found",
+        message="Resume version was not found.",
+        details={"version_id": version_id},
+    )
     if not version:
         raise AppError(
             code="resume_version_not_found",
@@ -280,6 +323,12 @@ def archive_resume_version(db: Session, version_id: str) -> ResumeVersionRecord:
 
 def archive_resume(db: Session, resume_id: str) -> dict[str, object]:
     resume = db.get(Resume, resume_id)
+    require_owned(
+        resume,
+        code="resume_not_found",
+        message="Resume was not found.",
+        details={"resume_id": resume_id},
+    )
     if not resume or resume.status != "active":
         raise AppError(
             code="resume_not_found",
@@ -317,6 +366,12 @@ def get_source_resume_version(
     db: Session, resume_id: str, version_id: str | None = None
 ) -> ResumeVersion:
     resume = db.get(Resume, resume_id)
+    require_owned(
+        resume,
+        code="resume_not_found",
+        message="Resume was not found.",
+        details={"resume_id": resume_id},
+    )
     if not resume or resume.status != "active":
         raise AppError(
             code="resume_not_found",

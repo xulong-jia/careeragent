@@ -19,6 +19,9 @@ class Project(Base):
     user_id: Mapped[str] = mapped_column(
         String(64), default="default", nullable=False, index=True
     )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     profile_id: Mapped[str | None] = mapped_column(
         ForeignKey("profiles.id", ondelete="SET NULL"),
         index=True,
@@ -48,6 +51,12 @@ class ProjectRewrite(Base):
     __tablename__ = "project_rewrites"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), default="default", nullable=False, index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="default_workspace", nullable=False, index=True
+    )
     project_id: Mapped[str] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,

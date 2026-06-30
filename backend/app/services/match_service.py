@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import require_owned
 from app.models.job import JobDescription, JobProfile
 from app.models.resume import Resume, ResumeVersion
 from app.repositories import match_repository
@@ -20,6 +21,12 @@ def flatten_resume_skills(structured_resume: dict[str, object]) -> set[str]:
 
 def _get_resume(db: Session, resume_id: str) -> Resume:
     resume = db.get(Resume, resume_id)
+    require_owned(
+        resume,
+        code="resume_not_found",
+        message="Resume was not found.",
+        details={"resume_id": resume_id},
+    )
     if not resume or resume.status != "active":
         raise AppError(
             code="resume_not_found",
@@ -32,6 +39,13 @@ def _get_resume(db: Session, resume_id: str) -> Resume:
 
 def _get_resume_version(db: Session, resume_version_id: str) -> ResumeVersion:
     version = db.get(ResumeVersion, resume_version_id)
+    resume = db.get(Resume, version.resume_id) if version else None
+    require_owned(
+        resume,
+        code="resume_version_not_found",
+        message="Resume version was not found.",
+        details={"resume_version_id": resume_version_id},
+    )
     if not version:
         raise AppError(
             code="resume_version_not_found",
@@ -90,6 +104,12 @@ def _resolve_resume_version(db: Session, payload: MatchRunRequest) -> ResumeVers
 
 def _latest_job_profile(db: Session, jd_id: str) -> tuple[JobDescription, JobProfile]:
     job = db.get(JobDescription, jd_id)
+    require_owned(
+        job,
+        code="job_not_found",
+        message="JD was not found.",
+        details={"jd_id": jd_id},
+    )
     if not job or job.status != "active":
         raise AppError(
             code="job_not_found",

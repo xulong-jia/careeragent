@@ -22,6 +22,40 @@
 }
 ```
 
+## Auth / Workspace Scope
+
+公开入口：
+
+- `GET /health`
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+
+除上述入口外，`/api/*` 工作台 API 默认要求：
+
+```text
+Authorization: Bearer <access_token>
+```
+
+Token payload 包含当前 `user_id` 和 `workspace_id`。P1 后业务数据按当前 user/workspace scope 读写；跨用户或跨 workspace 访问应返回 404/401，而不是泄露目标对象存在性。P1 是基础认证和隔离 checkpoint，不等于完整 production-ready RBAC/SSO/MFA/refresh-token 体系。
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| POST | `/api/auth/register` | 注册 user，创建默认 workspace/membership，并返回 bearer token |
+| POST | `/api/auth/login` | 使用 email/password 登录并返回 bearer token |
+| GET | `/api/auth/me` | 查询当前 user/workspace；需要 bearer token |
+| POST | `/api/auth/logout` | stateless logout success；需要 bearer token，前端负责清理本地 token |
+
+Auth response 关键字段：
+
+- `access_token`
+- `token_type`
+- `expires_at`
+- `user.id`
+- `user.email`
+- `workspace.id`
+- `workspace.name`
+- `workspace.role`
+
 ## Health / DB
 
 | Method | Path | 说明 |
@@ -65,9 +99,7 @@
 - `readiness_level`
 - `completeness_score`
 
-隐私边界：Profile API 只保存目标、技能结构、偏好和可选 resume version ref，不返回 Resume raw text。
-
-当前无认证系统，Profile 的 `user_id` 由后端使用默认值 `default`，不做多用户权限隔离。
+隐私边界：Profile API 只保存目标、技能结构、偏好和可选 resume version ref，不返回 Resume raw text。P1 后 Profile 按当前 `user_id` / `workspace_id` 写入和过滤；旧本地数据可能仍带默认 owner。
 
 ## Project APIs
 
@@ -660,6 +692,29 @@ v1.4 规则：
 - `latest_applications`
 
 Application 仍是手动 tracking record。v1.3 允许 Agent Workflow 创建 draft 或把已有 application 绑定到 `agent_run_id`；v1.4 只加强运营字段、状态历史和统计，不会自动投递、不会接招聘网站、不会自动状态流转，也不会保存完整投递材料。
+
+## Privacy APIs
+
+P1 privacy endpoints 只作用于当前 authenticated user/workspace，并使用现有 preview/ref/summary 边界；它们是本地 prototype 的数据治理 baseline，不等于生产级不可恢复删除证明或备份擦除流程。
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| GET | `/api/privacy/export` | 导出当前 user/workspace 的数据摘要和 refs，不返回 secret 或大段 raw payload |
+| DELETE | `/api/privacy/delete-all` | 删除/归档当前 user/workspace 的业务数据，并写入 audit log |
+| GET | `/api/privacy/audit-log` | 查询当前 user/workspace 的 audit log |
+
+`GET /api/privacy/export` response 关键字段：
+
+- `user`
+- `workspace`
+- `counts`
+- `items`
+
+`DELETE /api/privacy/delete-all` response 关键字段：
+
+- `status`
+- `deleted_counts`
+- `audit_log_id`
 
 ## Bad Case APIs
 

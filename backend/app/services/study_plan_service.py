@@ -4,6 +4,7 @@ from typing import Iterable
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import require_owned
 from app.models.interview import InterviewAnswer
 from app.models.match import MatchReport
 from app.models.profile import Profile
@@ -190,6 +191,12 @@ def _get_profile(db: Session, profile_id: str | None) -> Profile | None:
     if normalized is None:
         return None
     profile = db.get(Profile, normalized)
+    require_owned(
+        profile,
+        code="profile_not_found",
+        message="Profile was not found.",
+        details={"profile_id": normalized},
+    )
     if not profile:
         raise AppError(
             code="profile_not_found",
@@ -205,6 +212,12 @@ def _get_match_report(db: Session, match_report_id: str | None) -> MatchReport |
     if normalized is None:
         return None
     match_report = db.get(MatchReport, normalized)
+    require_owned(
+        match_report,
+        code="match_report_not_found",
+        message="Match report was not found.",
+        details={"match_report_id": normalized},
+    )
     if not match_report:
         raise AppError(
             code="match_report_not_found",
@@ -222,6 +235,12 @@ def _get_project_rewrite(
     if normalized is None:
         return None
     project_rewrite = db.get(ProjectRewrite, normalized)
+    require_owned(
+        project_rewrite,
+        code="project_rewrite_not_found",
+        message="Project rewrite was not found.",
+        details={"project_rewrite_id": normalized},
+    )
     if not project_rewrite:
         raise AppError(
             code="project_rewrite_not_found",
@@ -238,6 +257,12 @@ def _get_interview_answers(
     answers: list[InterviewAnswer] = []
     for answer_id in _normalize_id_list(interview_answer_ids, "interview_answer_ids"):
         answer = db.get(InterviewAnswer, answer_id)
+        require_owned(
+            answer,
+            code="interview_answer_not_found",
+            message="Interview answer was not found.",
+            details={"interview_answer_id": answer_id},
+        )
         if not answer:
             raise AppError(
                 code="interview_answer_not_found",

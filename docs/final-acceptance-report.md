@@ -1,5 +1,7 @@
 # CareerAgent Final Acceptance Report
 
+状态说明：本文档保留 v1.6 Production AI & Deployment Readiness 当时的验收记录。P1 后 Auth、Workspace、Data Isolation 和 privacy export/delete/audit baseline 已在后续 checkpoint 中补齐；当前 P1 状态以 README、`docs/current-architecture.md` 和 `docs/release-notes-p1-production-foundation.md` 为准。P1 仍不代表 CareerAgent 已 production-ready。
+
 本报告记录 v1.6 Production AI & Deployment Readiness 开发后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示任何 v1.6 tag 已完成。
 
 ## 1. 验收结论
@@ -254,7 +256,7 @@ v1.6 当前已完成：
 - KnowledgeBasePage answer history filter 可识别 lexical/vector/hybrid retrieval mode。
 - 新增 `docs/ai-providers.md`、`docs/deployment.md` 和 `docs/release-notes-v1.6.md`，并更新 README、architecture、API reference、RAG design、evaluation README、安全清单和 final acceptance 草案。
 
-v1.6 仍不声明已完成真实生产 AI 平台：默认不调用真实 LLM 或外部 embedding provider；不接招聘网站、不自动投递、不做自由工具调用 Agent、不强制 PostgreSQL/pgvector、不提供生产级认证/多用户隔离、云 secret manager、审计日志、SLA 或监控。
+v1.6 当时不声明已完成真实生产 AI 平台：默认不调用真实 LLM 或外部 embedding provider；不接招聘网站、不自动投递、不做自由工具调用 Agent、不强制 PostgreSQL/pgvector，也不提供云 secret manager、集中审计、SLA 或监控。基础认证和 workspace isolation 已在后续 P1 checkpoint 补齐。
 
 ## 11. 明确边界
 
@@ -275,7 +277,7 @@ v1.6 仍不声明已完成真实生产 AI 平台：默认不调用真实 LLM 或
 - 不做自由聊天 Agent 或 true tool-calling autonomy。
 - 不自动修改简历、项目、面试答案、学习计划任务状态或投递状态。
 - 不把 reflection 自动写入 Bad Case 或 Study Plan。
-- 不做认证、多用户权限。
+- v1.6 当时未包含账号体系和多用户权限；基础 token auth、workspace scope 和 data isolation 已在后续 P1 checkpoint 补齐，但仍不是完整 production RBAC/SSO/MFA 体系。
 - 不把 deterministic evaluation 当作模型能力最终评分。
 
 ## 12. 测试与检查结果

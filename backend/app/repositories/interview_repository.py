@@ -5,6 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import (
+    current_user_id,
+    current_workspace_id,
+    is_owned,
+    owner_filter,
+)
 from app.models.interview import InterviewAnswer, InterviewQuestion
 from app.schemas.interviews import (
     InterviewAnswerRecord,
@@ -81,7 +87,8 @@ def create_questions(
     records = [
         InterviewQuestion(
             id=_next_interview_question_id(db),
-            user_id="default",
+            user_id=current_user_id(),
+            workspace_id=current_workspace_id(),
             jd_id=jd_id,
             resume_version_id=resume_version_id,
             project_id=project_id,
@@ -116,7 +123,8 @@ def create_answer(
     answer = InterviewAnswer(
         id=_next_interview_answer_id(db),
         question_id=question_id,
-        user_id="default",
+        user_id=current_user_id(),
+        workspace_id=current_workspace_id(),
         answer_text=answer_text,
         answer_text_preview=answer_text_preview,
         scores={},
@@ -141,7 +149,12 @@ def list_answers(
     resume_version_id: str | None = None,
     project_id: str | None = None,
 ) -> list[InterviewAnswerRecord]:
-    statement = select(InterviewAnswer).join(InterviewQuestion)
+    statement = (
+        select(InterviewAnswer)
+        .join(InterviewQuestion)
+        .where(*owner_filter(InterviewAnswer))
+        .where(*owner_filter(InterviewQuestion))
+    )
     if question_id is not None:
         statement = statement.where(InterviewAnswer.question_id == question_id)
     if jd_id is not None:
@@ -167,7 +180,7 @@ def list_questions(
     question_type: str | None = None,
     difficulty: str | None = None,
 ) -> list[InterviewQuestionRecord]:
-    statement = select(InterviewQuestion)
+    statement = select(InterviewQuestion).where(*owner_filter(InterviewQuestion))
     if jd_id is not None:
         statement = statement.where(InterviewQuestion.jd_id == jd_id)
     if resume_version_id is not None:
@@ -187,7 +200,8 @@ def list_questions(
 
 
 def get_question_model(db: Session, question_id: str) -> InterviewQuestion | None:
-    return db.get(InterviewQuestion, question_id)
+    question = db.get(InterviewQuestion, question_id)
+    return question if question and is_owned(question) else None
 
 
 def get_question(db: Session, question_id: str) -> InterviewQuestionRecord:
@@ -203,7 +217,8 @@ def get_question(db: Session, question_id: str) -> InterviewQuestionRecord:
 
 
 def get_answer_model(db: Session, answer_id: str) -> InterviewAnswer | None:
-    return db.get(InterviewAnswer, answer_id)
+    answer = db.get(InterviewAnswer, answer_id)
+    return answer if answer and is_owned(answer) else None
 
 
 def get_answer(db: Session, answer_id: str) -> InterviewAnswerRecord:
@@ -240,8 +255,12 @@ def update_answer_score(
 
 
 def get_stats(db: Session) -> InterviewStatsResponse:
-    questions = db.scalars(select(InterviewQuestion)).all()
-    answers = db.scalars(select(InterviewAnswer)).all()
+    questions = db.scalars(
+        select(InterviewQuestion).where(*owner_filter(InterviewQuestion))
+    ).all()
+    answers = db.scalars(
+        select(InterviewAnswer).where(*owner_filter(InterviewAnswer))
+    ).all()
     scored_answers = [
         answer
         for answer in answers

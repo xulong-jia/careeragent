@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models.resume import ResumeVersion
+from app.core.tenant import require_owned
+from app.models.resume import Resume, ResumeVersion
 from app.repositories import profile_repository
 from app.schemas.profiles import (
     ProfileCreateRequest,
@@ -139,7 +140,15 @@ def _validate_source_resume_version(
 ) -> None:
     if source_resume_version_id is None:
         return
-    if db.get(ResumeVersion, source_resume_version_id) is None:
+    version = db.get(ResumeVersion, source_resume_version_id)
+    resume = db.get(Resume, version.resume_id) if version else None
+    require_owned(
+        resume,
+        code="resume_version_not_found",
+        message="Resume version was not found.",
+        details={"version_id": source_resume_version_id},
+    )
+    if version is None:
         raise AppError(
             code="resume_version_not_found",
             message="Resume version was not found.",

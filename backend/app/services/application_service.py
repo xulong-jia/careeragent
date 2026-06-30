@@ -5,10 +5,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.tenant import require_owned
 from app.models.agent import AgentRun
 from app.models.job import JobDescription, JobProfile
 from app.models.match import MatchReport as MatchReportModel
-from app.models.resume import ResumeVersion
+from app.models.resume import Resume, ResumeVersion
 from app.repositories import application_repository
 from app.schemas.applications import (
     ApplicationCreateRequest,
@@ -141,6 +142,12 @@ def _validate_and_resolve_refs(
     match_report: MatchReportModel | None = None
     if resolved_match_report_id:
         match_report = db.get(MatchReportModel, resolved_match_report_id)
+        require_owned(
+            match_report,
+            code="match_report_not_found",
+            message="Match report was not found.",
+            details={"match_report_id": resolved_match_report_id},
+        )
         if not match_report:
             raise AppError(
                 code="match_report_not_found",
@@ -168,6 +175,12 @@ def _validate_and_resolve_refs(
 
     if resolved_jd_id:
         job = db.get(JobDescription, resolved_jd_id)
+        require_owned(
+            job,
+            code="job_not_found",
+            message="JD was not found.",
+            details={"jd_id": resolved_jd_id},
+        )
         if not job or job.status != "active":
             raise AppError(
                 code="job_not_found",
@@ -177,6 +190,13 @@ def _validate_and_resolve_refs(
             )
     if resolved_resume_version_id:
         version = db.get(ResumeVersion, resolved_resume_version_id)
+        resume = db.get(Resume, version.resume_id) if version else None
+        require_owned(
+            resume,
+            code="resume_version_not_found",
+            message="Resume version was not found.",
+            details={"resume_version_id": resolved_resume_version_id},
+        )
         if not version:
             raise AppError(
                 code="resume_version_not_found",
@@ -186,6 +206,12 @@ def _validate_and_resolve_refs(
             )
     if resolved_agent_run_id:
         agent_run = db.get(AgentRun, resolved_agent_run_id)
+        require_owned(
+            agent_run,
+            code="agent_run_not_found",
+            message="Agent run was not found.",
+            details={"agent_run_id": resolved_agent_run_id},
+        )
         if not agent_run:
             raise AppError(
                 code="agent_run_not_found",

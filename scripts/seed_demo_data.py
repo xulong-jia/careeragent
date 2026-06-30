@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed synthetic CareerAgent demo data through the public HTTP API."""
+"""Seed synthetic CareerAgent demo data through the protected HTTP API."""
 
 from __future__ import annotations
 
@@ -11,22 +11,54 @@ from urllib.request import Request, urlopen
 
 
 API_BASE_URL = os.getenv("CAREERAGENT_API_BASE_URL", "http://localhost:8000").rstrip("/")
+DEMO_EMAIL = os.getenv("CAREERAGENT_DEMO_EMAIL", "demo@example.test")
+DEMO_PASSWORD = os.getenv("CAREERAGENT_DEMO_PASSWORD", "synthetic-demo-password")
+DEMO_TOKEN = os.getenv("CAREERAGENT_AUTH_TOKEN", "").strip()
 
 
-def request_json(method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+def request_json(
+    method: str,
+    path: str,
+    payload: dict[str, Any] | None = None,
+    token: str | None = None,
+) -> Any:
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {"Content-Type": "application/json"} if payload is not None else {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     request = Request(
         f"{API_BASE_URL}{path}",
         data=body,
         method=method,
-        headers={"Content-Type": "application/json"} if payload is not None else {},
+        headers=headers,
     )
     with urlopen(request, timeout=20) as response:
         data = json.loads(response.read().decode("utf-8"))
     return data["data"]
 
 
-def upload_resume(filename: str, content: str) -> Any:
+def authenticate() -> str:
+    if DEMO_TOKEN:
+        return DEMO_TOKEN
+    payload = {
+        "email": DEMO_EMAIL,
+        "password": DEMO_PASSWORD,
+        "display_name": "Synthetic Demo User",
+    }
+    try:
+        session = request_json("POST", "/api/auth/register", payload)
+    except HTTPError as exc:
+        if exc.code != 409:
+            raise
+        session = request_json(
+            "POST",
+            "/api/auth/login",
+            {"email": DEMO_EMAIL, "password": DEMO_PASSWORD},
+        )
+    return session["access_token"]
+
+
+def upload_resume(filename: str, content: str, token: str) -> Any:
     boundary = "careeragent-demo-boundary"
     body = (
         f"--{boundary}\r\n"
@@ -39,7 +71,10 @@ def upload_resume(filename: str, content: str) -> Any:
         f"{API_BASE_URL}/api/resumes/upload",
         data=body,
         method="POST",
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
     )
     with urlopen(request, timeout=20) as response:
         data = json.loads(response.read().decode("utf-8"))
@@ -50,6 +85,7 @@ def main() -> None:
     try:
         health = request_json("GET", "/health")
         print(f"Backend health: {health['status']}")
+        token = authenticate()
 
         resume = upload_resume(
             "synthetic-demo-resume.md",
@@ -61,9 +97,10 @@ def main() -> None:
                     "No real personal data is included in this demo resume.",
                 ]
             ),
+            token,
         )
         resume_id = resume["resume_id"]
-        versions = request_json("GET", f"/api/resumes/{resume_id}/versions")
+        versions = request_json("GET", f"/api/resumes/{resume_id}/versions", token=token)
         resume_version_id = versions["items"][0]["resume_version_id"]
 
         job = request_json(
@@ -79,6 +116,7 @@ def main() -> None:
                 ),
                 "source_url": None,
             },
+            token=token,
         )
         jd_id = job["jd_id"]
 
@@ -86,6 +124,7 @@ def main() -> None:
             "POST",
             "/api/matches/run",
             {"resume_version_id": resume_version_id, "jd_id": jd_id},
+            token=token,
         )
         match_report_id = match["match_report_id"]
 
@@ -102,11 +141,13 @@ def main() -> None:
                 ),
                 "metadata": {"topic": "interview", "tags": ["demo", "synthetic"]},
             },
+            token=token,
         )
         request_json(
             "POST",
             f"/api/rag/documents/{rag_doc['doc_id']}/index",
             {"max_chars": 320, "overlap_chars": 40},
+            token=token,
         )
 
         agent = request_json(
@@ -119,6 +160,7 @@ def main() -> None:
                 "use_rag": True,
                 "rag_query": "FastAPI interview preparation",
             },
+            token=token,
         )
 
         application = request_json(
@@ -136,6 +178,7 @@ def main() -> None:
                 "reflection": "Synthetic demo reflection only.",
                 "tags": ["demo", "synthetic"],
             },
+            token=token,
         )
 
         bad_case = request_json(
@@ -152,15 +195,18 @@ def main() -> None:
                 "actual_behavior": "Synthetic demo actual behavior summary.",
                 "suggested_fix": "Use deterministic evaluation smoke set.",
             },
+            token=token,
         )
         evaluation_case = request_json(
             "POST",
             f"/api/evaluations/cases/from-bad-case/{bad_case['id']}",
+            token=token,
         )
         evaluation = request_json(
             "POST",
             "/api/evaluations/runs",
             {"name": "Synthetic demo smoke run", "module": "all"},
+            token=token,
         )
 
         print("Seeded synthetic demo data:")
