@@ -24,8 +24,18 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 ## API Key
 
 - [ ] `.env.example` 只保留空 placeholder。
-- [ ] `OPENAI_API_KEY` 当前不需要填写。
-- [ ] 当前 deterministic MVP 不依赖任何真实 LLM provider。
+- [ ] `LLM_API_KEY`、`EMBEDDING_API_KEY` 和 `OPENAI_API_KEY` 当前默认不需要填写。
+- [ ] 默认 deterministic MVP 不依赖任何真实 LLM 或外部 embedding provider。
+- [ ] 只有本地 `.env` 或部署平台 secret manager 注入真实 key；不把 key 写入 docs、tests、eval artifacts 或 Docker image。
+- [ ] `/health` 只返回 provider mode、model/store/mode 和 enable flags，不返回 API key、Authorization header 或 provider request payload。
+
+## Provider / Vector Readiness
+
+- [ ] `ENABLE_REAL_LLM=false` 和 `ENABLE_REAL_EMBEDDING=false` 时，backend tests、frontend build 和 Docker Compose config 可 keyless 运行。
+- [ ] `ENABLE_REAL_LLM=true` 或 `ENABLE_REAL_EMBEDDING=true` 时，缺少 base URL / key / model 应返回受控配置错误，不静默降级为假成功。
+- [ ] LLM structured output 必须经过 Pydantic schema validation。
+- [ ] RAG vector/hybrid retrieval 默认使用 local deterministic embeddings，不提交 FAISS/pgvector/remote vector DB artifacts。
+- [ ] `retrieval_debug` 只包含 IDs、scores、counts、mode/model/version metadata，不包含 full raw_text、chunk text 或 secret。
 
 ## Resume / JD / RAG
 
@@ -99,7 +109,7 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 ```bash
 git status --short
 git ls-files | grep -E '(^|/)(\.env|local_data|node_modules|dist|__pycache__|\.pytest_cache|.*\.db|.*\.sqlite|.*\.pyc)$' || true
-grep -R "OPENAI_API_KEY\|sk-" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.venv || true
+grep -R "OPENAI_API_KEY\|LLM_API_KEY\|EMBEDDING_API_KEY\|sk-" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.venv || true
 grep -R "raw_text\|answer_text\|chunk.text\|interview_notes\|reflection" backend/app/api backend/app/schemas backend/app/services backend/app/agents scripts evals -n || true
 ```
 

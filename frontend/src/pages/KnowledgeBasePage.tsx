@@ -489,7 +489,7 @@ export function KnowledgeBasePage({
         <div>
           <h3>安全边界</h3>
           <p>当前仅建议输入 synthetic text。不要输入真实简历、真实 JD、投递记录、面试复盘或 API Key。</p>
-          <p>当前 RAG 是 deterministic lexical retrieval + deterministic answer，不接真实 LLM、embedding 或 vector store。</p>
+          <p>当前 RAG 默认使用 deterministic lexical retrieval；v1.6 可配置 deterministic vector/hybrid，本地默认不调用真实 LLM 或外部 embedding provider。</p>
         </div>
         <span className="status-pill">Preview only</span>
       </article>
@@ -796,6 +796,8 @@ export function KnowledgeBasePage({
               >
                 <option value="">All</option>
                 <option value="deterministic_lexical">lexical</option>
+                <option value="deterministic_vector">vector</option>
+                <option value="deterministic_hybrid">hybrid</option>
               </select>
             </label>
           </div>

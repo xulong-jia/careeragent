@@ -30,12 +30,16 @@ class RagSearchRequest(BaseModel):
     query: str
     top_k: int = 5
     filters: RagSearchFilters | None = None
+    retrieval_mode: str | None = None
+    score_threshold: float | None = Field(default=None, ge=0)
 
 
 class RagAnswerRequest(BaseModel):
     question: str
     top_k: int = 5
     filters: RagSearchFilters | None = None
+    retrieval_mode: str | None = None
+    score_threshold: float | None = Field(default=None, ge=0)
     persist: bool = True
 
 
@@ -80,6 +84,8 @@ class RagSearchSource(BaseModel):
     snippet: str
     score: float
     metadata: dict[str, object] = Field(default_factory=dict)
+    retrieval_mode: str | None = None
+    embedding_model: str | None = None
 
 
 class RagCitation(BaseModel):
@@ -110,12 +116,14 @@ class RagRetrievalDebug(BaseModel):
     retrieval_version: str | None = None
     schema_version: str | None = None
     model_version: str | None = None
+    embedding_model: str | None = None
     query_tokens: list[str] = Field(default_factory=list)
     candidate_count: int
     selected_chunk_ids: list[str] = Field(default_factory=list)
     scores: list[float] = Field(default_factory=list)
     top_k: int
     filters: dict[str, object] = Field(default_factory=dict)
+    score_threshold: float | None = None
     insufficient_reason: str | None = None
 
 

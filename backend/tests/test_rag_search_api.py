@@ -213,3 +213,45 @@ def test_search_rejects_empty_query_and_caps_top_k():
     )
     assert capped_response.status_code == 200
     assert get_data(capped_response)["top_k"] == 20
+
+
+def test_search_supports_deterministic_vector_mode_without_full_text():
+    client = make_client()
+    document = _create_and_index_document(
+        client,
+        title="Vector Backend Notes",
+        raw_text="FastAPI pytest retrieval testing notes.",
+        metadata={"tags": ["backend"], "topic": "retrieval"},
+    )
+
+    response = client.post(
+        "/api/rag/search",
+        json={
+            "query": "FastAPI retrieval",
+            "top_k": 3,
+            "retrieval_mode": "vector",
+            "score_threshold": 0,
+        },
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert result["retrieval_debug"]["retrieval_mode"] == "deterministic_vector"
+    assert result["retrieval_debug"]["embedding_model"] == "deterministic-hash-v1"
+    assert result["sources"][0]["doc_id"] == document["doc_id"]
+    assert result["sources"][0]["retrieval_mode"] == "deterministic_vector"
+    assert result["sources"][0]["embedding_model"] == "deterministic-hash-v1"
+    assert "text" not in result["sources"][0]
+    assert "raw_text" not in str(result)
+
+
+def test_search_rejects_unsupported_retrieval_mode():
+    client = make_client()
+
+    response = client.post(
+        "/api/rag/search",
+        json={"query": "FastAPI", "retrieval_mode": "unsupported"},
+    )
+
+    assert response.status_code == 400
+    assert get_error(response)["code"] == "rag_search_validation_error"

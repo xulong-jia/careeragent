@@ -13,6 +13,22 @@ services:
       APP_ENV: ${APP_ENV:-development}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173}
       DATABASE_URL: ${DATABASE_URL:-sqlite:////app/backend/local_data/careeragent.db}
+      AI_PROVIDER_MODE: ${AI_PROVIDER_MODE:-deterministic}
+      LLM_PROVIDER: ${LLM_PROVIDER:-deterministic}
+      LLM_API_BASE_URL: ${LLM_API_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.0}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-deterministic}
+      EMBEDDING_API_BASE_URL: ${EMBEDDING_API_BASE_URL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-deterministic-hash-v1}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-384}
+      VECTOR_STORE: ${VECTOR_STORE:-local}
+      RAG_RETRIEVAL_MODE: ${RAG_RETRIEVAL_MODE:-lexical}
+      ENABLE_REAL_LLM: ${ENABLE_REAL_LLM:-false}
+      ENABLE_REAL_EMBEDDING: ${ENABLE_REAL_EMBEDDING:-false}
 
   frontend:
     build:

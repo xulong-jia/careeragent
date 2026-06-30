@@ -207,3 +207,33 @@ def test_answer_contract_does_not_expose_full_text_in_citations_or_debug():
     _assert_no_sensitive_keys(result["citations"])
     _assert_no_sensitive_keys(result["source_refs"])
     _assert_no_sensitive_keys(result["retrieval_debug"])
+
+
+def test_answer_persists_vector_retrieval_mode_and_filter_alias():
+    client = make_client()
+    _create_and_index_document(
+        client,
+        title="Vector Answer Notes",
+        raw_text="FastAPI vector retrieval should keep citations and source refs.",
+        metadata={"tags": ["backend"], "topic": "retrieval"},
+    )
+
+    answer_response = client.post(
+        "/api/rag/answer",
+        json={
+            "question": "FastAPI vector retrieval",
+            "retrieval_mode": "vector",
+        },
+    )
+
+    assert answer_response.status_code == 200
+    result = get_data(answer_response)
+    assert result["retrieval_debug"]["retrieval_mode"] == "deterministic_vector"
+    assert result["answer_run_id"]
+
+    list_response = client.get("/api/rag/answers?retrieval_mode=vector")
+    assert list_response.status_code == 200
+    listed = get_data(list_response)
+    assert [item["answer_run_id"] for item in listed["items"]] == [
+        result["answer_run_id"]
+    ]

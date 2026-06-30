@@ -2,11 +2,17 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.ai.embedding_provider import (
+    DeterministicEmbeddingProvider,
+    build_embedding_provider,
+    embedding_id_for_text,
+)
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.versioning import MODEL_VERSION, RETRIEVAL_VERSION, SCHEMA_VERSION
 from app.rag.answering import build_deterministic_answer
 from app.rag.chunking import chunk_document_text
-from app.rag.retriever import rank_chunks, tokenize_text
+from app.rag.retriever import normalize_retrieval_mode, rank_chunks_by_mode, tokenize_text
 from app.repositories import rag_repository
 from app.schemas.rag import (
     RagChunkRecord,
@@ -41,7 +47,11 @@ ALLOWED_ANSWER_UNCERTAINTIES = {
     "no_relevant_source",
     "insufficient_evidence",
 }
-ALLOWED_RETRIEVAL_MODES = {"deterministic_lexical"}
+ALLOWED_RETRIEVAL_MODES = {
+    "deterministic_lexical",
+    "deterministic_vector",
+    "deterministic_hybrid",
+}
 STORED_TEXT_PREVIEW_CHARS = 240
 SENSITIVE_KEY_PARTS = {
     "raw_text",
@@ -79,7 +89,8 @@ def _validate_answer_run_filter(
             status_code=400,
             details={"field": "uncertainty"},
         )
-    if retrieval_mode and retrieval_mode not in ALLOWED_RETRIEVAL_MODES:
+    normalized_mode = normalize_retrieval_mode(retrieval_mode) if retrieval_mode else None
+    if normalized_mode and normalized_mode not in ALLOWED_RETRIEVAL_MODES:
         raise AppError(
             code="rag_answer_run_filter_validation_error",
             message="Unsupported RAG retrieval_mode filter.",
@@ -181,6 +192,12 @@ def index_document(
             max_chars=payload.max_chars,
             overlap_chars=payload.overlap_chars,
         )
+        embedding_provider = build_embedding_provider(get_settings())
+        for chunk in chunks:
+            chunk["embedding_id"] = embedding_id_for_text(
+                str(chunk["text"]),
+                model=embedding_provider.model,
+            )
         if not chunks:
             raise AppError(
                 code="rag_chunk_validation_error",
@@ -252,29 +269,61 @@ def search_documents(db: Session, payload: RagSearchRequest) -> RagSearchResult:
     source_type = _normalize_source_type(filters["source_type"]) if filters.get("source_type") else None
     doc_id = filters.get("doc_id")
 
+    settings = get_settings()
+    retrieval_mode = normalize_retrieval_mode(
+        payload.retrieval_mode or settings.rag_retrieval_mode
+    )
+    if retrieval_mode not in ALLOWED_RETRIEVAL_MODES:
+        raise AppError(
+            code="rag_search_validation_error",
+            message="Unsupported RAG retrieval_mode.",
+            status_code=400,
+            details={"field": "retrieval_mode"},
+        )
+    if retrieval_mode in {"deterministic_vector", "deterministic_hybrid"}:
+        embedding_provider = build_embedding_provider(settings)
+        if not isinstance(embedding_provider, DeterministicEmbeddingProvider):
+            # ponytail: vector retrieval stays local until real embedding storage is added.
+            embedding_provider = DeterministicEmbeddingProvider(
+                dimension=settings.embedding_dimension,
+                model=settings.embedding_model,
+            )
+    else:
+        embedding_provider = DeterministicEmbeddingProvider(
+            dimension=settings.embedding_dimension,
+            model=settings.embedding_model,
+        )
+
     candidates = rag_repository.list_indexed_chunks_for_search(
         db,
         source_type=source_type,
         doc_id=str(doc_id) if doc_id else None,
     )
-    ranked_sources = rank_chunks(
+    ranked_sources = rank_chunks_by_mode(
         query,
         candidates,
         top_k=top_k,
         filters=filters,
+        retrieval_mode=retrieval_mode,
+        score_threshold=payload.score_threshold,
+        embedding_provider=embedding_provider,
     )
     sources = [RagSearchSource(**source) for source in ranked_sources]
     retrieval_debug = RagRetrievalDebug(
-        retrieval_mode="deterministic_lexical",
+        retrieval_mode=retrieval_mode,
         retrieval_version=RETRIEVAL_VERSION,
         schema_version=SCHEMA_VERSION,
         model_version=MODEL_VERSION,
+        embedding_model=embedding_provider.model
+        if retrieval_mode in {"deterministic_vector", "deterministic_hybrid"}
+        else None,
         query_tokens=tokenize_text(query),
         candidate_count=len(candidates),
         selected_chunk_ids=[source.chunk_id for source in sources],
         scores=[source.score for source in sources],
         top_k=top_k,
         filters=filters,
+        score_threshold=payload.score_threshold,
         insufficient_reason=None if sources else "no_relevant_source",
     )
     return RagSearchResult(
@@ -302,6 +351,8 @@ def answer_question(db: Session, payload: RagAnswerRequest) -> RagAnswerResult:
             query=question,
             top_k=payload.top_k,
             filters=payload.filters,
+            retrieval_mode=payload.retrieval_mode,
+            score_threshold=payload.score_threshold,
         ),
     )
     answer_payload = build_deterministic_answer(
@@ -353,11 +404,14 @@ def list_answer_runs(
         uncertainty=uncertainty,
         retrieval_mode=retrieval_mode,
     )
+    normalized_retrieval_mode = (
+        normalize_retrieval_mode(retrieval_mode) if retrieval_mode else None
+    )
     return rag_repository.list_answer_runs(
         db,
         grounded=grounded,
         uncertainty=uncertainty,
-        retrieval_mode=retrieval_mode,
+        retrieval_mode=normalized_retrieval_mode,
     )
 
 

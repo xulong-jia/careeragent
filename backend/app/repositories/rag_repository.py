@@ -178,7 +178,7 @@ def replace_chunks_for_document(
                 text=str(chunk["text"]),
                 token_count=int(chunk["token_count"]),
                 metadata_json=dict(chunk.get("metadata") or {}),
-                embedding_id=None,
+                embedding_id=str(chunk["embedding_id"]) if chunk.get("embedding_id") else None,
             )
             chunk_models.append(chunk_model)
             db.add(chunk_model)

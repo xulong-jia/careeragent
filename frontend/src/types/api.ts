@@ -594,6 +594,8 @@ export type RagSearchRequest = {
   query: string;
   top_k: number;
   filters?: RagSearchFilters | null;
+  retrieval_mode?: string | null;
+  score_threshold?: number | null;
 };
 
 export type RagSearchSource = {
@@ -605,6 +607,8 @@ export type RagSearchSource = {
   snippet: string;
   score: number;
   metadata: Record<string, unknown>;
+  retrieval_mode?: string | null;
+  embedding_model?: string | null;
 };
 
 export type RagCitation = {
@@ -635,12 +639,14 @@ export type RagRetrievalDebug = {
   retrieval_version?: string | null;
   schema_version?: string | null;
   model_version?: string | null;
+  embedding_model?: string | null;
   query_tokens: string[];
   candidate_count: number;
   selected_chunk_ids: string[];
   scores: number[];
   top_k: number;
   filters: Record<string, unknown>;
+  score_threshold?: number | null;
   insufficient_reason: string | null;
 };
 
@@ -656,6 +662,8 @@ export type RagAnswerRequest = {
   question: string;
   top_k: number;
   filters?: RagSearchFilters | null;
+  retrieval_mode?: string | null;
+  score_threshold?: number | null;
   persist?: boolean;
 };
 

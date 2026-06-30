@@ -4,15 +4,18 @@
 
 阶段三目标是建立可检索、可追踪来源的 CareerAgent 知识库，为后续面试准备、学习计划和 Agent Workflow 提供 evidence source。本阶段先确保数据结构、chunk、metadata、retrieval 和 citation contract 稳定，不直接接入真实 LLM、embedding 或 vector store。
 
+当前实现口径：v1.2 已完成 deterministic grounded answer contract、answer run persistence、KnowledgeBasePage answer history、Dashboard RAG stats 和 downstream optional refs；v1.6 在默认不接真实 provider 的前提下，新增 deterministic embedding id、local vector/hybrid retrieval mode、`score_threshold` 和 provider metadata。默认 retrieval mode 仍是 lexical。
+
 - 建立可检索知识库。
 - 支持 RAG document 管理。
 - 支持 chunking。
 - 支持 metadata。
 - 支持 deterministic lexical retrieval。
+- 支持 v1.6 local deterministic vector/hybrid retrieval readiness。
 - 支持 source/citation 追踪。
 - 支持 RAG answer 的 deterministic answer with citations。
 - 为后续面试准备、学习计划、Agent Workflow 提供 evidence source。
-- 当前阶段先不接真实 LLM / embedding / vector store。
+- 默认不接真实 LLM / 外部 embedding / vector store；真实 provider 仅作为 opt-in readiness skeleton。
 
 ## 2. 非目标
 
@@ -20,8 +23,8 @@
 
 - 不接真实 LLM。
 - 不接 OpenAI / DeepSeek / Qwen。
-- 不接 embedding。
-- 不接 FAISS / pgvector。
+- 默认不接外部 embedding。
+- 不强制接 FAISS / pgvector；v1.6 vector/hybrid 是 local deterministic baseline。
 - 不做 Agent Workflow。
 - 不做投递管理。
 - 不做 Bad Case 页面。
@@ -31,7 +34,7 @@
 
 ## 3. RAG 数据模型设计
 
-阶段 3A 只做设计，不新增表。阶段 3B 已新增 RAG ORM models、Alembic migration、schemas skeleton 和 DB smoke tests。阶段 3C 新增 document create/list/detail、deterministic chunking/indexing backend 和 chunk list API。阶段 3D 新增 lexical retrieval 和 `POST /api/rag/search`，返回 sources / score / snippet / metadata。阶段 3E 新增 deterministic RAG answer 和 `POST /api/rag/answer`，answer 复用 search sources 并在无来源时返回 uncertainty。阶段 3F 新增 KnowledgeBasePage 最小 UI，可创建 document、index、查看 chunks、search、answer with citations。阶段 3G 补充阶段三验收文档、synthetic test set 示例、README 收口和安全检查清单；LLM、embedding 和 vector store 仍留到后续阶段。
+阶段 3A 只做设计，不新增表。阶段 3B 已新增 RAG ORM models、Alembic migration、schemas skeleton 和 DB smoke tests。阶段 3C 新增 document create/list/detail、deterministic chunking/indexing backend 和 chunk list API。阶段 3D 新增 lexical retrieval 和 `POST /api/rag/search`，返回 sources / score / snippet / metadata。阶段 3E 新增 deterministic RAG answer 和 `POST /api/rag/answer`，answer 复用 search sources 并在无来源时返回 uncertainty。阶段 3F 新增 KnowledgeBasePage 最小 UI，可创建 document、index、查看 chunks、search、answer with citations。阶段 3G 补充阶段三验收文档、synthetic test set 示例、README 收口和安全检查清单；v1.6 补充 local deterministic vector/hybrid readiness，但真实 LLM、外部 embedding 和生产 vector store 仍需后续单独验收。
 
 ### rag_documents
 
@@ -294,6 +297,14 @@ metadata filter 用途：
 - RAG answer 暂时 deterministic summary，不调用 LLM。
 - answer 必须引用 `doc_id` / `chunk_id` / source snippet。
 
+v1.6 retrieval readiness：
+
+- `retrieval_mode` 支持 `lexical` / `vector` / `hybrid` alias，并归一化为 `deterministic_lexical` / `deterministic_vector` / `deterministic_hybrid`。
+- vector/hybrid 当前使用本地 deterministic hashing embedding 和 existing DB chunks；`rag_chunks.embedding_id` 保存非 secret 的 deterministic id，不保存外部 provider payload。
+- `score_threshold` 可过滤低分来源；无来源时仍返回 uncertainty，不编造答案。
+- `retrieval_debug` 可记录 retrieval mode、embedding model、scores、selected chunk IDs 和版本 metadata，但不包含 raw_text 或 full chunk text。
+- 真实 embedding provider skeleton 不等于生产 vector store；FAISS/pgvector/remote vector DB 仍需后续单独设计和验收。
+
 ## 9. Source / Citation Contract
 
 固定 source 格式：
@@ -342,6 +353,8 @@ metadata filter 用途：
 - 前端默认只展示 preview/snippet。
 - `local_data/vector_index/` 不提交 Git。
 - API Key 只允许在 `.env`，本仓库只提交 `.env.example`。
+- `LLM_API_KEY` / `EMBEDDING_API_KEY` 只允许本地 env 注入，health 和 logs 不返回 key。
+- 默认 provider mode 必须 keyless deterministic 可运行。
 - RAG answer 不得无来源编造。
 - synthetic test data 必须可公开。
 

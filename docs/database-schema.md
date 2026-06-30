@@ -280,7 +280,7 @@ JSON 字段说明：
 - `metadata`
 - `embedding_id`
 
-当前没有真实 embedding，`embedding_id` 是预留字段。
+v1.6 后 `embedding_id` 保存 deterministic embedding id，用于 local vector/hybrid retrieval readiness；当前不保存真实外部 embedding vector，也不要求 FAISS、pgvector 或 remote vector store。
 
 ## rag_answer_runs
 
@@ -307,7 +307,7 @@ JSON 字段说明：
 
 `POST /api/rag/answer` 默认 `persist=true`，会写入 `rag_answer_runs` 并返回 `answer_run_id`。如果 request 设置 `persist=false`，则只返回即时 answer contract，不写入该表。
 
-隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`rag_answer_runs.citations_json` 只保存短 snippet 和 metadata preview，`source_refs_json` 只保存短 preview，`retrieval_debug_json` 只允许保存 retrieval_mode、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。12D stats 只返回聚合计数、latest question preview 和 uncertainty，不返回 citations/source_refs/retrieval_debug。v1.2 deterministic RAG Completion MVP 不接真实 LLM、embedding/vector DB，不自动修改 Interview / Study Plan / Resume / Project / Application。
+隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`rag_answer_runs.citations_json` 只保存短 snippet 和 metadata preview，`source_refs_json` 只保存短 preview，`retrieval_debug_json` 只允许保存 retrieval_mode、embedding_model、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters、score_threshold 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。12D stats 只返回聚合计数、latest question preview 和 uncertainty，不返回 citations/source_refs/retrieval_debug。v1.6 local vector/hybrid retrieval 不接真实外部 embedding/vector DB，不自动修改 Interview / Study Plan / Resume / Project / Application。
 
 ## agent_runs
 
