@@ -121,11 +121,12 @@ job_application_preparation
 3. `load_job_profile`
 4. `run_match_report`
 5. `rag_search`
-6. `run_project_rewrites`
-7. `generate_interview_questions`
-8. `generate_study_plan`
-9. `create_or_link_application`
-10. `build_final_summary`
+6. `summarize_rag_context`
+7. `run_project_rewrites`
+8. `generate_interview_questions`
+9. `generate_study_plan`
+10. `create_or_link_application`
+11. `build_final_summary`
 
 说明：
 
@@ -135,6 +136,7 @@ job_application_preparation
 - `final_summary` 只基于 refs / existing reports / generated record IDs。
 - `run_match_report` 应调用已有 Match service，不重写匹配逻辑。
 - `rag_search` 调用已有 RAG service，不重写检索逻辑；`use_rag=false` 时 step status 为 `skipped`。
+- `summarize_rag_context` 只消费 `rag_search` 的轻量 refs/counts/warnings，不读取或保存 RAG document raw_text / full chunk text。
 - `run_project_rewrites` 调用已有 Project Rewrite service；没有 active project 时 step status 为 `skipped`。
 - `generate_interview_questions` 调用 Interview Center，最多生成 6 个 deterministic questions。
 - `generate_study_plan` 调用 Study Plan Center。

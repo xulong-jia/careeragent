@@ -122,8 +122,13 @@ def test_create_agent_run_successful_workflow(db_session):
     assert data["run"]["output_refs"]["interview_question_ids"]
     assert data["run"]["output_refs"]["study_plan_id"]
     assert data["run"]["output_refs"]["application_id"]
+    assert data["run"]["output_refs"]["grounded_source_count"] == 0
+    assert data["run"]["output_refs"]["rag_context_warnings"] == [
+        "RAG context was not requested."
+    ]
     assert data["run"]["final_summary"]["created_records"]
-    assert data["steps_count"] == 10
+    assert data["run"]["final_summary"]["rag_context"]["grounded_source_count"] == 0
+    assert data["steps_count"] == 11
     _assert_refs_are_private_safe(data["run"]["input_refs"])
     _assert_refs_are_private_safe(data["run"]["output_refs"])
 
@@ -225,20 +230,21 @@ def test_get_agent_run_detail_and_ordered_steps(db_session):
     assert detail_response.status_code == 200
     detail = get_data(detail_response)
     assert detail["run"]["id"] == run["id"]
-    assert detail["steps_count"] == 10
+    assert detail["steps_count"] == 11
     assert "steps" not in detail["run"]
 
     steps_response = client.get(f"/api/agents/runs/{run['id']}/steps")
     assert steps_response.status_code == 200
     steps_data = get_data(steps_response)
-    assert steps_data["total"] == 10
-    assert [step["step_order"] for step in steps_data["steps"]] == list(range(1, 11))
+    assert steps_data["total"] == 11
+    assert [step["step_order"] for step in steps_data["steps"]] == list(range(1, 12))
     assert [step["step_name"] for step in steps_data["steps"]] == [
         "validate_inputs",
         "load_resume_version",
         "load_job_profile",
         "run_match_report",
         "rag_search",
+        "summarize_rag_context",
         "run_project_rewrites",
         "generate_interview_questions",
         "generate_study_plan",
@@ -246,7 +252,13 @@ def test_get_agent_run_detail_and_ordered_steps(db_session):
         "build_final_summary",
     ]
     rag_step = [step for step in steps_data["steps"] if step["step_name"] == "rag_search"][0]
+    summarize_step = [
+        step for step in steps_data["steps"] if step["step_name"] == "summarize_rag_context"
+    ][0]
     assert rag_step["status"] == state.STEP_STATUS_SKIPPED
+    assert summarize_step["status"] == state.STEP_STATUS_COMPLETED
+    assert summarize_step["output_refs"]["rag_source_count"] == 0
+    assert summarize_step["output_refs"]["grounded_source_count"] == 0
     for step in steps_data["steps"]:
         _assert_refs_are_private_safe(step["input_refs"])
         _assert_refs_are_private_safe(step["output_refs"])
@@ -287,12 +299,21 @@ def test_create_agent_run_with_rag_source_refs(db_session):
     run = get_data(run_response)["run"]
     assert run["status"] == state.RUN_STATUS_COMPLETED
     assert run["output_refs"]["rag_source_count"] >= 1
+    assert run["output_refs"]["grounded_source_count"] >= 1
+    assert run["output_refs"]["final_summary"]["rag_context"]["source_count"] >= 1
 
     steps = get_data(client.get(f"/api/agents/runs/{run['id']}/steps"))["steps"]
     rag_step = [step for step in steps if step["step_name"] == "rag_search"][0]
+    summarize_step = [
+        step for step in steps if step["step_name"] == "summarize_rag_context"
+    ][0]
     assert rag_step["status"] == state.STEP_STATUS_COMPLETED
     assert rag_step["output_refs"]["source_count"] >= 1
     assert "snippet" not in rag_step["output_refs"]
+    assert summarize_step["status"] == state.STEP_STATUS_COMPLETED
+    assert summarize_step["output_refs"]["grounded_source_count"] >= 1
+    assert summarize_step["output_refs"]["usable_rag_refs"]
+    assert "snippet" not in summarize_step["output_refs"]
 
 
 def test_missing_agent_run_returns_404():

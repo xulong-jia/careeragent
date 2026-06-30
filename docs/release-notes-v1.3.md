@@ -6,7 +6,7 @@ Scope: deterministic Agent Workflow Baseline + Application Linkage.
 
 ## Summary
 
-v1.3 extends `job_application_preparation` from a small deterministic workflow into an end-to-end orchestration baseline. The workflow now links Resume Version, JD, Match Report, optional RAG search, Project Rewrite, Interview Questions, Study Plan, and Application tracking records.
+v1.3 extends `job_application_preparation` from a small deterministic workflow into an end-to-end orchestration baseline. The workflow now links Resume Version, JD, Match Report, optional RAG search, RAG context summary, Project Rewrite, Interview Questions, Study Plan, and Application tracking records.
 
 This release still does not add a real LLM Agent, free-form chat, tool-calling autonomy, automatic job applications, recruitment website integration, automatic resume/project/interview/study-plan edits, embedding/vector DB, or production authentication.
 
@@ -14,12 +14,13 @@ This release still does not add a real LLM Agent, free-form chat, tool-calling a
 
 ### Workflow Baseline
 
-- Expanded `job_application_preparation` to 10 deterministic steps:
+- Expanded `job_application_preparation` to 11 deterministic steps:
   - `validate_inputs`
   - `load_resume_version`
   - `load_job_profile`
   - `run_match_report`
   - `rag_search`
+  - `summarize_rag_context`
   - `run_project_rewrites`
   - `generate_interview_questions`
   - `generate_study_plan`
@@ -32,7 +33,8 @@ This release still does not add a real LLM Agent, free-form chat, tool-calling a
   - `rag_answer_run_ids`
 - `project_ids` can be explicit; when empty, the workflow auto-discovers active projects for the selected resume version.
 - `rag_answer_run_ids` are passed into Interview and Study Plan generation as optional refs.
-- `final_summary` is exposed on `AgentRunRecord` and stored in `output_refs.final_summary`.
+- `summarize_rag_context` consumes `rag_search` refs and exposes source counts, usable refs, and warnings without storing document raw text or full chunk text.
+- `final_summary` is exposed on `AgentRunRecord` and stored in `output_refs.final_summary`, including summarized RAG context counts and warnings.
 
 ### Application Linkage
 

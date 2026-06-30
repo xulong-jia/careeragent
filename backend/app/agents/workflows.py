@@ -23,6 +23,7 @@ JOB_APPLICATION_PREPARATION = WorkflowDefinition(
         "load_job_profile",
         "run_match_report",
         "rag_search",
+        "summarize_rag_context",
         "run_project_rewrites",
         "generate_interview_questions",
         "generate_study_plan",

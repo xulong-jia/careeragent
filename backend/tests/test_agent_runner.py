@@ -4,6 +4,7 @@ from app.core.errors import AppError
 from app.models.agent import AgentRun
 from app.models.job import JobDescription, JobProfile
 from app.models.project import Project
+from app.models.rag import RagAnswerRun
 from app.models.resume import Resume, ResumeVersion
 from app.schemas.rag import RagSearchResult, RagSearchSource
 from app.services import agent_service
@@ -177,7 +178,15 @@ def test_successful_workflow_creates_ordered_steps_and_skips_rag(db_session):
     assert persisted.output_refs["study_plan_id"].startswith("study_plan_")
     assert persisted.output_refs["application_id"].startswith("app_")
     assert persisted.output_refs["rag_source_count"] == 0
+    assert persisted.output_refs["grounded_source_count"] == 0
+    assert persisted.output_refs["rag_context_warnings"] == ["RAG context was not requested."]
     assert persisted.output_refs["final_summary"]["total_score"] > 0
+    assert persisted.output_refs["final_summary"]["rag_context"] == {
+        "has_grounded_context": False,
+        "source_count": 0,
+        "grounded_source_count": 0,
+        "warnings": ["RAG context was not requested."],
+    }
     assert persisted.output_refs["final_summary"]["created_records"]
 
     step_names = [step.step_name for step in persisted.steps]
@@ -187,13 +196,14 @@ def test_successful_workflow_creates_ordered_steps_and_skips_rag(db_session):
         "load_job_profile",
         "run_match_report",
         "rag_search",
+        "summarize_rag_context",
         "run_project_rewrites",
         "generate_interview_questions",
         "generate_study_plan",
         "create_or_link_application",
         "build_final_summary",
     ]
-    assert [step.step_order for step in persisted.steps] == list(range(1, 11))
+    assert [step.step_order for step in persisted.steps] == list(range(1, 12))
     assert [step.status for step in persisted.steps] == [
         state.STEP_STATUS_COMPLETED,
         state.STEP_STATUS_COMPLETED,
@@ -205,7 +215,20 @@ def test_successful_workflow_creates_ordered_steps_and_skips_rag(db_session):
         state.STEP_STATUS_COMPLETED,
         state.STEP_STATUS_COMPLETED,
         state.STEP_STATUS_COMPLETED,
+        state.STEP_STATUS_COMPLETED,
     ]
+    summarize_step = [
+        step for step in persisted.steps if step.step_name == "summarize_rag_context"
+    ][0]
+    assert summarize_step.output_refs["rag_answer_run_ids"] == []
+    assert summarize_step.output_refs["rag_source_count"] == 0
+    assert summarize_step.output_refs["grounded_source_count"] == 0
+    assert summarize_step.output_refs["usable_rag_refs"] == []
+    assert summarize_step.output_refs["rag_context_summary"] == {
+        "has_grounded_context": False,
+        "source_titles": [],
+        "warnings": ["RAG context was not requested."],
+    }
 
     for step in persisted.steps:
         _assert_refs_are_private_safe(step.input_refs)
@@ -249,6 +272,9 @@ def test_workflow_completes_rag_search_with_source_refs(db_session, monkeypatch)
 
     persisted = db_session.get(AgentRun, run.id)
     rag_step = [step for step in persisted.steps if step.step_name == "rag_search"][0]
+    summarize_step = [
+        step for step in persisted.steps if step.step_name == "summarize_rag_context"
+    ][0]
 
     assert persisted.status == state.RUN_STATUS_COMPLETED
     assert rag_step.status == state.STEP_STATUS_COMPLETED
@@ -256,7 +282,93 @@ def test_workflow_completes_rag_search_with_source_refs(db_session, monkeypatch)
     assert rag_step.output_refs["doc_ids"] == ["rag_doc_0001"]
     assert rag_step.output_refs["chunk_ids"] == ["rag_chunk_0001"]
     assert "snippet" not in rag_step.output_refs
+    assert summarize_step.status == state.STEP_STATUS_COMPLETED
+    assert summarize_step.output_refs["rag_source_count"] == 1
+    assert summarize_step.output_refs["grounded_source_count"] == 1
+    assert summarize_step.output_refs["usable_rag_refs"] == [
+        {
+            "source_type": "rag_search",
+            "document_id": "rag_doc_0001",
+            "chunk_id": "rag_chunk_0001",
+            "title": "Synthetic RAG note",
+        }
+    ]
+    assert summarize_step.output_refs["rag_context_summary"] == {
+        "has_grounded_context": True,
+        "source_titles": ["Synthetic RAG note"],
+        "warnings": [],
+    }
+    assert "snippet" not in summarize_step.output_refs
+    assert "This snippet should not be persisted" not in str(persisted.output_refs)
     assert persisted.output_refs["rag_source_count"] == 1
+    assert persisted.output_refs["grounded_source_count"] == 1
+    assert persisted.output_refs["final_summary"]["rag_context"] == {
+        "has_grounded_context": True,
+        "source_count": 1,
+        "grounded_source_count": 1,
+        "warnings": [],
+    }
+
+
+def test_workflow_summarizes_grounded_rag_answer_run_refs(db_session):
+    _, version = _create_resume_with_version(db_session)
+    _create_job_with_profile(db_session)
+    answer_run = RagAnswerRun(
+        id="rag_answer_run_agent_0001",
+        question="What evidence supports Python API ownership?",
+        filters_json={},
+        top_k=1,
+        retrieval_mode="deterministic_lexical",
+        answer="Grounded deterministic answer.",
+        answer_type="deterministic_summary",
+        grounded=True,
+        uncertainty="grounded",
+        evidence_summary=["Grounded evidence summary."],
+        citations_json=[],
+        source_refs_json=[],
+        retrieval_debug_json={
+            "retrieval_mode": "deterministic_lexical",
+            "candidate_count": 1,
+            "top_k": 1,
+        },
+    )
+    db_session.add(answer_run)
+    db_session.commit()
+
+    run = agent_service.create_run_for_workflow(
+        db_session,
+        {
+            "workflow_name": state.WORKFLOW_JOB_APPLICATION_PREPARATION,
+            "resume_version_id": version.id,
+            "jd_id": "jd_agent_0001",
+            "use_rag": False,
+            "rag_answer_run_ids": [answer_run.id],
+        },
+    )
+
+    persisted = db_session.get(AgentRun, run.id)
+    summarize_step = [
+        step for step in persisted.steps if step.step_name == "summarize_rag_context"
+    ][0]
+
+    assert persisted.status == state.RUN_STATUS_COMPLETED
+    assert summarize_step.status == state.STEP_STATUS_COMPLETED
+    assert summarize_step.output_refs["rag_source_count"] == 0
+    assert summarize_step.output_refs["grounded_source_count"] == 1
+    assert summarize_step.output_refs["usable_rag_refs"] == [
+        {"source_type": "rag_answer_run", "source_id": answer_run.id}
+    ]
+    assert summarize_step.output_refs["rag_context_summary"] == {
+        "has_grounded_context": True,
+        "source_titles": [],
+        "warnings": [],
+    }
+    assert persisted.output_refs["final_summary"]["rag_context"] == {
+        "has_grounded_context": True,
+        "source_count": 0,
+        "grounded_source_count": 1,
+        "warnings": [],
+    }
 
 
 def test_failed_step_records_error_and_marks_run_failed(db_session, monkeypatch):

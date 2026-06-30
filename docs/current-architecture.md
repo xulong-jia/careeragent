@@ -116,7 +116,7 @@ sqlite:///./local_data/careeragent.db
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
 - RAG：deterministic chunking + lexical retrieval + deterministic grounded answer。v1.2 RAG Completion deterministic MVP 已完成，覆盖 contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs，answer response 在保留 `sources` 的同时补齐 `citations`、`source_refs`、`evidence_summary`、safe `retrieval_debug` 和可选 `answer_run_id`；默认不接真实 LLM、embedding 或 vector DB。
-- Agent：v1.3 deterministic workflow baseline，固定 `job_application_preparation` state machine 串联 Resume Version、JD、Match、可选 RAG search、Project Rewrite、Interview Questions、Study Plan 和 Application linkage；不是自由工具调用 Agent，不自动投递。
+- Agent：v1.3 deterministic workflow baseline，固定 `job_application_preparation` state machine 串联 Resume Version、JD、Match、可选 RAG search、RAG context summary、Project Rewrite、Interview Questions、Study Plan 和 Application linkage；不是自由工具调用 Agent，不自动投递。
 - Evaluation：deterministic smoke set，不是 LLM judge。
 
 ### Resume Center v0.8
@@ -205,11 +205,12 @@ Agent Workflow 当前链路：
 3. `load_resume_version` 和 `load_job_profile` 读取已有 DB-backed refs。
 4. `run_match_report` 调用已有 Match service，生成并保存 match report。
 5. `rag_search` 仅在 `use_rag=true` 时执行 legacy deterministic lexical search；未启用时 step 标记 skipped。
-6. `run_project_rewrites` 使用传入 `project_ids`，或按 `resume_version_id` 自动发现 active projects；没有项目时 skipped。
-7. `generate_interview_questions` 调用 Interview Center，最多生成 6 个 deterministic questions，可携带 grounded RAG answer run refs。
-8. `generate_study_plan` 调用 Study Plan Center，基于 match report、首个 project rewrite 和可选 grounded RAG answer run refs 生成 plan。
-9. `create_or_link_application` 创建 draft application，或绑定已有 application；如果 `create_application=false` 且未传 `application_id`，则跳过。
-10. `build_final_summary` 汇总 `match_report_id`、`project_rewrite_ids`、`interview_question_ids`、`study_plan_id`、`application_id` 和 deterministic next actions。
+6. `summarize_rag_context` 汇总 `rag_search` refs、source counts、usable refs 和 warnings，不读取或保存 document raw text / full chunk text。
+7. `run_project_rewrites` 使用传入 `project_ids`，或按 `resume_version_id` 自动发现 active projects；没有项目时 skipped。
+8. `generate_interview_questions` 调用 Interview Center，最多生成 6 个 deterministic questions，可携带 grounded RAG answer run refs。
+9. `generate_study_plan` 调用 Study Plan Center，基于 match report、首个 project rewrite 和可选 grounded RAG answer run refs 生成 plan。
+10. `create_or_link_application` 创建 draft application，或绑定已有 application；如果 `create_application=false` 且未传 `application_id`，则跳过。
+11. `build_final_summary` 汇总 `match_report_id`、`project_rewrite_ids`、`interview_question_ids`、`study_plan_id`、`application_id`、summarized RAG context 和 deterministic next actions。
 
 `applications.agent_run_id` 将投递 tracking record 与 workflow run 连接。Application 仍由用户手动维护状态，workflow 不自动投递、不接招聘网站、不自动提交材料、不自动状态流转。
 
@@ -247,7 +248,7 @@ Dashboard 当前展示：
 | v1.2 RAG Completion 12C | KnowledgeBasePage 接入 answer history list/detail、grounded/uncertainty/retrieval_mode filters、citations/source_refs/retrieval_debug 展示；仍不展示 raw_text/full chunk text，不做 RAG evaluation dashboard |
 | v1.2 RAG Completion 12D | 新增 `GET /api/rag/stats`、Dashboard RAG stats，并为 Interview / Study Plan generation 增加可选 `rag_answer_run_ids`；仅 grounded answer runs 作为 preview-first refs 补充，ungrounded runs 不作为强来源 |
 | v1.2 RAG Completion 12E | 新增 release notes，并完成 README、architecture、API reference、database schema、demo script 和 final acceptance report 最终口径收口；不创建 tag |
-| v1.3 Agent Workflow Baseline + Application Linkage | `job_application_preparation` 扩展为 10 步 deterministic workflow，串联 Match、Project Rewrite、Interview、Study Plan 和 Application draft/linkage；AgentRunsPage、ApplicationTrackerPage、Dashboard 和 docs 已接入 `agent_run_id` 与 `final_summary` |
+| v1.3 Agent Workflow Baseline + Application Linkage | `job_application_preparation` 扩展为 11 步 deterministic workflow，串联 Match、RAG context summary、Project Rewrite、Interview、Study Plan 和 Application draft/linkage；AgentRunsPage、ApplicationTrackerPage、Dashboard 和 docs 已接入 `agent_run_id` 与 `final_summary` |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做

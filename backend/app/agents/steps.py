@@ -8,6 +8,7 @@ from app.core.errors import AppError
 from app.models.application import Application
 from app.models.job import JobDescription, JobProfile
 from app.models.project import Project
+from app.models.rag import RagAnswerRun
 from app.models.resume import Resume, ResumeVersion
 from app.schemas.applications import ApplicationCreateRequest, ApplicationUpdateRequest
 from app.schemas.interviews import InterviewQuestionGenerateRequest
@@ -68,6 +69,12 @@ def _normalize_id_list(value: object) -> list[str]:
         if text and text not in normalized:
             normalized.append(text)
     return normalized
+
+
+def _normalize_string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [text for item in value if (text := str(item).strip())]
 
 
 def _latest_active_resume_version(db: Session, resume_id: str) -> ResumeVersion | None:
@@ -344,6 +351,11 @@ def run_match_report(db: Session, context: WorkflowContext) -> StepResult:
 def rag_search(db: Session, context: WorkflowContext) -> StepResult:
     if not bool(context.resolved.get("use_rag", False)):
         context.resolved["rag_source_count"] = 0
+        context.resolved["rag_doc_ids"] = []
+        context.resolved["rag_chunk_ids"] = []
+        context.resolved["rag_source_titles"] = []
+        context.resolved["rag_source_scores"] = []
+        context.resolved["rag_uncertainty"] = None
         return StepResult(
             status=state.STEP_STATUS_SKIPPED,
             output_refs={"reason": "use_rag is false", "source_count": 0},
@@ -370,6 +382,9 @@ def rag_search(db: Session, context: WorkflowContext) -> StepResult:
     context.resolved["rag_source_count"] = len(sources)
     context.resolved["rag_doc_ids"] = [source.doc_id for source in sources]
     context.resolved["rag_chunk_ids"] = [source.chunk_id for source in sources]
+    context.resolved["rag_source_titles"] = [source.title for source in sources]
+    context.resolved["rag_source_scores"] = [source.score for source in sources]
+    context.resolved["rag_uncertainty"] = result.uncertainty
     return StepResult(
         status=state.STEP_STATUS_COMPLETED,
         output_refs={
@@ -380,6 +395,84 @@ def rag_search(db: Session, context: WorkflowContext) -> StepResult:
             "uncertainty": result.uncertainty,
         },
     )
+
+
+def summarize_rag_context(db: Session, context: WorkflowContext) -> StepResult:
+    rag_answer_run_ids = _normalize_id_list(context.resolved.get("rag_answer_run_ids"))
+    doc_ids = _normalize_string_list(context.resolved.get("rag_doc_ids"))
+    chunk_ids = _normalize_string_list(context.resolved.get("rag_chunk_ids"))
+    titles = _normalize_string_list(context.resolved.get("rag_source_titles"))
+    rag_source_count = int(context.resolved.get("rag_source_count") or 0)
+    answer_run_by_id = {}
+    if rag_answer_run_ids:
+        rows = db.execute(
+            select(
+                RagAnswerRun.id,
+                RagAnswerRun.grounded,
+                RagAnswerRun.uncertainty,
+            ).where(RagAnswerRun.id.in_(rag_answer_run_ids))
+        ).all()
+        answer_run_by_id = {str(row.id): row for row in rows}
+
+    usable_rag_refs: list[dict[str, object]] = []
+    for index, doc_id in enumerate(doc_ids):
+        chunk_id = chunk_ids[index] if index < len(chunk_ids) else None
+        ref: dict[str, object] = {
+            "source_type": "rag_search",
+            "document_id": doc_id,
+        }
+        if chunk_id:
+            ref["chunk_id"] = chunk_id
+        if index < len(titles):
+            ref["title"] = titles[index]
+        usable_rag_refs.append(ref)
+
+    missing_answer_run_ids: list[str] = []
+    ungrounded_answer_run_ids: list[str] = []
+    for answer_run_id in rag_answer_run_ids:
+        answer_run = answer_run_by_id.get(answer_run_id)
+        if answer_run is None:
+            missing_answer_run_ids.append(answer_run_id)
+            continue
+        if not bool(answer_run.grounded):
+            ungrounded_answer_run_ids.append(answer_run_id)
+            continue
+        usable_rag_refs.append(
+            {
+                "source_type": "rag_answer_run",
+                "source_id": answer_run_id,
+            }
+        )
+
+    grounded_source_count = len(usable_rag_refs)
+    warnings: list[str] = []
+    if missing_answer_run_ids:
+        warnings.append("Some RAG answer run refs were not found.")
+    if ungrounded_answer_run_ids:
+        warnings.append("Some RAG answer run refs were ungrounded.")
+    if rag_source_count == 0:
+        if bool(context.resolved.get("use_rag", False)):
+            warnings.append("No grounded RAG search sources were found.")
+        elif not rag_answer_run_ids:
+            warnings.append("RAG context was not requested.")
+    elif grounded_source_count < rag_source_count:
+        warnings.append("Some RAG search sources did not include usable document refs.")
+
+    rag_context_summary = {
+        "has_grounded_context": grounded_source_count > 0,
+        "source_titles": titles,
+        "warnings": warnings,
+    }
+    output_refs = {
+        "rag_answer_run_ids": rag_answer_run_ids,
+        "rag_source_count": rag_source_count,
+        "grounded_source_count": grounded_source_count,
+        "usable_rag_refs": usable_rag_refs,
+        "rag_context_summary": rag_context_summary,
+    }
+    context.resolved.update(output_refs)
+    context.resolved["rag_context_warnings"] = warnings
+    return StepResult(status=state.STEP_STATUS_COMPLETED, output_refs=output_refs)
 
 
 def _projects_for_workflow(db: Session, context: WorkflowContext) -> list[Project]:
@@ -576,6 +669,15 @@ def build_final_summary(db: Session, context: WorkflowContext) -> StepResult:
     jd_id = str(context.resolved["jd_id"])
     match_report_id = str(context.resolved["match_report_id"])
     rag_source_count = int(context.resolved.get("rag_source_count") or 0)
+    grounded_source_count = int(context.resolved.get("grounded_source_count") or 0)
+    rag_context_summary = context.resolved.get("rag_context_summary")
+    if not isinstance(rag_context_summary, dict):
+        rag_context_summary = {
+            "has_grounded_context": grounded_source_count > 0,
+            "source_titles": [],
+            "warnings": [],
+        }
+    rag_context_warnings = list(rag_context_summary.get("warnings") or [])
     project_rewrite_ids = list(context.resolved.get("project_rewrite_ids") or [])
     interview_question_ids = list(context.resolved.get("interview_question_ids") or [])
     study_plan_id = context.resolved.get("study_plan_id")
@@ -584,6 +686,12 @@ def build_final_summary(db: Session, context: WorkflowContext) -> StepResult:
         "total_score": int(context.resolved.get("match_total_score") or 0),
         "top_strengths": list(context.resolved.get("match_strengths") or [])[:3],
         "top_gaps": list(context.resolved.get("match_gaps") or [])[:3],
+        "rag_context": {
+            "has_grounded_context": bool(rag_context_summary.get("has_grounded_context")),
+            "source_count": rag_source_count,
+            "grounded_source_count": grounded_source_count,
+            "warnings": rag_context_warnings,
+        },
         "next_actions": [
             "Review generated project rewrite suggestions.",
             "Use generated interview questions for targeted practice.",
@@ -616,6 +724,10 @@ def build_final_summary(db: Session, context: WorkflowContext) -> StepResult:
             "application_id": application_id,
             "rag_answer_run_ids": list(context.resolved.get("rag_answer_run_ids") or []),
             "rag_source_count": rag_source_count,
+            "grounded_source_count": grounded_source_count,
+            "rag_context_warnings": rag_context_warnings,
+            "rag_context_summary": rag_context_summary,
+            "usable_rag_refs": list(context.resolved.get("usable_rag_refs") or []),
             "final_summary": final_summary,
         },
     )
@@ -627,6 +739,7 @@ STEP_EXECUTORS = {
     "load_job_profile": load_job_profile,
     "run_match_report": run_match_report,
     "rag_search": rag_search,
+    "summarize_rag_context": summarize_rag_context,
     "run_project_rewrites": run_project_rewrites,
     "generate_interview_questions": generate_interview_questions,
     "generate_study_plan": generate_study_plan,
