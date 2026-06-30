@@ -1,11 +1,15 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.applications import (
     ApplicationCreateRequest,
+    ApplicationReflectionRequest,
     ApplicationRecord,
     ApplicationStats,
+    ApplicationStatusHistoryRecord,
     ApplicationUpdateRequest,
 )
 from app.schemas.common import ApiResponse, ListResponse
@@ -37,7 +41,13 @@ async def list_applications(
     role_category: str | None = Query(default=None),
     resume_version_id: str | None = Query(default=None),
     jd_id: str | None = Query(default=None),
+    match_report_id: str | None = Query(default=None),
     agent_run_id: str | None = Query(default=None),
+    priority: str | None = Query(default=None),
+    apply_date_from: date | None = Query(default=None),
+    apply_date_to: date | None = Query(default=None),
+    next_step_date_from: date | None = Query(default=None),
+    next_step_date_to: date | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     items = application_service.list_applications(
@@ -47,7 +57,13 @@ async def list_applications(
         role_category=role_category,
         resume_version_id=resume_version_id,
         jd_id=jd_id,
+        match_report_id=match_report_id,
         agent_run_id=agent_run_id,
+        priority=priority,
+        apply_date_from=apply_date_from,
+        apply_date_to=apply_date_to,
+        next_step_date_from=next_step_date_from,
+        next_step_date_to=next_step_date_to,
     )
     return {
         "data": ListResponse(items=items, total=len(items)),
@@ -74,6 +90,22 @@ async def get_application(
     return {"data": application, "request_id": request.state.request_id}
 
 
+@router.get(
+    "/{application_id}/status-history",
+    response_model=ApiResponse[ListResponse[ApplicationStatusHistoryRecord]],
+)
+async def list_application_status_history(
+    request: Request,
+    application_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    items = application_service.list_status_history(db, application_id)
+    return {
+        "data": ListResponse(items=items, total=len(items)),
+        "request_id": request.state.request_id,
+    }
+
+
 @router.patch("/{application_id}", response_model=ApiResponse[ApplicationRecord])
 async def update_application(
     request: Request,
@@ -82,4 +114,19 @@ async def update_application(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     application = application_service.update_application(db, application_id, payload)
+    return {"data": application, "request_id": request.state.request_id}
+
+
+@router.post("/{application_id}/reflection", response_model=ApiResponse[ApplicationRecord])
+async def update_application_reflection(
+    request: Request,
+    application_id: str,
+    payload: ApplicationReflectionRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    application = application_service.update_application_reflection(
+        db,
+        application_id,
+        payload,
+    )
     return {"data": application, "request_id": request.state.request_id}

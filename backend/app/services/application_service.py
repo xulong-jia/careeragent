@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -11,8 +12,10 @@ from app.models.resume import ResumeVersion
 from app.repositories import application_repository
 from app.schemas.applications import (
     ApplicationCreateRequest,
+    ApplicationReflectionRequest,
     ApplicationRecord,
     ApplicationStats,
+    ApplicationStatusHistoryRecord,
     ApplicationUpdateRequest,
 )
 
@@ -32,6 +35,8 @@ APPLICATION_STATUSES = {
 }
 INTERVIEW_STATUSES = {"first_interview", "second_interview", "hr_interview"}
 INACTIVE_STATUSES = {"offer", "rejected", "withdrawn", "archived"}
+PIPELINE_STATUSES = APPLICATION_STATUSES - {"saved", "ready_to_apply"}
+APPLICATION_PRIORITIES = {"low", "medium", "high"}
 
 
 def _invalid_field(field: str, message: str) -> AppError:
@@ -64,6 +69,13 @@ def _normalize_status(value: str) -> str:
     return normalized
 
 
+def _normalize_priority(value: str) -> str:
+    normalized = _normalize_required_text(value, "priority").lower()
+    if normalized not in APPLICATION_PRIORITIES:
+        raise _invalid_field("priority", "Unsupported application priority.")
+    return normalized
+
+
 def _normalize_tags(tags: list[str] | None) -> list[str]:
     normalized: list[str] = []
     for tag in tags or []:
@@ -71,6 +83,28 @@ def _normalize_tags(tags: list[str] | None) -> list[str]:
         if value and value not in normalized:
             normalized.append(value)
     return normalized
+
+
+def _normalize_string_list(values: list[str] | None) -> list[str]:
+    normalized: list[str] = []
+    for item in values or []:
+        value = str(item).strip()
+        if value and value not in normalized:
+            normalized.append(value)
+    return normalized
+
+
+def _require_application_refs(
+    jd_id: str | None,
+    resume_version_id: str | None,
+) -> None:
+    if not jd_id:
+        raise _invalid_field("jd_id", "jd_id is required for application tracking.")
+    if not resume_version_id:
+        raise _invalid_field(
+            "resume_version_id",
+            "resume_version_id is required for application tracking.",
+        )
 
 
 def _latest_job_profile_role_category(db: Session, jd_id: str | None) -> str | None:
@@ -179,6 +213,7 @@ def create_application(
         match_report_id=payload.match_report_id,
         agent_run_id=payload.agent_run_id,
     )
+    _require_application_refs(jd_id, resume_version_id)
     role_category = _normalize_optional_text(payload.role_category, "role_category")
     if role_category is None:
         role_category = _latest_job_profile_role_category(db, jd_id)
@@ -195,8 +230,14 @@ def create_application(
         status=_normalize_status(payload.status),
         apply_date=payload.apply_date,
         next_step_date=payload.next_step_date,
+        source_url=_normalize_optional_text(payload.source_url, "source_url"),
+        location=_normalize_optional_text(payload.location, "location"),
+        priority=_normalize_priority(payload.priority),
+        notes=_normalize_optional_text(payload.notes, "notes"),
         interview_notes=_normalize_optional_text(payload.interview_notes, "interview_notes"),
         reflection=_normalize_optional_text(payload.reflection, "reflection"),
+        interview_question_ids=_normalize_string_list(payload.interview_question_ids),
+        last_contact_date=payload.last_contact_date,
         tags=_normalize_tags(payload.tags),
     )
 
@@ -209,9 +250,16 @@ def list_applications(
     role_category: str | None = None,
     resume_version_id: str | None = None,
     jd_id: str | None = None,
+    match_report_id: str | None = None,
     agent_run_id: str | None = None,
+    priority: str | None = None,
+    apply_date_from: date | None = None,
+    apply_date_to: date | None = None,
+    next_step_date_from: date | None = None,
+    next_step_date_to: date | None = None,
 ) -> list[ApplicationRecord]:
     normalized_status = _normalize_status(status) if status else None
+    normalized_priority = _normalize_priority(priority) if priority else None
     return application_repository.list_applications(
         db,
         status=normalized_status,
@@ -222,7 +270,13 @@ def list_applications(
             "resume_version_id",
         ),
         jd_id=_normalize_optional_text(jd_id, "jd_id"),
+        match_report_id=_normalize_optional_text(match_report_id, "match_report_id"),
         agent_run_id=_normalize_optional_text(agent_run_id, "agent_run_id"),
+        priority=normalized_priority,
+        apply_date_from=apply_date_from,
+        apply_date_to=apply_date_to,
+        next_step_date_from=next_step_date_from,
+        next_step_date_to=next_step_date_to,
     )
 
 
@@ -269,6 +323,7 @@ def update_application(
             agent_run_id=agent_run_id,
         )
     )
+    _require_application_refs(resolved_jd_id, resolved_resume_version_id)
 
     normalized_role_category = None
     clear_role_category = False
@@ -293,12 +348,9 @@ def update_application(
         role_category=normalized_role_category,
         clear_role_category=clear_role_category,
         jd_id=resolved_jd_id,
-        clear_jd_id=("jd_id" in update_data and update_data["jd_id"] is None),
+        clear_jd_id=False,
         resume_version_id=resolved_resume_version_id,
-        clear_resume_version_id=(
-            "resume_version_id" in update_data
-            and update_data["resume_version_id"] is None
-        ),
+        clear_resume_version_id=False,
         match_report_id=resolved_match_report_id,
         clear_match_report_id=(
             "match_report_id" in update_data
@@ -311,11 +363,44 @@ def update_application(
         status=_normalize_status(update_data["status"])
         if "status" in update_data and update_data["status"] is not None
         else None,
+        status_reason=_normalize_optional_text(
+            update_data.get("status_reason"),
+            "status_reason",
+        )
+        if "status_reason" in update_data
+        else None,
+        status_note=_normalize_optional_text(update_data.get("status_note"), "status_note")
+        if "status_note" in update_data
+        else None,
         apply_date=update_data.get("apply_date"),
         clear_apply_date=("apply_date" in update_data and update_data["apply_date"] is None),
         next_step_date=update_data.get("next_step_date"),
         clear_next_step_date=(
             "next_step_date" in update_data and update_data["next_step_date"] is None
+        ),
+        source_url=_normalize_optional_text(update_data.get("source_url"), "source_url")
+        if "source_url" in update_data
+        else None,
+        clear_source_url=(
+            "source_url" in update_data
+            and _normalize_optional_text(update_data["source_url"], "source_url") is None
+        ),
+        location=_normalize_optional_text(update_data.get("location"), "location")
+        if "location" in update_data
+        else None,
+        clear_location=(
+            "location" in update_data
+            and _normalize_optional_text(update_data["location"], "location") is None
+        ),
+        priority=_normalize_priority(update_data["priority"])
+        if "priority" in update_data and update_data["priority"] is not None
+        else None,
+        notes=_normalize_optional_text(update_data.get("notes"), "notes")
+        if "notes" in update_data
+        else None,
+        clear_notes=(
+            "notes" in update_data
+            and _normalize_optional_text(update_data["notes"], "notes") is None
         ),
         interview_notes=_normalize_optional_text(
             update_data.get("interview_notes"),
@@ -335,10 +420,84 @@ def update_application(
             "reflection" in update_data
             and _normalize_optional_text(update_data["reflection"], "reflection") is None
         ),
+        interview_question_ids=_normalize_string_list(update_data["interview_question_ids"])
+        if "interview_question_ids" in update_data
+        and update_data["interview_question_ids"] is not None
+        else None,
+        last_contact_date=update_data.get("last_contact_date"),
+        clear_last_contact_date=(
+            "last_contact_date" in update_data
+            and update_data["last_contact_date"] is None
+        ),
         tags=_normalize_tags(update_data["tags"])
         if "tags" in update_data and update_data["tags"] is not None
         else None,
     )
+
+
+def _build_reflection_text(payload: ApplicationReflectionRequest) -> str | None:
+    sections: list[str] = []
+    reflection = _normalize_optional_text(payload.reflection, "reflection")
+    if reflection:
+        sections.append(reflection)
+    failure_reason = _normalize_optional_text(payload.failure_reason, "failure_reason")
+    if failure_reason:
+        sections.append(f"Failure reason: {failure_reason}")
+    preparation_gaps = _normalize_string_list(payload.preparation_gaps)
+    if preparation_gaps:
+        sections.append(f"Preparation gaps: {', '.join(preparation_gaps)}")
+    next_actions = _normalize_string_list(payload.next_actions)
+    if next_actions:
+        sections.append(f"Next actions: {', '.join(next_actions)}")
+    note = _normalize_optional_text(payload.note, "note")
+    if note:
+        sections.append(f"Note: {note}")
+    return "\n".join(sections) or None
+
+
+def update_application_reflection(
+    db: Session,
+    application_id: str,
+    payload: ApplicationReflectionRequest,
+) -> ApplicationRecord:
+    application = application_repository.get_application_model(db, application_id)
+    if not application:
+        raise AppError(
+            code="application_not_found",
+            message="Application was not found.",
+            status_code=404,
+            details={"application_id": application_id},
+        )
+
+    reflection = _build_reflection_text(payload)
+    interview_notes = _normalize_optional_text(
+        payload.interview_notes,
+        "interview_notes",
+    )
+    tags = _normalize_tags(
+        [*(application.tags or []), *_normalize_string_list(payload.weakness_tags)]
+    )
+    return application_repository.update_application(
+        db,
+        application,
+        interview_notes=interview_notes,
+        reflection=reflection,
+        tags=tags,
+    )
+
+
+def list_status_history(
+    db: Session,
+    application_id: str,
+) -> list[ApplicationStatusHistoryRecord]:
+    if not application_repository.get_application_model(db, application_id):
+        raise AppError(
+            code="application_not_found",
+            message="Application was not found.",
+            status_code=404,
+            details={"application_id": application_id},
+        )
+    return application_repository.list_status_history(db, application_id)
 
 
 def get_application_stats(db: Session) -> ApplicationStats:
@@ -346,14 +505,59 @@ def get_application_stats(db: Session) -> ApplicationStats:
     by_status = {status: 0 for status in sorted(APPLICATION_STATUSES)}
     for application in applications:
         by_status[application.status] = by_status.get(application.status, 0) + 1
+    total = len(applications)
+    interview_count = sum(by_status.get(status, 0) for status in INTERVIEW_STATUSES)
+    offer_count = by_status.get("offer", 0)
+    rejected_count = by_status.get("rejected", 0)
+    withdrawn_count = by_status.get("withdrawn", 0)
+    active_count = sum(
+        count for status, count in by_status.items() if status not in INACTIVE_STATUSES
+    )
+    applied_count = sum(by_status.get(status, 0) for status in PIPELINE_STATUSES)
+    today = date.today()
+    upcoming_until = today + timedelta(days=14)
+    active_applications = [
+        application
+        for application in applications
+        if application.status not in INACTIVE_STATUSES
+    ]
+    upcoming_count = sum(
+        1
+        for application in active_applications
+        if application.next_step_date
+        and today <= application.next_step_date <= upcoming_until
+    )
+    overdue_count = sum(
+        1
+        for application in active_applications
+        if application.next_step_date and application.next_step_date < today
+    )
+    latest_applications = sorted(
+        applications,
+        key=lambda application: (application.created_at, application.application_id),
+        reverse=True,
+    )[:5]
+
+    def _rate(numerator: int, denominator: int) -> float:
+        if denominator <= 0:
+            return 0
+        return round(numerator / denominator, 4)
 
     return ApplicationStats(
-        total_applications=len(applications),
+        total=total,
+        total_applications=total,
         by_status=by_status,
-        interview_count=sum(by_status.get(status, 0) for status in INTERVIEW_STATUSES),
-        offer_count=by_status.get("offer", 0),
-        rejected_count=by_status.get("rejected", 0),
-        active_count=sum(
-            count for status, count in by_status.items() if status not in INACTIVE_STATUSES
-        ),
+        active_count=active_count,
+        interview_count=interview_count,
+        offer_count=offer_count,
+        rejected_count=rejected_count,
+        withdrawn_count=withdrawn_count,
+        conversion={
+            "applied_to_interview_rate": _rate(interview_count, applied_count),
+            "interview_to_offer_rate": _rate(offer_count, interview_count),
+            "applied_to_offer_rate": _rate(offer_count, applied_count),
+        },
+        upcoming_count=upcoming_count,
+        overdue_count=overdue_count,
+        latest_applications=latest_applications,
     )

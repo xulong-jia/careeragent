@@ -96,7 +96,7 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 ### Dashboard
 
-回到 Dashboard，确认展示 profile readiness、resume parse status、risk flags count、project count、active project count、latest project status，以及 Resume、JD、Match、Knowledge、Agent、Applications、Quality、Evaluation 统计。若刚运行 seed 脚本，应看到多个模块已有数据。
+回到 Dashboard，确认展示 profile readiness、resume parse status、risk flags count、project count、active project count、latest project status，以及 Resume、JD、Match、Knowledge、Agent、Applications total/active/upcoming/overdue/conversion、Quality、Evaluation 统计。若刚运行 seed 脚本，应看到多个模块已有数据。
 
 ### JD Center
 
@@ -179,12 +179,16 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 ### Applications
 
-1. 创建手动 application record。
-2. 绑定 `jd_id`、`resume_version_id`、`match_report_id` 和可选 `agent_run_id`。
-3. 如果刚运行 Agent workflow，可在列表或详情中查看 Agent 创建/绑定的 draft application。
-4. 修改 status。
-5. 使用 status / company / jd_id / resume_version_id / agent_run_id 筛选。
-6. 查看 stats。
+1. 创建手动 application record，必须绑定 `jd_id` 和 `resume_version_id`；可选绑定 `match_report_id` 和 `agent_run_id`。
+2. 填写 company、role title、role category、status、priority、apply date、next step date、source URL、location、notes、interview notes、reflection、interview question IDs 和 tags。
+3. 如果刚运行 Agent workflow，可在 Application Board、列表或详情中查看 Agent 创建/绑定的 draft application。
+4. 修改 status，并填写 status reason / note；确认 detail 中 status history 新增一条记录。
+5. 更新 notes、priority、dates、reflection 等非状态字段，确认 status history 不重复新增。
+6. 使用 status / company / role category / priority / jd_id / resume_version_id / match_report_id / agent_run_id 筛选。
+7. 在 reflection 表单填写 interview feedback、failure reason、preparation gaps、next actions 和 weakness tags；确认只更新 Application，不自动写 Bad Case 或 Study Plan。
+8. 回到 Dashboard，查看 application total、active、interview、offer、rejected、upcoming、overdue、conversion 和 latest application。
+
+当前 Applications 只做手动运营 tracking，不自动投递，不接招聘网站，不自动状态流转，不保存完整投递材料、简历原文、JD 原文或完整面试复盘。
 
 ### Quality Review
 

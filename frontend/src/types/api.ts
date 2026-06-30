@@ -988,6 +988,19 @@ export type ApplicationStatus =
   | "withdrawn"
   | "archived";
 
+export type ApplicationPriority = "low" | "medium" | "high";
+
+export type ApplicationStatusHistoryRecord = {
+  history_id: string;
+  application_id: string;
+  from_status: ApplicationStatus | null;
+  to_status: ApplicationStatus;
+  changed_at: string;
+  reason: string | null;
+  note: string | null;
+  created_at: string;
+};
+
 export type ApplicationRecord = {
   application_id: string;
   user_id: string;
@@ -1001,9 +1014,16 @@ export type ApplicationRecord = {
   status: ApplicationStatus;
   apply_date: string | null;
   next_step_date: string | null;
+  source_url: string | null;
+  location: string | null;
+  priority: ApplicationPriority;
+  notes: string | null;
   interview_notes: string | null;
   reflection: string | null;
+  interview_question_ids: string[];
+  last_contact_date: string | null;
   tags: string[];
+  status_history: ApplicationStatusHistoryRecord[];
   created_at: string;
   updated_at: string;
 };
@@ -1019,12 +1039,31 @@ export type ApplicationCreatePayload = {
   status?: ApplicationStatus;
   apply_date?: string | null;
   next_step_date?: string | null;
+  source_url?: string | null;
+  location?: string | null;
+  priority?: ApplicationPriority;
+  notes?: string | null;
   interview_notes?: string | null;
   reflection?: string | null;
+  interview_question_ids?: string[];
+  last_contact_date?: string | null;
   tags?: string[];
 };
 
-export type ApplicationUpdatePayload = Partial<ApplicationCreatePayload>;
+export type ApplicationUpdatePayload = Partial<ApplicationCreatePayload> & {
+  status_reason?: string | null;
+  status_note?: string | null;
+};
+
+export type ApplicationReflectionPayload = {
+  reflection?: string | null;
+  interview_notes?: string | null;
+  failure_reason?: string | null;
+  preparation_gaps?: string[];
+  next_actions?: string[];
+  weakness_tags?: string[];
+  note?: string | null;
+};
 
 export type ApplicationFilters = {
   status?: ApplicationStatus | "";
@@ -1032,16 +1071,32 @@ export type ApplicationFilters = {
   roleCategory?: string;
   resumeVersionId?: string;
   jdId?: string;
+  matchReportId?: string;
   agentRunId?: string;
+  priority?: ApplicationPriority | "";
+  applyDateFrom?: string;
+  applyDateTo?: string;
+  nextStepDateFrom?: string;
+  nextStepDateTo?: string;
 };
 
 export type ApplicationStats = {
+  total: number;
   total_applications: number;
   by_status: Record<ApplicationStatus, number>;
+  active_count: number;
   interview_count: number;
   offer_count: number;
   rejected_count: number;
-  active_count: number;
+  withdrawn_count: number;
+  conversion: {
+    applied_to_interview_rate: number;
+    interview_to_offer_rate: number;
+    applied_to_offer_rate: number;
+  };
+  upcoming_count: number;
+  overdue_count: number;
+  latest_applications: ApplicationRecord[];
 };
 
 export type WorkbenchState = {

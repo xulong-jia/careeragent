@@ -3,7 +3,9 @@ import type {
   ApplicationCreatePayload,
   ApplicationFilters,
   ApplicationRecord,
+  ApplicationReflectionPayload,
   ApplicationStats,
+  ApplicationStatusHistoryRecord,
   ApplicationUpdatePayload,
   ListResponse,
 } from "../types/api";
@@ -39,8 +41,26 @@ export function listApplications(
   if (filters.jdId) {
     params.set("jd_id", filters.jdId);
   }
+  if (filters.matchReportId) {
+    params.set("match_report_id", filters.matchReportId);
+  }
   if (filters.agentRunId) {
     params.set("agent_run_id", filters.agentRunId);
+  }
+  if (filters.priority) {
+    params.set("priority", filters.priority);
+  }
+  if (filters.applyDateFrom) {
+    params.set("apply_date_from", filters.applyDateFrom);
+  }
+  if (filters.applyDateTo) {
+    params.set("apply_date_to", filters.applyDateTo);
+  }
+  if (filters.nextStepDateFrom) {
+    params.set("next_step_date_from", filters.nextStepDateFrom);
+  }
+  if (filters.nextStepDateTo) {
+    params.set("next_step_date_to", filters.nextStepDateTo);
   }
   const query = params.toString();
   return requestJson<ListResponse<ApplicationRecord>>(
@@ -65,6 +85,30 @@ export function updateApplication(
     },
     body: JSON.stringify(payload),
   });
+}
+
+export function updateApplicationReflection(
+  applicationId: string,
+  payload: ApplicationReflectionPayload,
+): Promise<ApplicationRecord> {
+  return requestJson<ApplicationRecord>(
+    `/api/applications/${applicationId}/reflection`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function listApplicationStatusHistory(
+  applicationId: string,
+): Promise<ListResponse<ApplicationStatusHistoryRecord>> {
+  return requestJson<ListResponse<ApplicationStatusHistoryRecord>>(
+    `/api/applications/${applicationId}/status-history`,
+  );
 }
 
 export function getApplicationStats(): Promise<ApplicationStats> {

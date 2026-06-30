@@ -9,6 +9,7 @@ import app.models  # noqa: F401
 
 def test_orm_metadata_contains_applications_table():
     assert "applications" in Base.metadata.tables
+    assert "application_status_history" in Base.metadata.tables
 
 
 def test_alembic_migration_creates_applications_table(tmp_path, monkeypatch):
@@ -36,12 +37,32 @@ def test_alembic_migration_creates_applications_table(tmp_path, monkeypatch):
         "status",
         "apply_date",
         "next_step_date",
+        "source_url",
+        "location",
+        "priority",
+        "notes",
         "interview_notes",
         "reflection",
+        "interview_question_ids",
+        "last_contact_date",
         "tags",
         "created_at",
         "updated_at",
     }.issubset(columns)
+    history_columns = {
+        column["name"]
+        for column in inspect(engine).get_columns("application_status_history")
+    }
+    assert {
+        "id",
+        "application_id",
+        "from_status",
+        "to_status",
+        "changed_at",
+        "reason",
+        "note",
+        "created_at",
+    }.issubset(history_columns)
     get_settings.cache_clear()
 
 
@@ -50,5 +71,12 @@ def test_applications_table_does_not_copy_resume_or_jd_raw_text():
     columns = set(table.columns.keys()) if table is not None else set()
 
     assert columns.isdisjoint(
-        {"raw_text", "jd_raw_text", "resume_text", "job_text", "full_text"}
+        {
+            "raw_text",
+            "jd_raw_text",
+            "resume_text",
+            "job_text",
+            "chunk_text",
+            "full_text",
+        }
     )

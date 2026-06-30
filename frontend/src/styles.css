@@ -734,6 +734,66 @@ button:disabled {
   grid-template-columns: 1fr;
 }
 
+.application-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.application-column {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 140px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 12px;
+}
+
+.application-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.application-card {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 10px;
+  text-align: left;
+}
+
+.application-card:hover {
+  border-color: #b9cbbf;
+  background: #f3f8f4;
+}
+
+.application-card span,
+.application-card small,
+.empty-column {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.detail-edit-panel {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.status-history-list {
+  margin-top: 16px;
+}
+
 .warning-panel {
   display: flex;
   align-items: flex-start;

@@ -61,6 +61,12 @@ export function DashboardPage({
   const agentLinkedApplicationCount = state.applications.filter(
     (application) => application.agent_run_id,
   ).length;
+  const applicationStats = state.applicationStats;
+  const latestApplication =
+    applicationStats?.latest_applications[0] ?? state.applications[0] ?? null;
+  const appliedToOfferRate = Math.round(
+    (applicationStats?.conversion.applied_to_offer_rate ?? 0) * 100,
+  );
   const latestAgentScore =
     typeof latestAgentRun?.final_summary?.total_score === "number"
       ? `${latestAgentRun.final_summary.total_score}`
@@ -177,7 +183,7 @@ export function DashboardPage({
     },
     {
       label: "Applications",
-      value: String(state.applicationStats?.total_applications ?? 0),
+      value: String(applicationStats?.total_applications ?? 0),
       detail: `${agentLinkedApplicationCount} linked to agent`,
       tone: "blue",
       page: "applications" as const,
@@ -240,30 +246,51 @@ export function DashboardPage({
     },
     {
       label: "App Interview Stages",
-      value: String(state.applicationStats?.interview_count ?? 0),
+      value: String(applicationStats?.interview_count ?? 0),
       detail: "Application tracking",
       tone: "amber",
       page: "applications" as const,
     },
     {
       label: "Offers",
-      value: String(state.applicationStats?.offer_count ?? 0),
+      value: String(applicationStats?.offer_count ?? 0),
       detail: "Application outcomes",
       tone: "green",
       page: "applications" as const,
     },
     {
       label: "Rejected",
-      value: String(state.applicationStats?.rejected_count ?? 0),
+      value: String(applicationStats?.rejected_count ?? 0),
       detail: "Rejected applications",
       tone: "red",
       page: "applications" as const,
     },
     {
       label: "Active Apps",
-      value: String(state.applicationStats?.active_count ?? 0),
+      value: String(applicationStats?.active_count ?? 0),
       detail: "Not closed",
       tone: "blue",
+      page: "applications" as const,
+    },
+    {
+      label: "Upcoming Apps",
+      value: String(applicationStats?.upcoming_count ?? 0),
+      detail: "Next-step window",
+      tone: "amber",
+      page: "applications" as const,
+    },
+    {
+      label: "Overdue Apps",
+      value: String(applicationStats?.overdue_count ?? 0),
+      detail: "Needs follow-up",
+      tone: "red",
+      page: "applications" as const,
+    },
+    {
+      label: "App Conversion",
+      value: `${appliedToOfferRate}%`,
+      detail: "Applied to offer",
+      tone: "green",
       page: "applications" as const,
     },
     {
@@ -290,7 +317,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>当前稳定节点：v1.1 Study Plan Center，已支持 Profile、Resume parsing / risk-check、Project Optimization、Interview Training、Study Plan、SQLite 持久化工作台、Knowledge Base、deterministic Agent Runs、手动投递 tracking、Bad Case 和 deterministic evaluation。当前不接真实 LLM，不做 LLM judge，不自动投递。</p>
+        <p>当前稳定节点：v1.4 Product Operations Hardening，已支持 deterministic Agent Runs、RAG v1.2、Application Board、状态历史、投递复盘和运营统计。当前不接真实 LLM，不做 LLM judge，不自动投递。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -426,8 +453,28 @@ export function DashboardPage({
             <li>
               <strong>Applications</strong>
               <span>
-                {state.applicationStats?.total_applications ?? 0} records /{" "}
-                {state.applicationStats?.active_count ?? 0} active
+                {applicationStats?.total_applications ?? 0} records /{" "}
+                {applicationStats?.active_count ?? 0} active /{" "}
+                {applicationStats?.upcoming_count ?? 0} upcoming /{" "}
+                {applicationStats?.overdue_count ?? 0} overdue
+              </span>
+            </li>
+            <li>
+              <strong>Latest Application</strong>
+              <span>
+                {latestApplication
+                  ? `${latestApplication.company} / ${latestApplication.status} / ${latestApplication.priority}`
+                  : "No application records"}
+              </span>
+            </li>
+            <li>
+              <strong>Application Conversion</strong>
+              <span>
+                {appliedToOfferRate}% applied to offer /{" "}
+                {Math.round(
+                  (applicationStats?.conversion.applied_to_interview_rate ?? 0) * 100,
+                )}
+                % applied to interview
               </span>
             </li>
             <li>

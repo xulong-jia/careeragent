@@ -1,10 +1,10 @@
 # CareerAgent Final Acceptance Report
 
-本报告记录 v1.3.0 Agent Workflow Baseline + Application Linkage 后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示 v1.3 final tag 已完成。
+本报告记录 v1.4 Product Operations / Application Management Hardening 后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示任何 v1.4 tag 已完成。
 
 ## 1. 验收结论
 
-v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.0 RAG Completion deterministic MVP 已完成 12A/12B/12C/12D/12E 的 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff 文档；v1.3.0 Agent Workflow Baseline + Application Linkage 已完成 deterministic end-to-end workflow orchestration、Application `agent_run_id` linkage、frontend display 和 docs/tests 收口。v1.0.0 `interview-center` 仍作为已完成的稳定里程碑保留在本报告中。
+v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.0 RAG Completion deterministic MVP 已完成 12A/12B/12C/12D/12E 的 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff 文档；v1.3.0 Agent Workflow Baseline + Application Linkage 已完成 deterministic end-to-end workflow orchestration、Application `agent_run_id` linkage、frontend display 和 docs/tests 收口；v1.4 Product Operations / Application Management Hardening 已完成 JD/Resume 强绑定、status history、reflection、Application Board 和 enhanced stats。v1.0.0 `interview-center` 仍作为已完成的稳定里程碑保留在本报告中。
 
 已完成范围：
 
@@ -26,6 +26,7 @@ v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.
 - v1.3 Agent Workflow baseline：`job_application_preparation` 扩展为 11 步 deterministic workflow，串联 Match、RAG context summary、Project Rewrite、Interview Questions、Study Plan 和 Application create/link。
 - v1.3 Application linkage：新增 `applications.agent_run_id`、migration、schema/repository/service/API 支持和 refs 校验。
 - v1.3 frontend/docs/tests：AgentRunsPage 展示 final summary，ApplicationTrackerPage 支持 `agent_run_id` 创建/筛选/展示，Dashboard 展示 latest agent run score/status 和 linked application 摘要，新增 release notes 和文档收口。
+- v1.4 Application operations：新增运营字段、`application_status_history`、reflection endpoint、status-history endpoint、enhanced stats 和 frontend Application Board / detail edit / reflection / Dashboard operations overview。
 
 ## 2. 当前模块状态
 
@@ -40,7 +41,7 @@ v1.1.0 `study-plan-center` 已完成 deterministic Study Plan Center MVP；v1.2.
 | Match Report | 已完成 deterministic MVP |
 | RAG Knowledge Base | v1.2 12A/12B/12C/12D/12E 已完成 contract tightening、answer run persistence、answer history UI、Dashboard RAG stats、optional downstream refs 和 final handoff |
 | Agent Runs | v1.3 已完成 deterministic workflow baseline：11 步 `job_application_preparation`、step timeline、final summary、Project/Interview/Study/Application orchestration |
-| Application Tracking | 已完成手动 tracking MVP，并支持 `agent_run_id` linkage |
+| Application Tracking | v1.4 已完成 Product Operations hardening：JD/Resume 强绑定、status history、reflection、board、enhanced stats 和 `agent_run_id` linkage |
 | Quality Review / Bad Case | 已完成人工复盘 MVP |
 | Evaluation | 已完成 deterministic smoke evaluation MVP |
 | Docker / Compose | 已完成本地开发配置；build 需在 Docker daemon 可用环境验证 |
@@ -201,9 +202,25 @@ v1.3 当前已完成：
 
 v1.3 仍不接真实 LLM，不做自由聊天 Agent，不做 true tool-calling autonomy，不自动投递，不接招聘网站，不自动修改简历、项目、面试答案、学习计划任务状态或投递状态。
 
-## 8. 明确边界
+## 8. v1.4 Product Operations / Application Management Hardening
 
-当前 v1.3 明确不做：
+v1.4 当前已完成：
+
+- Application create/update 要求最终绑定有效 `jd_id` 和 `resume_version_id`；`match_report_id` 和 `agent_run_id` 仍为可选 linkage。
+- `applications` 新增 source URL、location、priority、notes、interview question IDs 和 last contact date 等运营字段。
+- 新增 `application_status_history` 表和 endpoint；create 写初始状态，status patch 写流转历史，非状态字段 patch 不重复写 history。
+- 新增 reflection endpoint，支持投递复盘摘要、面试反馈、失败原因、准备缺口、下一步行动和 weakness tags；不自动写 Bad Case 或 Study Plan。
+- Application stats 返回 total/by_status/active/interview/offer/rejected/withdrawn、conversion、upcoming/overdue 和 latest applications。
+- ApplicationTrackerPage 支持 Application Board、filters、detail edit、status history 和 reflection。
+- Dashboard 展示 application total、active、interview、offer、rejected、upcoming、overdue、conversion 和 latest application。
+- Agent workflow create/link application 回归保持可用，`final_summary.application_id` 仍可用于追踪。
+- RAG v1.2 contract 未回退，Application 模块不读取 document raw_text 或 chunk full text。
+
+v1.4 仍不接真实 LLM，不接 embedding/vector DB，不自动投递，不接招聘网站，不自动状态流转，不保存完整投递材料，也不把 reflection 自动写入 Bad Case / Study Plan。
+
+## 9. 明确边界
+
+当前 v1.4 明确不做：
 
 - 不接真实 LLM。
 - 不自动写回 Resume Version。
@@ -218,10 +235,11 @@ v1.3 仍不接真实 LLM，不做自由聊天 Agent，不做 true tool-calling a
 - 不接招聘网站。
 - 不做自由聊天 Agent 或 true tool-calling autonomy。
 - 不自动修改简历、项目、面试答案、学习计划任务状态或投递状态。
+- 不把 reflection 自动写入 Bad Case 或 Study Plan。
 - 不做认证、多用户权限。
 - 不把 deterministic evaluation 当作模型能力最终评分。
 
-## 9. 测试与检查结果
+## 10. 测试与检查结果
 
 2026-06-30 在当前工作树执行：
 
@@ -229,7 +247,7 @@ v1.3 仍不接真实 LLM，不做自由聊天 Agent，不做 true tool-calling a
 PYTHONPATH=backend backend/.venv/bin/python -m pytest backend/tests
 ```
 
-结果：252 passed, 6 warnings。
+结果：256 passed, 6 warnings。
 
 ```bash
 cd frontend && npm run build
@@ -244,7 +262,7 @@ docker compose config
 结果：通过，Compose 配置可解析。
 
 ```bash
-PYTHONPATH=backend DATABASE_URL=sqlite:////tmp/careeragent_v13_alembic_check.db backend/.venv/bin/alembic -c backend/alembic.ini upgrade head
+PYTHONPATH=backend DATABASE_URL=sqlite:////tmp/careeragent_v14_alembic_check.db backend/.venv/bin/alembic -c backend/alembic.ini upgrade head
 ```
 
 结果：通过，所有 Alembic migrations 可从空 SQLite DB 升级到 head。
@@ -261,9 +279,13 @@ git diff --check
 
 结果：通过。
 
-`docker compose build` 本轮未执行；Docker image build 仍建议在 Docker daemon 可用环境补跑。
+```bash
+docker compose build
+```
 
-## 10. 安全与隐私
+结果：通过，backend / frontend images 均构建成功。
+
+## 11. 安全与隐私
 
 - `.env`、真实 API key、local DB、`local_data/`、uploads、vector index、exports、logs、cache、`dist/` 和 `node_modules/` 不进入 Git。
 - Demo 和测试只使用 synthetic data。
@@ -281,7 +303,7 @@ git diff --check
 - Application linkage 只保存 `agent_run_id` ref；Application 仍是 tracking record，不自动投递、不自动状态流转。
 - Bad Case 和 Evaluation Case 不应保存大段隐私原文。
 
-## 11. 后续只读验收与 Tag 建议
+## 12. 后续只读验收与 Tag 建议
 
 当前 v1.3 final handoff 文档完成后，建议提交：
 

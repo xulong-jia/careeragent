@@ -357,7 +357,7 @@ JSON 字段说明：
 
 ## applications
 
-用途：记录手动投递 tracking。v1.3 新增可选 `agent_run_id`，用于把 Agent Workflow 创建或绑定的 draft application 与对应 run 关联。
+用途：记录手动投递 tracking。v1.3 新增可选 `agent_run_id`，用于把 Agent Workflow 创建或绑定的 draft application 与对应 run 关联。v1.4 补强 Product Operations 字段，并要求新建/更新后的投递记录绑定 JD + Resume Version。
 
 关键字段：
 
@@ -372,18 +372,47 @@ JSON 字段说明：
 - `status`
 - `apply_date`
 - `next_step_date`
+- `source_url`
+- `location`
+- `priority`
+- `notes`
 - `interview_notes`
 - `reflection`
+- `interview_question_ids`
+- `last_contact_date`
 - `tags`
 
 关系说明：
 
-- `jd_id` 可选外键到 `job_descriptions.id`。
-- `resume_version_id` 可选外键到 `resume_versions.id`。
+- `jd_id` 外键到 `job_descriptions.id`；v1.4 service 要求 application tracking 记录必须绑定有效 JD。
+- `resume_version_id` 外键到 `resume_versions.id`；v1.4 service 要求 application tracking 记录必须绑定有效 Resume Version。
 - `match_report_id` 可选外键到 `match_reports.id`。
 - `agent_run_id` 可选外键到 `agent_runs.id`，并带索引，支持按 workflow run 查询投递记录。
 
-隐私说明：不复制 resume raw_text、JD raw_text、match 源对象全文、Agent step payload 或投递材料全文。Agent Workflow 只会创建/绑定 draft tracking record，不做自动投递或状态流转。
+状态说明：`status` 支持 `saved`、`ready_to_apply`、`applied`、`written_test`、`first_interview`、`second_interview`、`hr_interview`、`offer`、`rejected`、`withdrawn`、`archived`。`priority` 支持 `low`、`medium`、`high`。
+
+隐私说明：不复制 resume raw_text、JD raw_text、match 源对象全文、Agent step payload 或投递材料全文。`notes`、`interview_notes` 和 `reflection` 应保存摘要，不粘贴真实投递材料、完整面试复盘或隐私原文。Agent Workflow 只会创建/绑定 draft tracking record，不做自动投递或状态流转。
+
+## application_status_history
+
+用途：记录 Application status 的手动流转历史。v1.4 创建 application 时写入初始 status；PATCH status 且状态真实变化时写入新 history；PATCH 非状态字段不重复写入。
+
+关键字段：
+
+- `id`
+- `application_id`
+- `from_status`
+- `to_status`
+- `changed_at`
+- `reason`
+- `note`
+- `created_at`
+
+关系说明：
+
+- `application_id` 外键到 `applications.id`，删除 application 时级联删除 history。
+
+隐私说明：history 只保存状态、原因和短 note，不保存投递材料、简历/JD 原文或 Agent step payload。
 
 ## bad_cases
 
