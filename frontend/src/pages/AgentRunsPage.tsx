@@ -8,6 +8,7 @@ import {
   listAgentRunSteps,
 } from "../api/agents";
 import type {
+  AgentFinalSummary,
   AgentRunCreateResponse,
   AgentRunDetailResponse,
   AgentRunRecord,
@@ -87,6 +88,59 @@ function SafeJsonBlock({
   );
 }
 
+function parseIdList(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function FinalSummaryPanel({ summary }: { summary: AgentFinalSummary | null }) {
+  if (!summary) {
+    return null;
+  }
+
+  return (
+    <div className="state-callout success">
+      <strong>Final summary</strong>
+      <span>
+        Match score:{" "}
+        {typeof summary.total_score === "number" ? summary.total_score : "None"}
+      </span>
+      {summary.top_strengths?.length ? (
+        <ul className="compact-list">
+          {summary.top_strengths.slice(0, 3).map((item) => (
+            <li key={item}>Strength: {item}</li>
+          ))}
+        </ul>
+      ) : null}
+      {summary.top_gaps?.length ? (
+        <ul className="compact-list">
+          {summary.top_gaps.slice(0, 3).map((item) => (
+            <li key={item}>Gap: {item}</li>
+          ))}
+        </ul>
+      ) : null}
+      {summary.next_actions?.length ? (
+        <ul className="compact-list">
+          {summary.next_actions.map((item) => (
+            <li key={item}>Next: {item}</li>
+          ))}
+        </ul>
+      ) : null}
+      {summary.created_records?.length ? (
+        <ul className="compact-list">
+          {summary.created_records.map((item) => (
+            <li key={`${item.type}-${item.id ?? "none"}`}>
+              {item.type}: {item.id ?? "None"}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function BusinessState({ run }: { run: AgentRunRecord }) {
   if (run.status === "need_more_info") {
     return (
@@ -110,7 +164,7 @@ function BusinessState({ run }: { run: AgentRunRecord }) {
     return (
       <div className="state-callout success">
         <strong>Workflow completed</strong>
-        <span>Deterministic final summary is available in output refs.</span>
+        <span>Deterministic workflow outputs are linked below.</span>
       </div>
     );
   }
@@ -140,8 +194,12 @@ export function AgentRunsPage({
   const [resumeId, setResumeId] = useState("");
   const [resumeVersionId, setResumeVersionId] = useState("");
   const [jdId, setJdId] = useState("");
+  const [projectIds, setProjectIds] = useState("");
+  const [applicationId, setApplicationId] = useState("");
+  const [createApplication, setCreateApplication] = useState(true);
   const [useRag, setUseRag] = useState(false);
   const [ragQuery, setRagQuery] = useState("");
+  const [ragAnswerRunIds, setRagAnswerRunIds] = useState("");
   const [lastCreatedRun, setLastCreatedRun] =
     useState<AgentRunCreateResponse | null>(null);
   const [isListLoading, setIsListLoading] = useState(false);
@@ -220,8 +278,12 @@ export function AgentRunsPage({
         resume_id: resumeId.trim() || null,
         resume_version_id: resumeVersionId.trim() || null,
         jd_id: jdId.trim() || null,
+        project_ids: parseIdList(projectIds),
+        application_id: applicationId.trim() || null,
+        create_application: createApplication,
         use_rag: useRag,
         rag_query: ragQuery.trim() || null,
+        rag_answer_run_ids: parseIdList(ragAnswerRunIds),
       });
       setLastCreatedRun(result);
       const items = await refreshRuns();
@@ -290,6 +352,30 @@ export function AgentRunsPage({
                 onChange={(event) => setJdId(event.target.value)}
               />
             </label>
+            <label>
+              Project IDs
+              <input
+                placeholder="optional project_0001, project_0002"
+                value={projectIds}
+                onChange={(event) => setProjectIds(event.target.value)}
+              />
+            </label>
+            <label>
+              Existing Application ID
+              <input
+                placeholder="optional app_0001"
+                value={applicationId}
+                onChange={(event) => setApplicationId(event.target.value)}
+              />
+            </label>
+            <label className="checkbox-row">
+              <input
+                checked={createApplication}
+                type="checkbox"
+                onChange={(event) => setCreateApplication(event.target.checked)}
+              />
+              Create draft if no existing application
+            </label>
             <label className="checkbox-row">
               <input
                 checked={useRag}
@@ -305,6 +391,14 @@ export function AgentRunsPage({
                 placeholder="optional synthetic query"
                 value={ragQuery}
                 onChange={(event) => setRagQuery(event.target.value)}
+              />
+            </label>
+            <label>
+              RAG Answer Run IDs
+              <input
+                placeholder="optional rag_answer_0001, rag_answer_0002"
+                value={ragAnswerRunIds}
+                onChange={(event) => setRagAnswerRunIds(event.target.value)}
               />
             </label>
             <button
@@ -323,6 +417,7 @@ export function AgentRunsPage({
               </span>
               <span>{lastCreatedRun.steps_count ?? 0} steps</span>
               <BusinessState run={lastCreatedRun.run} />
+              <FinalSummaryPanel summary={lastCreatedRun.run.final_summary} />
             </div>
           ) : null}
         </article>
@@ -400,6 +495,7 @@ export function AgentRunsPage({
                 </li>
               </ul>
               <BusinessState run={detailRun} />
+              <FinalSummaryPanel summary={detailRun.final_summary} />
               <MarkBadCasePanel
                 defaultCategory={defaultRunBadCaseCategory(detailRun.status)}
                 defaultTitle="Agent run review"

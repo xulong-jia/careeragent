@@ -150,7 +150,7 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 9. 可选：用 grounded RAG Answer Run ID 重新生成 study plan，确认只新增学习/证据复核类 refs；ungrounded run 只记录 uncertainty ref，不作为强来源。
 10. 回到 Dashboard，查看 Study Plans、Active Study Plans、Pending Tasks、Blocked Tasks、Done Tasks、Latest Study Target 和 In Progress Tasks 摘要。
 
-当前 Study Plan Center 只接 deterministic generate/list/detail/task status/stats API、前端 StudyPlanPage、Dashboard study stats 和 v1.2 12D optional grounded RAG answer run refs；完整演示路径为 generate -> 查看 phases/tasks -> 更新 task status -> Dashboard stats。不接真实 LLM，不做 Agent full workflow，不接外部学习平台或日历提醒，不展示 Resume/JD full raw_text、RAG full chunk text 或完整 answer_text。
+当前 Study Plan Center 只接 deterministic generate/list/detail/task status/stats API、前端 StudyPlanPage、Dashboard study stats 和 v1.2 12D optional grounded RAG answer run refs；完整演示路径为 generate -> 查看 phases/tasks -> 更新 task status -> Dashboard stats。v1.3 Agent Workflow 可调用 Study Plan generation，但 Study Plan 页面本身不接真实 LLM，不接外部学习平台或日历提醒，不展示 Resume/JD full raw_text、RAG full chunk text 或完整 answer_text。
 
 ### Knowledge Base
 
@@ -167,18 +167,24 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 ### Agent Runs
 
-1. 创建 `job_application_preparation` workflow。
-2. 选择 resume version 和 JD。
-3. 可选启用 RAG query。
-4. 查看 run detail 和 step timeline。
+1. 先准备 `resume_version_id`、`jd_id`，建议同时准备一个绑定该 resume version 的 active project。
+2. 打开 Agent Runs，创建 `job_application_preparation` workflow。
+3. 输入 Resume Version ID 和 JD ID；可选输入 Project IDs、Existing Application ID、RAG Query 和 RAG Answer Run IDs。
+4. 保持 `Create or link application` 开启时，workflow 会创建 saved draft application；传入 Existing Application ID 时会绑定已有记录。
+5. 点击 Create run。
+6. 查看 run detail、step timeline、`final_summary.total_score`、top strengths/gaps、next actions 和 created record IDs。
+7. 确认 step order 包含 Match、Project Rewrite、Interview Question generation、Study Plan generation、Application create/link 和 Final Summary。
+
+当前 Agent Runs 是 deterministic workflow baseline，不接真实 LLM，不做自由聊天 Agent，不自动投递，不自动修改简历、项目、面试答案、学习计划任务状态或投递状态。
 
 ### Applications
 
 1. 创建手动 application record。
-2. 绑定 `jd_id`、`resume_version_id`、`match_report_id`。
-3. 修改 status。
-4. 使用 status / company / jd_id / resume_version_id 筛选。
-5. 查看 stats。
+2. 绑定 `jd_id`、`resume_version_id`、`match_report_id` 和可选 `agent_run_id`。
+3. 如果刚运行 Agent workflow，可在列表或详情中查看 Agent 创建/绑定的 draft application。
+4. 修改 status。
+5. 使用 status / company / jd_id / resume_version_id / agent_run_id 筛选。
+6. 查看 stats。
 
 ### Quality Review
 

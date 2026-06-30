@@ -34,6 +34,13 @@ class AgentRun(Base):
         order_by="AgentStep.step_order",
     )
 
+    @property
+    def final_summary(self) -> dict | None:
+        if not isinstance(self.output_refs, dict):
+            return None
+        summary = self.output_refs.get("final_summary")
+        return summary if isinstance(summary, dict) else None
+
 
 class AgentStep(Base):
     __tablename__ = "agent_steps"

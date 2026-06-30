@@ -39,6 +39,9 @@ export function listApplications(
   if (filters.jdId) {
     params.set("jd_id", filters.jdId);
   }
+  if (filters.agentRunId) {
+    params.set("agent_run_id", filters.agentRunId);
+  }
   const query = params.toString();
   return requestJson<ListResponse<ApplicationRecord>>(
     query ? `/api/applications?${query}` : "/api/applications",

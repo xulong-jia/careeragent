@@ -42,6 +42,7 @@ type ApplicationFormState = {
   jdId: string;
   resumeVersionId: string;
   matchReportId: string;
+  agentRunId: string;
   status: ApplicationStatus;
   applyDate: string;
   nextStepDate: string;
@@ -78,6 +79,7 @@ function initialFormState(): ApplicationFormState {
     jdId: "",
     resumeVersionId: "",
     matchReportId: "",
+    agentRunId: "",
     status: "saved",
     applyDate: "",
     nextStepDate: "",
@@ -185,6 +187,7 @@ export function ApplicationTrackerPage({
         jd_id: optionalText(formState.jdId),
         resume_version_id: optionalText(formState.resumeVersionId),
         match_report_id: optionalText(formState.matchReportId),
+        agent_run_id: optionalText(formState.agentRunId),
         status: formState.status,
         apply_date: optionalText(formState.applyDate),
         next_step_date: optionalText(formState.nextStepDate),
@@ -432,6 +435,19 @@ export function ApplicationTrackerPage({
                   value={formState.matchReportId}
                 />
               </label>
+              <label>
+                Agent Run ID
+                <input
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      agentRunId: event.target.value,
+                    }))
+                  }
+                  placeholder="optional agent_run_0001"
+                  value={formState.agentRunId}
+                />
+              </label>
             </div>
             <label>
               Interview notes
@@ -561,6 +577,19 @@ export function ApplicationTrackerPage({
                   value={filters.resumeVersionId ?? ""}
                 />
               </label>
+              <label>
+                Agent Run ID
+                <input
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      agentRunId: event.target.value,
+                    }))
+                  }
+                  placeholder="optional agent_run_0001"
+                  value={filters.agentRunId ?? ""}
+                />
+              </label>
             </div>
             <button
               className="primary-action"
@@ -593,6 +622,7 @@ export function ApplicationTrackerPage({
                     <strong>{application.company}</strong>
                     <small>{application.role_title}</small>
                     <small>{application.application_id}</small>
+                    <small>Agent {application.agent_run_id ?? "none"}</small>
                   </div>
                   <span className={statusClass(application.status)}>
                     {application.status}
@@ -640,7 +670,8 @@ export function ApplicationTrackerPage({
                   <span>
                     JD {selectedApplication.jd_id ?? "none"} / Resume Version{" "}
                     {selectedApplication.resume_version_id ?? "none"} / Match{" "}
-                    {selectedApplication.match_report_id ?? "none"}
+                    {selectedApplication.match_report_id ?? "none"} / Agent{" "}
+                    {selectedApplication.agent_run_id ?? "none"}
                   </span>
                 </li>
                 <li>

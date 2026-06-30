@@ -1,6 +1,7 @@
 from app.agents import state
 from app.models.agent import AgentRun
 from app.models.job import JobDescription, JobProfile
+from app.models.project import Project
 from app.models.resume import Resume, ResumeVersion
 from conftest import get_data, get_error, make_client
 
@@ -66,6 +67,25 @@ def _create_job_with_profile(db_session, *, jd_id="jd_api_0001"):
     return job, profile
 
 
+def _create_project(db_session, version, *, project_id="project_api_0001"):
+    project = Project(
+        id=project_id,
+        resume_version_id=version.id,
+        name="Synthetic API Project",
+        role="Backend engineer",
+        period="2026",
+        background="Synthetic learning project for Python API workflow.",
+        tech_stack=["Python", "FastAPI"],
+        responsibilities=["Built FastAPI APIs with validation and tests."],
+        results=["Improved local workflow quality with reproducible pytest checks."],
+        evidence=[{"type": "test", "summary": "pytest smoke output exists"}],
+        status="active",
+    )
+    db_session.add(project)
+    db_session.commit()
+    return project
+
+
 def _assert_refs_are_private_safe(value):
     if isinstance(value, dict):
         assert PRIVATE_TEXT_KEYS.isdisjoint(value.keys())
@@ -80,6 +100,7 @@ def test_create_agent_run_successful_workflow(db_session):
     client = make_client()
     _, version = _create_resume_with_version(db_session)
     _create_job_with_profile(db_session)
+    _create_project(db_session, version)
 
     response = client.post(
         "/api/agents/runs",
@@ -97,7 +118,12 @@ def test_create_agent_run_successful_workflow(db_session):
     assert data["run"]["status"] == state.RUN_STATUS_COMPLETED
     assert data["run"]["output_refs"]["resume_version_id"] == version.id
     assert data["run"]["output_refs"]["jd_id"] == "jd_api_0001"
-    assert data["steps_count"] == 6
+    assert data["run"]["output_refs"]["project_rewrite_ids"]
+    assert data["run"]["output_refs"]["interview_question_ids"]
+    assert data["run"]["output_refs"]["study_plan_id"]
+    assert data["run"]["output_refs"]["application_id"]
+    assert data["run"]["final_summary"]["created_records"]
+    assert data["steps_count"] == 10
     _assert_refs_are_private_safe(data["run"]["input_refs"])
     _assert_refs_are_private_safe(data["run"]["output_refs"])
 
@@ -114,7 +140,10 @@ def test_create_agent_run_missing_inputs_returns_need_more_info():
     data = get_data(response)
     run = data["run"]
     assert run["status"] == state.RUN_STATUS_NEED_MORE_INFO
-    assert {slot["name"] for slot in run["missing_slots"]} == {"resume", "jd_id"}
+    assert {slot["name"] for slot in run["missing_slots"]} == {
+        "resume_version_id",
+        "jd_id",
+    }
     assert data["steps_count"] == 1
     assert run["questions"]
 
@@ -196,20 +225,24 @@ def test_get_agent_run_detail_and_ordered_steps(db_session):
     assert detail_response.status_code == 200
     detail = get_data(detail_response)
     assert detail["run"]["id"] == run["id"]
-    assert detail["steps_count"] == 6
+    assert detail["steps_count"] == 10
     assert "steps" not in detail["run"]
 
     steps_response = client.get(f"/api/agents/runs/{run['id']}/steps")
     assert steps_response.status_code == 200
     steps_data = get_data(steps_response)
-    assert steps_data["total"] == 6
-    assert [step["step_order"] for step in steps_data["steps"]] == [1, 2, 3, 4, 5, 6]
+    assert steps_data["total"] == 10
+    assert [step["step_order"] for step in steps_data["steps"]] == list(range(1, 11))
     assert [step["step_name"] for step in steps_data["steps"]] == [
         "validate_inputs",
         "load_resume_version",
         "load_job_profile",
         "run_match_report",
         "rag_search",
+        "run_project_rewrites",
+        "generate_interview_questions",
+        "generate_study_plan",
+        "create_or_link_application",
         "build_final_summary",
     ]
     rag_step = [step for step in steps_data["steps"] if step["step_name"] == "rag_search"][0]

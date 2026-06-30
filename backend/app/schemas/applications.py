@@ -12,6 +12,7 @@ class ApplicationCreateRequest(BaseModel):
     jd_id: str | None = Field(default=None, max_length=64)
     resume_version_id: str | None = Field(default=None, max_length=64)
     match_report_id: str | None = Field(default=None, max_length=64)
+    agent_run_id: str | None = Field(default=None, max_length=64)
     status: str = "saved"
     apply_date: date | None = None
     next_step_date: date | None = None
@@ -29,6 +30,7 @@ class ApplicationUpdateRequest(BaseModel):
     jd_id: str | None = Field(default=None, max_length=64)
     resume_version_id: str | None = Field(default=None, max_length=64)
     match_report_id: str | None = Field(default=None, max_length=64)
+    agent_run_id: str | None = Field(default=None, max_length=64)
     status: str | None = None
     apply_date: date | None = None
     next_step_date: date | None = None
@@ -46,6 +48,7 @@ class ApplicationRecord(BaseModel):
     jd_id: str | None = None
     resume_version_id: str | None = None
     match_report_id: str | None = None
+    agent_run_id: str | None = None
     status: str
     apply_date: date | None = None
     next_step_date: date | None = None

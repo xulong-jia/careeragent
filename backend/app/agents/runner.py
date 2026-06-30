@@ -26,6 +26,7 @@ def run_workflow(
         workflow_name=workflow.name,
         input_refs=initial_input_refs(payload),
     )
+    context.resolved["agent_run_id"] = run.id
     agent_repository.update_run_status(db, run, status=state.RUN_STATUS_RUNNING)
 
     for step_order, step_name in enumerate(workflow.steps, start=1):
@@ -47,6 +48,14 @@ def run_workflow(
                 error_code = state.ERROR_MATCH_REPORT_FAILED
             elif step_name == "rag_search":
                 error_code = state.ERROR_RAG_SEARCH_FAILED
+            elif step_name == "run_project_rewrites":
+                error_code = state.ERROR_PROJECT_REWRITE_FAILED
+            elif step_name == "generate_interview_questions":
+                error_code = state.ERROR_INTERVIEW_GENERATION_FAILED
+            elif step_name == "generate_study_plan":
+                error_code = state.ERROR_STUDY_PLAN_FAILED
+            elif step_name == "create_or_link_application":
+                error_code = state.ERROR_APPLICATION_LINK_FAILED
             error_message = _safe_error_message(exc)
             agent_repository.update_step_error(
                 db,

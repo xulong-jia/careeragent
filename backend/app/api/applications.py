@@ -37,6 +37,7 @@ async def list_applications(
     role_category: str | None = Query(default=None),
     resume_version_id: str | None = Query(default=None),
     jd_id: str | None = Query(default=None),
+    agent_run_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     items = application_service.list_applications(
@@ -46,6 +47,7 @@ async def list_applications(
         role_category=role_category,
         resume_version_id=resume_version_id,
         jd_id=jd_id,
+        agent_run_id=agent_run_id,
     )
     return {
         "data": ListResponse(items=items, total=len(items)),

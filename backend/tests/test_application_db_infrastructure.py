@@ -32,6 +32,7 @@ def test_alembic_migration_creates_applications_table(tmp_path, monkeypatch):
         "jd_id",
         "resume_version_id",
         "match_report_id",
+        "agent_run_id",
         "status",
         "apply_date",
         "next_step_date",

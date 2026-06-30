@@ -31,6 +31,7 @@ def _to_application_record(application: Application) -> ApplicationRecord:
         jd_id=application.jd_id,
         resume_version_id=application.resume_version_id,
         match_report_id=application.match_report_id,
+        agent_run_id=application.agent_run_id,
         status=application.status,
         apply_date=application.apply_date,
         next_step_date=application.next_step_date,
@@ -51,6 +52,7 @@ def create_application(
     jd_id: str | None,
     resume_version_id: str | None,
     match_report_id: str | None,
+    agent_run_id: str | None,
     status: str,
     apply_date,
     next_step_date,
@@ -67,6 +69,7 @@ def create_application(
         jd_id=jd_id,
         resume_version_id=resume_version_id,
         match_report_id=match_report_id,
+        agent_run_id=agent_run_id,
         status=status,
         apply_date=apply_date,
         next_step_date=next_step_date,
@@ -92,6 +95,7 @@ def list_applications(
     role_category: str | None = None,
     resume_version_id: str | None = None,
     jd_id: str | None = None,
+    agent_run_id: str | None = None,
 ) -> list[ApplicationRecord]:
     statement = select(Application).order_by(Application.created_at, Application.id)
     if status:
@@ -104,6 +108,8 @@ def list_applications(
         statement = statement.where(Application.resume_version_id == resume_version_id)
     if jd_id:
         statement = statement.where(Application.jd_id == jd_id)
+    if agent_run_id:
+        statement = statement.where(Application.agent_run_id == agent_run_id)
 
     applications = db.scalars(statement).all()
     return [_to_application_record(application) for application in applications]
@@ -139,6 +145,8 @@ def update_application(
     clear_resume_version_id: bool = False,
     match_report_id: str | None = None,
     clear_match_report_id: bool = False,
+    agent_run_id: str | None = None,
+    clear_agent_run_id: bool = False,
     status: str | None = None,
     apply_date=None,
     clear_apply_date: bool = False,
@@ -170,6 +178,10 @@ def update_application(
         application.match_report_id = None
     elif match_report_id is not None:
         application.match_report_id = match_report_id
+    if clear_agent_run_id:
+        application.agent_run_id = None
+    elif agent_run_id is not None:
+        application.agent_run_id = agent_run_id
     if status is not None:
         application.status = status
     if clear_apply_date:

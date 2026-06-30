@@ -311,7 +311,7 @@ JSON 字段说明：
 
 ## agent_runs
 
-用途：记录 deterministic workflow run。
+用途：记录 deterministic workflow run。v1.3 `job_application_preparation` 会串联 Resume Version、JD、Match、可选 RAG search、Project Rewrite、Interview Questions、Study Plan 和 Application linkage。
 
 关键字段：
 
@@ -320,6 +320,7 @@ JSON 字段说明：
 - `status`
 - `input_refs`
 - `output_refs`
+- `output_refs.final_summary`
 - `missing_slots`
 - `questions`
 - `error_code`
@@ -328,7 +329,14 @@ JSON 字段说明：
 - `finished_at`
 - `duration_ms`
 
-隐私说明：只保存 refs 和短 metadata，不复制 resume/JD/RAG 原文。
+JSON 字段说明：
+
+- `input_refs`：workflow 输入 ID、布尔开关和是否提供 query 的短 metadata。
+- `output_refs`：workflow 输出 ID、下游 created record IDs 和聚合摘要。
+- `output_refs.final_summary`：`total_score`、`top_strengths`、`top_gaps`、`next_actions` 和 `created_records`。`AgentRunRecord.final_summary` 从该字段派生，便于前端直接展示。
+- `missing_slots` / `questions`：缺少 resume version、JD、project 或 application refs 时的可恢复提示。
+
+隐私说明：只保存 refs、短 metadata、分数、warnings 和 created record IDs，不复制 resume/JD/RAG 原文、完整 interview answer 或投递材料。
 
 ## agent_steps
 
@@ -349,7 +357,7 @@ JSON 字段说明：
 
 ## applications
 
-用途：记录手动投递 tracking。
+用途：记录手动投递 tracking。v1.3 新增可选 `agent_run_id`，用于把 Agent Workflow 创建或绑定的 draft application 与对应 run 关联。
 
 关键字段：
 
@@ -360,6 +368,7 @@ JSON 字段说明：
 - `jd_id`
 - `resume_version_id`
 - `match_report_id`
+- `agent_run_id`
 - `status`
 - `apply_date`
 - `next_step_date`
@@ -367,7 +376,14 @@ JSON 字段说明：
 - `reflection`
 - `tags`
 
-隐私说明：不复制 resume raw_text、JD raw_text 或投递材料全文。
+关系说明：
+
+- `jd_id` 可选外键到 `job_descriptions.id`。
+- `resume_version_id` 可选外键到 `resume_versions.id`。
+- `match_report_id` 可选外键到 `match_reports.id`。
+- `agent_run_id` 可选外键到 `agent_runs.id`，并带索引，支持按 workflow run 查询投递记录。
+
+隐私说明：不复制 resume raw_text、JD raw_text、match 源对象全文、Agent step payload 或投递材料全文。Agent Workflow 只会创建/绑定 draft tracking record，不做自动投递或状态流转。
 
 ## bad_cases
 

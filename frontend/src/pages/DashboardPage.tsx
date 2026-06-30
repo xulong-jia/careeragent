@@ -52,6 +52,19 @@ export function DashboardPage({
     ragStats?.latest_answer_question_preview ?? "No RAG answer";
   const latestRagUncertainty =
     ragStats?.latest_answer_uncertainty ?? "No uncertainty";
+  const latestAgentRun = state.agentRuns[0] ?? null;
+  const latestAgentApplication = latestAgentRun
+    ? state.applications.find(
+        (application) => application.agent_run_id === latestAgentRun.id,
+      ) ?? null
+    : null;
+  const agentLinkedApplicationCount = state.applications.filter(
+    (application) => application.agent_run_id,
+  ).length;
+  const latestAgentScore =
+    typeof latestAgentRun?.final_summary?.total_score === "number"
+      ? `${latestAgentRun.final_summary.total_score}`
+      : "No score";
   const metrics = [
     {
       label: "Profile",
@@ -156,14 +169,16 @@ export function DashboardPage({
     {
       label: "Agent",
       value: String(state.agentRuns.length),
-      detail: "Deterministic runs",
+      detail: latestAgentRun
+        ? `${latestAgentRun.status} / ${latestAgentScore}`
+        : "Deterministic runs",
       tone: "green",
       page: "agents" as const,
     },
     {
       label: "Applications",
       value: String(state.applicationStats?.total_applications ?? 0),
-      detail: "Manual tracking",
+      detail: `${agentLinkedApplicationCount} linked to agent`,
       tone: "blue",
       page: "applications" as const,
     },
@@ -370,7 +385,19 @@ export function DashboardPage({
             </li>
             <li>
               <strong>Agent Runs</strong>
-              <span>{state.agentRuns.length} deterministic runs</span>
+              <span>
+                {latestAgentRun
+                  ? `${latestAgentRun.id} / ${latestAgentRun.status} / ${latestAgentScore}`
+                  : `${state.agentRuns.length} deterministic runs`}
+              </span>
+            </li>
+            <li>
+              <strong>Agent Application</strong>
+              <span>
+                {latestAgentApplication
+                  ? `${latestAgentApplication.application_id} / ${latestAgentApplication.status}`
+                  : `${agentLinkedApplicationCount} linked records`}
+              </span>
             </li>
             <li>
               <strong>Interview Training</strong>

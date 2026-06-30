@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.models.agent import AgentRun
 from app.models.job import JobDescription, JobProfile
 from app.models.match import MatchReport as MatchReportModel
 from app.models.resume import ResumeVersion
@@ -90,7 +91,8 @@ def _validate_and_resolve_refs(
     jd_id: str | None,
     resume_version_id: str | None,
     match_report_id: str | None,
-) -> tuple[str | None, str | None, str | None]:
+    agent_run_id: str | None = None,
+) -> tuple[str | None, str | None, str | None, str | None]:
     resolved_jd_id = _normalize_optional_text(jd_id, "jd_id")
     resolved_resume_version_id = _normalize_optional_text(
         resume_version_id,
@@ -100,6 +102,7 @@ def _validate_and_resolve_refs(
         match_report_id,
         "match_report_id",
     )
+    resolved_agent_run_id = _normalize_optional_text(agent_run_id, "agent_run_id")
 
     match_report: MatchReportModel | None = None
     if resolved_match_report_id:
@@ -147,19 +150,34 @@ def _validate_and_resolve_refs(
                 status_code=404,
                 details={"resume_version_id": resolved_resume_version_id},
             )
+    if resolved_agent_run_id:
+        agent_run = db.get(AgentRun, resolved_agent_run_id)
+        if not agent_run:
+            raise AppError(
+                code="agent_run_not_found",
+                message="Agent run was not found.",
+                status_code=404,
+                details={"agent_run_id": resolved_agent_run_id},
+            )
 
-    return resolved_jd_id, resolved_resume_version_id, resolved_match_report_id
+    return (
+        resolved_jd_id,
+        resolved_resume_version_id,
+        resolved_match_report_id,
+        resolved_agent_run_id,
+    )
 
 
 def create_application(
     db: Session,
     payload: ApplicationCreateRequest,
 ) -> ApplicationRecord:
-    jd_id, resume_version_id, match_report_id = _validate_and_resolve_refs(
+    jd_id, resume_version_id, match_report_id, agent_run_id = _validate_and_resolve_refs(
         db,
         jd_id=payload.jd_id,
         resume_version_id=payload.resume_version_id,
         match_report_id=payload.match_report_id,
+        agent_run_id=payload.agent_run_id,
     )
     role_category = _normalize_optional_text(payload.role_category, "role_category")
     if role_category is None:
@@ -173,6 +191,7 @@ def create_application(
         jd_id=jd_id,
         resume_version_id=resume_version_id,
         match_report_id=match_report_id,
+        agent_run_id=agent_run_id,
         status=_normalize_status(payload.status),
         apply_date=payload.apply_date,
         next_step_date=payload.next_step_date,
@@ -190,6 +209,7 @@ def list_applications(
     role_category: str | None = None,
     resume_version_id: str | None = None,
     jd_id: str | None = None,
+    agent_run_id: str | None = None,
 ) -> list[ApplicationRecord]:
     normalized_status = _normalize_status(status) if status else None
     return application_repository.list_applications(
@@ -202,6 +222,7 @@ def list_applications(
             "resume_version_id",
         ),
         jd_id=_normalize_optional_text(jd_id, "jd_id"),
+        agent_run_id=_normalize_optional_text(agent_run_id, "agent_run_id"),
     )
 
 
@@ -233,12 +254,19 @@ def update_application(
         "match_report_id",
         application.match_report_id,
     )
-    resolved_jd_id, resolved_resume_version_id, resolved_match_report_id = (
+    agent_run_id = update_data.get("agent_run_id", application.agent_run_id)
+    (
+        resolved_jd_id,
+        resolved_resume_version_id,
+        resolved_match_report_id,
+        resolved_agent_run_id,
+    ) = (
         _validate_and_resolve_refs(
             db,
             jd_id=jd_id,
             resume_version_id=resume_version_id,
             match_report_id=match_report_id,
+            agent_run_id=agent_run_id,
         )
     )
 
@@ -275,6 +303,10 @@ def update_application(
         clear_match_report_id=(
             "match_report_id" in update_data
             and update_data["match_report_id"] is None
+        ),
+        agent_run_id=resolved_agent_run_id,
+        clear_agent_run_id=(
+            "agent_run_id" in update_data and update_data["agent_run_id"] is None
         ),
         status=_normalize_status(update_data["status"])
         if "status" in update_data and update_data["status"] is not None

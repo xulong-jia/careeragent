@@ -13,13 +13,20 @@ class WorkflowDefinition:
 
 JOB_APPLICATION_PREPARATION = WorkflowDefinition(
     name=state.WORKFLOW_JOB_APPLICATION_PREPARATION,
-    description="Prepare a deterministic job application workflow using Resume, JD, Match, and optional RAG refs.",
+    description=(
+        "Prepare a deterministic job application workflow using Resume, JD, "
+        "Match, Project, Interview, Study Plan, Application, and optional RAG refs."
+    ),
     steps=(
         "validate_inputs",
         "load_resume_version",
         "load_job_profile",
         "run_match_report",
         "rag_search",
+        "run_project_rewrites",
+        "generate_interview_questions",
+        "generate_study_plan",
+        "create_or_link_application",
         "build_final_summary",
     ),
     required_slots=("jd_id",),

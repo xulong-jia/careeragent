@@ -722,6 +722,15 @@ export type AgentStepStatus =
   | "skipped"
   | "need_more_info";
 
+export type AgentFinalSummary = {
+  total_score?: number;
+  top_strengths?: string[];
+  top_gaps?: string[];
+  next_actions?: string[];
+  created_records?: { type: string; id: string | null }[];
+  [key: string]: unknown;
+};
+
 export type AgentRunRecord = {
   id: string;
   user_id: string;
@@ -729,6 +738,7 @@ export type AgentRunRecord = {
   status: AgentRunStatus;
   input_refs: Record<string, unknown>;
   output_refs: Record<string, unknown>;
+  final_summary: AgentFinalSummary | null;
   missing_slots: Record<string, unknown>[] | null;
   questions: Record<string, unknown>[] | null;
   error_code: string | null;
@@ -760,8 +770,12 @@ export type AgentRunCreatePayload = {
   resume_id?: string | null;
   resume_version_id?: string | null;
   jd_id?: string | null;
+  project_ids?: string[];
+  application_id?: string | null;
+  create_application?: boolean;
   use_rag?: boolean;
   rag_query?: string | null;
+  rag_answer_run_ids?: string[];
 };
 
 export type AgentRunCreateResponse = {
@@ -983,6 +997,7 @@ export type ApplicationRecord = {
   jd_id: string | null;
   resume_version_id: string | null;
   match_report_id: string | null;
+  agent_run_id: string | null;
   status: ApplicationStatus;
   apply_date: string | null;
   next_step_date: string | null;
@@ -1000,6 +1015,7 @@ export type ApplicationCreatePayload = {
   jd_id?: string | null;
   resume_version_id?: string | null;
   match_report_id?: string | null;
+  agent_run_id?: string | null;
   status?: ApplicationStatus;
   apply_date?: string | null;
   next_step_date?: string | null;
@@ -1016,6 +1032,7 @@ export type ApplicationFilters = {
   roleCategory?: string;
   resumeVersionId?: string;
   jdId?: string;
+  agentRunId?: string;
 };
 
 export type ApplicationStats = {

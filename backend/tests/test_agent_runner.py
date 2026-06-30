@@ -3,6 +3,7 @@ import pytest
 from app.core.errors import AppError
 from app.models.agent import AgentRun
 from app.models.job import JobDescription, JobProfile
+from app.models.project import Project
 from app.models.resume import Resume, ResumeVersion
 from app.schemas.rag import RagSearchResult, RagSearchSource
 from app.services import agent_service
@@ -70,6 +71,25 @@ def _create_job_with_profile(db_session, *, jd_id="jd_agent_0001"):
     return job, profile
 
 
+def _create_project(db_session, version, *, project_id="project_agent_0001"):
+    project = Project(
+        id=project_id,
+        resume_version_id=version.id,
+        name="Synthetic API Project",
+        role="Backend engineer",
+        period="2026",
+        background="Synthetic learning project for Python API workflow.",
+        tech_stack=["Python", "FastAPI"],
+        responsibilities=["Built FastAPI APIs with validation and tests."],
+        results=["Improved local workflow quality with reproducible pytest checks."],
+        evidence=[{"type": "test", "summary": "pytest smoke output exists"}],
+        status="active",
+    )
+    db_session.add(project)
+    db_session.commit()
+    return project
+
+
 def _assert_refs_are_private_safe(value):
     if isinstance(value, dict):
         assert PRIVATE_TEXT_KEYS.isdisjoint(value.keys())
@@ -99,7 +119,7 @@ def test_missing_resume_and_jd_returns_need_more_info(db_session):
 
     assert run.status == state.RUN_STATUS_NEED_MORE_INFO
     assert {slot["name"] for slot in run.missing_slots or []} == {
-        "resume",
+        "resume_version_id",
         "jd_id",
     }
 
@@ -115,6 +135,7 @@ def test_missing_resume_and_jd_returns_need_more_info(db_session):
 def test_use_rag_without_query_returns_need_more_info(db_session):
     _, version = _create_resume_with_version(db_session)
     _create_job_with_profile(db_session)
+    _create_project(db_session, version)
 
     run = agent_service.create_run_for_workflow(
         db_session,
@@ -133,6 +154,7 @@ def test_use_rag_without_query_returns_need_more_info(db_session):
 def test_successful_workflow_creates_ordered_steps_and_skips_rag(db_session):
     _, version = _create_resume_with_version(db_session)
     _create_job_with_profile(db_session)
+    _create_project(db_session, version)
 
     run = agent_service.create_run_for_workflow(
         db_session,
@@ -150,8 +172,13 @@ def test_successful_workflow_creates_ordered_steps_and_skips_rag(db_session):
     assert persisted.output_refs["resume_version_id"] == version.id
     assert persisted.output_refs["jd_id"] == "jd_agent_0001"
     assert persisted.output_refs["match_report_id"].startswith("match_")
+    assert len(persisted.output_refs["project_rewrite_ids"]) == 1
+    assert persisted.output_refs["interview_question_ids"]
+    assert persisted.output_refs["study_plan_id"].startswith("study_plan_")
+    assert persisted.output_refs["application_id"].startswith("app_")
     assert persisted.output_refs["rag_source_count"] == 0
-    assert "Workflow completed using resume_version_id=" in persisted.output_refs["final_summary"]
+    assert persisted.output_refs["final_summary"]["total_score"] > 0
+    assert persisted.output_refs["final_summary"]["created_records"]
 
     step_names = [step.step_name for step in persisted.steps]
     assert step_names == [
@@ -160,15 +187,23 @@ def test_successful_workflow_creates_ordered_steps_and_skips_rag(db_session):
         "load_job_profile",
         "run_match_report",
         "rag_search",
+        "run_project_rewrites",
+        "generate_interview_questions",
+        "generate_study_plan",
+        "create_or_link_application",
         "build_final_summary",
     ]
-    assert [step.step_order for step in persisted.steps] == [1, 2, 3, 4, 5, 6]
+    assert [step.step_order for step in persisted.steps] == list(range(1, 11))
     assert [step.status for step in persisted.steps] == [
         state.STEP_STATUS_COMPLETED,
         state.STEP_STATUS_COMPLETED,
         state.STEP_STATUS_COMPLETED,
         state.STEP_STATUS_COMPLETED,
         state.STEP_STATUS_SKIPPED,
+        state.STEP_STATUS_COMPLETED,
+        state.STEP_STATUS_COMPLETED,
+        state.STEP_STATUS_COMPLETED,
+        state.STEP_STATUS_COMPLETED,
         state.STEP_STATUS_COMPLETED,
     ]
 

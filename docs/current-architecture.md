@@ -111,12 +111,12 @@ sqlite:///./local_data/careeragent.db
 - Profile：manual CRUD + readiness summary，不自动从简历生成画像。
 - Project：manual project facts CRUD + deterministic rewrite backend + ProjectOptimizationPage，可选绑定 profile / resume version，不自动生成项目事实，不接真实 LLM。
 - Interview：v1.0 10A/10B/10C/10D 提供 deterministic question generation / list、answer submit / list、scoring API、stats API、InterviewCenterPage 和 Dashboard training stats，基于 JD profile、structured resume、可选 project facts、project rewrite refs、可选 grounded RAG answer run refs、question expected_points/source_refs 和本地 DB answer，不做 LLM judge。
-- Study Plan：v1.1 11A/11B/11C/11D 提供 `study_plans` 表、`POST /api/study-plans/generate`、list/detail、task status update、stats API、frontend API wrapper、StudyPlanPage 和 Dashboard study stats，基于 Profile target_roles / skill_map、Match gaps / rewrite_priorities、Project Rewrite missing_points / evidence_required、Interview weakness_tags、可选 grounded RAG answer run refs 和 request weakness_tags 生成 deterministic phases/tasks/resources/deliverables/acceptance criteria，不做真实 LLM、Agent full workflow、外部学习平台、日历提醒或自动修改简历/项目/面试答案。
+- Study Plan：v1.1 11A/11B/11C/11D 提供 `study_plans` 表、`POST /api/study-plans/generate`、list/detail、task status update、stats API、frontend API wrapper、StudyPlanPage 和 Dashboard study stats，基于 Profile target_roles / skill_map、Match gaps / rewrite_priorities、Project Rewrite missing_points / evidence_required、Interview weakness_tags、可选 grounded RAG answer run refs 和 request weakness_tags 生成 deterministic phases/tasks/resources/deliverables/acceptance criteria；v1.3 Agent Workflow 可调用 generation，但不做真实 LLM、外部学习平台、日历提醒或自动修改简历/项目/面试答案。
 - Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
 - RAG：deterministic chunking + lexical retrieval + deterministic grounded answer。v1.2 RAG Completion deterministic MVP 已完成，覆盖 contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs，answer response 在保留 `sources` 的同时补齐 `citations`、`source_refs`、`evidence_summary`、safe `retrieval_debug` 和可选 `answer_run_id`；默认不接真实 LLM、embedding 或 vector DB。
-- Agent：deterministic state machine，不是自由工具调用 Agent。
+- Agent：v1.3 deterministic workflow baseline，固定 `job_application_preparation` state machine 串联 Resume Version、JD、Match、可选 RAG search、Project Rewrite、Interview Questions、Study Plan 和 Application linkage；不是自由工具调用 Agent，不自动投递。
 - Evaluation：deterministic smoke set，不是 LLM judge。
 
 ### Resume Center v0.8
@@ -194,7 +194,26 @@ Study Plan 11A/11B/11C/11D 当前链路：
 10. StudyPlanPage 通过 `frontend/src/api/studyPlans.ts` 调用真实后端 API，支持 generate、list/filter、detail、phase/task 展示、source_refs preview 展示和 task status update。
 11. Dashboard 通过 `getStudyPlanStats` 读取 stats，展示 Study Plans、Active Study Plans、Pending Tasks、Blocked Tasks、Done Tasks、Latest Study Target 和 In Progress Tasks；stats API 失败时 Dashboard 使用 0 / empty state，不影响其他模块数据。
 
-当前 Study Plan 11A/11B/11C/11D 不接真实 LLM，不接 embedding/vector DB，不做 Agent full workflow，不接外部学习平台或日历提醒，不自动修改简历、项目、面试答案或投递状态。v1.2 12D 只做 optional grounded RAG answer run refs，不做自动学习资源生成或外部平台同步。
+Study Plan 模块自身仍不接真实 LLM，不接 embedding/vector DB，不接外部学习平台或日历提醒，不自动修改简历、项目、面试答案或投递状态。v1.2 12D 支持 optional grounded RAG answer run refs；v1.3 Agent Workflow 可以调用 Study Plan generation，但不会自动写回简历、项目、面试答案或投递状态。
+
+### Agent Workflow v1.3
+
+Agent Workflow 当前链路：
+
+1. `POST /api/agents/runs` 创建 `job_application_preparation` run。
+2. `validate_inputs` 校验 resume / resume version、JD、可选 project refs、可选 application ref、RAG query 和 RAG answer run refs。
+3. `load_resume_version` 和 `load_job_profile` 读取已有 DB-backed refs。
+4. `run_match_report` 调用已有 Match service，生成并保存 match report。
+5. `rag_search` 仅在 `use_rag=true` 时执行 legacy deterministic lexical search；未启用时 step 标记 skipped。
+6. `run_project_rewrites` 使用传入 `project_ids`，或按 `resume_version_id` 自动发现 active projects；没有项目时 skipped。
+7. `generate_interview_questions` 调用 Interview Center，最多生成 6 个 deterministic questions，可携带 grounded RAG answer run refs。
+8. `generate_study_plan` 调用 Study Plan Center，基于 match report、首个 project rewrite 和可选 grounded RAG answer run refs 生成 plan。
+9. `create_or_link_application` 创建 draft application，或绑定已有 application；如果 `create_application=false` 且未传 `application_id`，则跳过。
+10. `build_final_summary` 汇总 `match_report_id`、`project_rewrite_ids`、`interview_question_ids`、`study_plan_id`、`application_id` 和 deterministic next actions。
+
+`applications.agent_run_id` 将投递 tracking record 与 workflow run 连接。Application 仍由用户手动维护状态，workflow 不自动投递、不接招聘网站、不自动提交材料、不自动状态流转。
+
+AgentRunsPage 支持输入 project IDs、existing application ID、create application 开关、RAG query 和 RAG Answer Run IDs，展示 run detail、step timeline 和 final summary。ApplicationTrackerPage 支持查看和筛选 `agent_run_id`。Dashboard 展示 latest agent run score/status 和 linked application 摘要。
 
 ### Dashboard readiness
 
@@ -206,7 +225,8 @@ Dashboard 当前展示：
 - interview training question count、answer count、scored answer count、latest average score 和 latest weakness tags。
 - study plan count、active plan count、pending / blocked / done / in progress task count 和 latest study target。
 - RAG document count、indexed document count、chunk count、grounded/ungrounded answer count、latest answer preview 和 latest uncertainty。
-- 原有 Resume、JD、Match、Agent、Application、Bad Case、Evaluation 统计。
+- Agent run count、latest agent run status/score 和 linked application 摘要。
+- 原有 Resume、JD、Match、Application、Bad Case、Evaluation 统计。
 
 ## 7. 阶段完成状态
 
@@ -221,12 +241,13 @@ Dashboard 当前展示：
 | v0.8 Resume/Profile Foundation | Resume parser / risk-check APIs + Profile Center MVP 已完成 |
 | v0.9 Project Optimization 9A / 9B / 9C / 9D / 9E | Project facts backend、deterministic rewrite backend、ProjectOptimizationPage、Dashboard/docs/tests 收口和 final handoff 已完成 |
 | v1.0 Interview Center 10A/10B/10C/10D | Backend interview tables、deterministic question generation、question list、answer submit/list、answer scoring API、InterviewCenterPage、stats API 和 Dashboard training stats 已完成；Study Plan 写入、RAG completion 与 LLM judge 未实现 |
-| v1.1 Study Plan Center 11A/11B/11C/11D | Backend `study_plans` table、deterministic generate API、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats 已完成；v1.1 阶段未做 RAG refs、Agent full workflow、外部学习平台和日历提醒，v1.2 12D 已补 optional grounded RAG answer run refs |
-| v1.2 RAG Completion 12A | RAG grounded answer contract tightening 已完成，标准化 citations/source_refs/retrieval_debug/evidence_summary；仍为 deterministic lexical retrieval，不接真实 LLM、embedding/vector DB 或 Agent full workflow |
+| v1.1 Study Plan Center 11A/11B/11C/11D | Backend `study_plans` table、deterministic generate API、list/detail、task status update、stats API、StudyPlanPage 和 Dashboard study stats 已完成；v1.1 阶段未做 RAG refs、外部学习平台和日历提醒，v1.2 12D 已补 optional grounded RAG answer run refs，v1.3 Agent Workflow 可调用 generation |
+| v1.2 RAG Completion 12A | RAG grounded answer contract tightening 已完成，标准化 citations/source_refs/retrieval_debug/evidence_summary；仍为 deterministic lexical retrieval，不接真实 LLM、embedding/vector DB |
 | v1.2 RAG Completion 12B | 新增 `rag_answer_runs` 持久化、answer run list/detail API 和更强 retrieval/privacy tests；answer runs 只保存 grounded contract、短 snippet/preview 和 safe debug，不保存 raw_text/full chunk text |
 | v1.2 RAG Completion 12C | KnowledgeBasePage 接入 answer history list/detail、grounded/uncertainty/retrieval_mode filters、citations/source_refs/retrieval_debug 展示；仍不展示 raw_text/full chunk text，不做 RAG evaluation dashboard |
 | v1.2 RAG Completion 12D | 新增 `GET /api/rag/stats`、Dashboard RAG stats，并为 Interview / Study Plan generation 增加可选 `rag_answer_run_ids`；仅 grounded answer runs 作为 preview-first refs 补充，ungrounded runs 不作为强来源 |
 | v1.2 RAG Completion 12E | 新增 release notes，并完成 README、architecture、API reference、database schema、demo script 和 final acceptance report 最终口径收口；不创建 tag |
+| v1.3 Agent Workflow Baseline + Application Linkage | `job_application_preparation` 扩展为 10 步 deterministic workflow，串联 Match、Project Rewrite、Interview、Study Plan 和 Application draft/linkage；AgentRunsPage、ApplicationTrackerPage、Dashboard 和 docs 已接入 `agent_run_id` 与 `final_summary` |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script 和安全清单 |
 
 ## 8. 当前不做

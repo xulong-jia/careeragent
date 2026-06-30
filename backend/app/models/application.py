@@ -26,6 +26,10 @@ class Application(Base):
         ForeignKey("match_reports.id", ondelete="SET NULL"),
         index=True,
     )
+    agent_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="SET NULL"),
+        index=True,
+    )
     status: Mapped[str] = mapped_column(String(40), default="saved", nullable=False, index=True)
     apply_date: Mapped[date | None] = mapped_column(Date)
     next_step_date: Mapped[date | None] = mapped_column(Date)

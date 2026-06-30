@@ -1,5 +1,6 @@
 import re
 
+from app.models.agent import AgentRun
 from conftest import get_data, get_error, make_client
 
 
@@ -112,6 +113,30 @@ def test_create_application_record_with_optional_refs_and_safe_response():
     assert data["created_at"]
     assert data["updated_at"]
     _assert_private_safe(data)
+
+
+def test_create_application_record_with_agent_run_link(db_session):
+    client = make_client()
+    refs = _create_resume_job_and_match(client)
+    run = AgentRun(
+        id="agent_run_application_0001",
+        workflow_name="job_application_preparation",
+        status="completed",
+        input_refs={},
+        output_refs={},
+    )
+    db_session.add(run)
+    db_session.commit()
+
+    data = _create_application(client, **refs, agent_run_id=run.id)
+    list_response = client.get("/api/applications", params={"agent_run_id": run.id})
+
+    assert data["agent_run_id"] == run.id
+    assert list_response.status_code == 200
+    listed = get_data(list_response)
+    assert [item["application_id"] for item in listed["items"]] == [
+        data["application_id"]
+    ]
 
 
 def test_create_multiple_applications_generates_unique_stable_ids():
@@ -272,6 +297,7 @@ def test_application_rejects_missing_optional_refs_when_provided():
         ("jd_id", "missing_jd", "job_not_found"),
         ("resume_version_id", "missing_version", "resume_version_not_found"),
         ("match_report_id", "missing_match", "match_report_not_found"),
+        ("agent_run_id", "missing_agent_run", "agent_run_not_found"),
     ]
     for field, value, expected_code in invalid_cases:
         response = client.post(

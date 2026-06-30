@@ -8,8 +8,12 @@ class AgentRunCreateRequest(BaseModel):
     resume_id: str | None = None
     resume_version_id: str | None = None
     jd_id: str | None = None
+    project_ids: list[str] = Field(default_factory=list)
+    application_id: str | None = None
+    create_application: bool = True
     use_rag: bool = False
     rag_query: str | None = None
+    rag_answer_run_ids: list[str] = Field(default_factory=list)
 
 
 class AgentRunRecord(BaseModel):
@@ -21,6 +25,7 @@ class AgentRunRecord(BaseModel):
     status: str
     input_refs: dict[str, object] = Field(default_factory=dict)
     output_refs: dict[str, object] = Field(default_factory=dict)
+    final_summary: dict[str, object] | None = None
     missing_slots: list[dict[str, object]] | None = None
     questions: list[dict[str, object]] | None = None
     error_code: str | None = None

@@ -7,7 +7,7 @@
 - 5C：Application repository / service / API 和 tests 已完成。
 - 5D：ApplicationTrackerPage 最小 UI 已完成。
 - 5E：Dashboard 已接入 application stats。
-- 当前实现仍保持手动 tracking：不自动投递、不接招聘网站、不接真实 LLM、不做复杂拖拽 Kanban。
+- 当前实现仍保持 tracking：v1.3 支持可选 `agent_run_id` linkage，但不自动投递、不接招聘网站、不接真实 LLM、不做复杂拖拽 Kanban。
 
 ## 1. 阶段五目标
 
@@ -16,7 +16,7 @@
 当前 MVP 支持：
 
 - 记录用户的求职投递记录。
-- 可选关联 `resume_version`、`job_description`、`match_report`。
+- 可选关联 `resume_version`、`job_description`、`match_report`、`agent_run`。
 - 记录公司、岗位、岗位类别、状态、投递日期、下一步日期、面试备注、复盘摘要和标签。
 - 支持 application create / list / detail / patch。
 - 支持通过 `status=archived` 归档，不提供单独 archive endpoint。
@@ -72,6 +72,7 @@
 | jd_id | string nullable | 否 | 目标 JD ref |
 | resume_version_id | string nullable | 否 | 投递使用的 resume version ref |
 | match_report_id | string nullable | 否 | 匹配报告 ref |
+| agent_run_id | string nullable | 否 | Agent workflow run ref |
 | status | string | 是 | 默认 `saved` |
 | apply_date | date nullable | 否 | 实际投递日期 |
 | next_step_date | date nullable | 否 | 下一步日期 |
@@ -87,14 +88,14 @@
 - `role_title` 必填。
 - `user_id` 必填，默认 `default`。
 - `status` 必填，默认 `saved`。
-- `resume_version_id` / `jd_id` / `match_report_id` 是 nullable refs。
+- `resume_version_id` / `jd_id` / `match_report_id` / `agent_run_id` 是 nullable refs。
 - `interview_notes` / `reflection` nullable，只保存摘要，不保存隐私原文。
 - `apply_date` / `next_step_date` nullable。
 - `created_at` / `updated_at` 必填。
 
 外键策略：
 
-- 当前对 `jd_id`、`resume_version_id`、`match_report_id` 使用 nullable FK，删除上游对象时 SET NULL。
+- 当前对 `jd_id`、`resume_version_id`、`match_report_id`、`agent_run_id` 使用 nullable FK，删除上游对象时 SET NULL。
 - 原因是用户可能手动记录外部岗位，且上游对象可能 archive。
 - Service 对传入 refs 做存在性校验；`match_report_id` 会校验并补齐对应 `jd_id` / `resume_version_id`。
 - 不复制源对象全文。
@@ -107,6 +108,7 @@
 - `resume_version_id`
 - `jd_id`
 - `match_report_id`
+- `agent_run_id`
 
 暂不设计 `contact_person` / `recruiter` 等个人信息字段，避免过早保存个人信息。后续如需要联系人信息，应先做隐私设计。
 
@@ -149,6 +151,7 @@ Application status：
 - `jd_id`
 - `resume_version_id`
 - `match_report_id`
+- `agent_run_id`
 - `status`
 - `apply_date`
 - `next_step_date`
@@ -171,6 +174,7 @@ Filters：
 - `role_category`
 - `resume_version_id`
 - `jd_id`
+- `agent_run_id`
 
 输出：
 
@@ -242,14 +246,14 @@ Filters：
 - Resume Version：通过 `resume_version_id` 引用投递所用简历版本。
 - JD / Job Profile：通过 `jd_id` 引用目标岗位。
 - Match Report：通过 `match_report_id` 引用匹配依据。
-- Agent Run：当前未实现 `agent_run_id` 字段，后续如需要应单独扩展 migration / schema / service。
+- Agent Run：通过 `agent_run_id` 引用创建或绑定该投递记录的 deterministic workflow run。
 - Quality Review / Bad Case：后续可允许 `source_type=application_record`，`source_id=application_id`。
 
 初期策略：
 
 - 阶段五 MVP 只保存 refs，不复制源对象全文。
-- 当前不在 Resume / JD / Match / Agent 页面自动创建 application。
-- 后续可考虑轻量 “Create application” 入口。
+- Agent Workflow 可创建或绑定 saved draft application，但只写 tracking record，不自动投递。
+- 其他页面后续可考虑轻量 “Create application” 入口。
 - 即使做入口，也必须用户确认，不得自动投递。
 - 不做外部平台动作。
 
@@ -288,12 +292,12 @@ API tests：
 
 - create application。
 - list applications。
-- filter by status / company / role_category / resume_version_id / jd_id。
+- filter by status / company / role_category / resume_version_id / jd_id / agent_run_id。
 - get detail。
 - patch status。
 - missing application returns 404。
 - invalid status returns 400。
-- optional `jd_id` / `resume_version_id` / `match_report_id` refs validate reasonably。
+- optional `jd_id` / `resume_version_id` / `match_report_id` / `agent_run_id` refs validate reasonably。
 - response 不返回源对象原文。
 
 Frontend build：
@@ -327,7 +331,7 @@ Safety tests：
 | application_url 或渠道信息泄露 | 只建议保存公开岗位链接；不保存账号、私信链接、内部推荐聊天记录或招聘平台凭证。 |
 | 与自动投递边界混乱 | 阶段五不提供自动投递按钮、不接招聘网站 API、不做外部动作。 |
 | 过早接招聘网站 API | 招聘网站集成必须作为后续独立阶段设计授权边界。 |
-| 与 Agent Workflow 过度耦合 | Application 只保存 `agent_run_id` ref，不由 Agent 自动创建或提交申请。 |
+| 与 Agent Workflow 过度耦合 | Application 只保存 `agent_run_id` ref；Agent 只能创建/绑定 draft tracking record，不提交申请。 |
 | 前端状态过复杂 | 先做 list / detail / form / filters，不做 Kanban、日历或复杂统计图。 |
 | 状态流转过度设计 | 初期只做 allowed values validation，不做强状态机或自动流转。 |
 | 过早保存 recruiter / contact_person 个人信息 | 初期不设计联系人字段；后续如需要，先做隐私和数据保留策略。 |
@@ -338,7 +342,7 @@ Safety tests：
 - 不支持日历 / 提醒。
 - 不支持招聘网站同步。
 - 不支持自动投递。
-- 不支持 `agent_run_id` 关联。
+- 支持 `agent_run_id` 关联；不支持按 Agent 自动状态流转。
 - 不支持联系人 / recruiter 信息。
 - 不支持状态历史表。
 - 不支持按时间趋势和转化漏斗图表。
