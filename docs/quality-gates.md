@@ -34,7 +34,8 @@
 | Agent Workflow service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module agent_workflow --output-dir /tmp/careeragent-evals-agent-workflow` | 8 个 Agent cases 覆盖 success、need_more_info、resume、retry、cancel、Bad Case payload 和多 workflow | workflow foundation，不是 durable production engine |
 | Anonymized benchmark eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset anonymized_benchmark --output-dir /tmp/careeragent-evals-anonymized` | 155-case manually curated anonymized real-world-style benchmark 通过，并输出 human review / LLM judge summaries | 不是外部真实生产数据 proof |
 | AI provider validation | `PYTHONPATH=backend backend/.venv/bin/python scripts/validate_ai_providers.py --output /tmp/careeragent-provider-proof.json` | 验证 offline/provider_verified provider path，输出 masked proof | 无真实 key 时只能证明 offline path；真实 provider proof 不进 Git |
-| v3.5 provider proof dry-run | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_external_provider_proof.py --dry-run --output /tmp/careeragent-v35-provider-proof-dry-run.json` | 验证外部 provider proof schema、redaction 和 dry-run 边界 | dry-run 必须是 `provider_mode=not_verified`，不是外部 provider proof |
+| v3.5 provider proof readiness | `PYTHONPATH=backend backend/.venv/bin/python scripts/check_provider_proof_readiness.py` | 检查私有 provider proof env 是否齐备并输出 masked summary | 不调用真实 provider，不证明 provider 可用 |
+| v3.5 provider proof dry-run | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_external_provider_proof.py --dry-run --output /tmp/careeragent-v35-provider-proof-dry-run.json` | 验证外部 provider proof schema、redaction 和 dry-run 边界 | dry-run 必须是 `provider_mode=dry_run`，不是外部 provider proof |
 | v3.5 evidence package validator | `PYTHONPATH=backend backend/.venv/bin/python scripts/validate_external_evidence_package.py --evidence-dir evidence/private_outputs --output /tmp/careeragent-v35-evidence-summary.json` | 汇总 private external evidence 的 schema、secret scan、candidate/certified blockers | 没有真实外部证明时应报告 blockers，不证明 production-ready |
 | AI quality report | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_ai_quality_certification.py --eval-dir /tmp/careeragent-evals-anonymized --provider-proof /tmp/careeragent-provider-proof.json --output-dir /tmp/careeragent-ai-quality-report` | 汇总 provider mode、benchmark、human agreement、LLM judge 和 production_quality_candidate flag | `provider_mode=offline` 时不能声称 production-quality candidate |
 | Deployment proof validation | `PYTHONPATH=backend backend/.venv/bin/python scripts/validate_production_deployment.py --allow-local-placeholders --strict --output /tmp/careeragent-deployment-proof.json` | 验证 required env、DB URL shape、compose config、readiness docs、secret masking | 本地 proof，不是 cloud/managed KMS proof |
@@ -124,6 +125,8 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
   stay public-safe and contain no real provider keys, reviewer identities,
   cloud identifiers, screenshots, raw logs or private user data.
 - `evidence/private_outputs/` must remain ignored by Git except for `.gitkeep`.
+- `scripts/check_provider_proof_readiness.py` must report missing/unsafe env
+  without printing API keys or runtime secrets.
 - `scripts/run_external_provider_proof.py --dry-run` must produce a redacted
   non-verified proof with `production_quality_candidate_signal=false`.
 - `scripts/import_human_review_proof.py` must redact reviewer identifiers and

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import csv
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from pathlib import Path
 import subprocess
+import threading
 
+from scripts import check_provider_proof_readiness
 from scripts import import_human_review_proof
+from scripts import run_ai_quality_certification
 from scripts import run_external_provider_proof
 from scripts import validate_external_evidence_package
 
@@ -13,8 +17,101 @@ from scripts import validate_external_evidence_package
 ROOT = Path(__file__).resolve().parents[2]
 
 
+class _FakeProviderHandler(BaseHTTPRequestHandler):
+    def do_POST(self):  # noqa: N802
+        length = int(self.headers.get("content-length", "0"))
+        payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        prompt = json.dumps(payload)
+        if self.path.endswith("/embeddings"):
+            body = {"data": [{"embedding": [0.1, 0.2, 0.3, 0.4]}]}
+        elif "grounded=true" in prompt:
+            body = {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "answer": "CareerAgent requires redacted provider proof.",
+                                    "citations": ["chunk_safe_1"],
+                                    "grounded": True,
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        elif "advisory judge" in prompt:
+            body = {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "groundedness_score": 1.0,
+                                    "factuality_score": 1.0,
+                                    "hallucination_flag": False,
+                                    "evidence_refs": ["chunk_safe_1"],
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        else:
+            body = {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "job_profile_id": "provider_probe",
+                                    "job_title": "Backend Engineer",
+                                    "company": "Anonymized Company",
+                                    "role_category": "backend",
+                                    "required_skills": ["Python"],
+                                    "preferred_skills": ["FastAPI"],
+                                    "parse_confidence": 0.91,
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        raw = json.dumps(body).encode("utf-8")
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.send_header("content-length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def log_message(self, *_args):
+        return
+
+
 def _json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_quality_inputs(tmp_path: Path) -> Path:
+    eval_dir = tmp_path / "eval"
+    eval_dir.mkdir()
+    (eval_dir / "metrics.json").write_text(
+        json.dumps({"total_count": 155, "pass_rate": 1.0, "by_module": {}}),
+        encoding="utf-8",
+    )
+    (eval_dir / "run_config.json").write_text(
+        json.dumps({"dataset_name": "anonymized_benchmark", "dataset_kind": "benchmark"}),
+        encoding="utf-8",
+    )
+    (eval_dir / "human_review_summary.json").write_text(
+        json.dumps({"agreement_rate": 0.85}),
+        encoding="utf-8",
+    )
+    (eval_dir / "llm_judge_summary.json").write_text(
+        json.dumps({"hallucination_rate": 0.0}),
+        encoding="utf-8",
+    )
+    return eval_dir
 
 
 def test_evidence_templates_match_schema_required_fields():
@@ -48,6 +145,39 @@ def test_private_outputs_are_gitignored():
     assert result.returncode == 0
 
 
+def test_provider_readiness_checker_reports_missing_env():
+    report = check_provider_proof_readiness.build_readiness_report(env={})
+
+    assert report["readiness_status"] == "missing_required_env"
+    assert "LLM_API_KEY" in report["missing_vars"]
+    assert report["secret_leak_check_passed"] is True
+
+
+def test_provider_readiness_checker_masks_present_env():
+    env = {
+        "AI_PROVIDER_MODE": "provider_verified",
+        "LLM_PROVIDER": "openai_compatible",
+        "LLM_BASE_URL": "https://provider.example.invalid/v1",
+        "LLM_MODEL": "chat-real",
+        "LLM_API_KEY": "private-llm-key-value-12345",
+        "EMBEDDING_PROVIDER": "openai_compatible",
+        "EMBEDDING_BASE_URL": "https://embedding.example.invalid/v1",
+        "EMBEDDING_MODEL": "embedding-real",
+        "EMBEDDING_API_KEY": "private-embedding-key-value-12345",
+        "DATA_ENCRYPTION_KEY": "private-data-key-value-12345",
+        "AUTH_JWT_SECRET": "private-auth-secret-value-12345",
+    }
+
+    report = check_provider_proof_readiness.build_readiness_report(env=env)
+    rendered = json.dumps(report)
+
+    assert report["readiness_status"] == "ready"
+    assert report["missing_vars"] == []
+    assert "private-llm-key-value-12345" not in rendered
+    assert "private-embedding-key-value-12345" not in rendered
+    assert report["masked_config_summary"]["LLM_API_KEY"]["value"].startswith("[set length=")
+
+
 def test_provider_dry_run_is_not_production_proof(monkeypatch):
     secret = "provider-token-redact-value-123"
     monkeypatch.setenv("LLM_API_KEY", secret)
@@ -60,10 +190,42 @@ def test_provider_dry_run_is_not_production_proof(monkeypatch):
     )
     rendered = json.dumps(proof)
 
-    assert proof["provider_mode"] == "not_verified"
+    assert proof["provider_mode"] == "dry_run"
     assert proof["production_quality_candidate_signal"] is False
     assert proof["secret_leak_check_passed"] is True
     assert secret not in rendered
+
+
+def test_provider_fake_server_is_marked_fake_not_external(monkeypatch):
+    server = HTTPServer(("127.0.0.1", 0), _FakeProviderHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base_url = f"http://127.0.0.1:{server.server_port}"
+    try:
+        monkeypatch.setenv("LLM_API_KEY", "test-provider-key")
+        monkeypatch.setenv("EMBEDDING_API_KEY", "test-embedding-key")
+        monkeypatch.setenv("EMBEDDING_DIMENSION", "4")
+
+        proof = run_external_provider_proof.build_external_provider_proof(
+            dry_run=False,
+            provider="openai_compatible",
+            llm_base_url=base_url,
+            embedding_base_url=base_url,
+            embedding_model="fake-embedding",
+            llm_model="fake-chat",
+        )
+        rendered = json.dumps(proof)
+
+        assert proof["provider_mode"] == "fake"
+        assert proof["llm_validation_passed"] is True
+        assert proof["embedding_validation_passed"] is True
+        assert proof["rag_grounded_answer_sample_passed"] is True
+        assert proof["llm_judge_sample_passed"] is True
+        assert proof["production_quality_candidate_signal"] is False
+        assert "test-provider-key" not in rendered
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
 
 
 def test_human_review_import_redacts_reviewers_and_computes_agreement(tmp_path):
@@ -131,8 +293,13 @@ def test_evidence_validator_accepts_complete_redacted_package(tmp_path):
             "proof_id": "provider-proof-test",
             "created_at": "2026-07-02T00:00:00Z",
             "provider": "openai_compatible",
-            "provider_mode": "provider_verified",
-            "base_url_redacted": "[set length=20 sha256:abcdef123456]",
+            "provider_mode": "external_verified",
+            "llm_provider": "openai_compatible",
+            "embedding_provider": "openai_compatible",
+            "base_url_redacted": {
+                "llm": "[set length=20 sha256:abcdef123456]",
+                "embedding": "[set length=22 sha256:abcdef123456]",
+            },
             "embedding_model": "embedding-model",
             "llm_model": "llm-model",
             "embedding_validation_passed": True,
@@ -227,6 +394,87 @@ def test_evidence_validator_accepts_complete_redacted_package(tmp_path):
     assert summary["secret_leak_check_passed"] is True
     assert summary["production_ready_candidate_possible"] is True
     assert summary["production_readiness_certified_possible"] is True
+
+
+def test_ai_quality_certification_rejects_missing_provider_proof(tmp_path):
+    eval_dir = _write_quality_inputs(tmp_path)
+
+    report = run_ai_quality_certification.build_report(
+        eval_dir=eval_dir,
+        provider_proof=None,
+    )
+
+    assert report["production_quality_candidate"] is False
+    assert "external provider proof path was not provided" in report["blockers"]
+
+
+def test_ai_quality_certification_rejects_offline_provider_proof(tmp_path):
+    eval_dir = _write_quality_inputs(tmp_path)
+    proof_path = tmp_path / "provider.json"
+    proof_path.write_text(
+        json.dumps({"proof_type": "provider", "provider_mode": "not_verified"}),
+        encoding="utf-8",
+    )
+
+    report = run_ai_quality_certification.build_report(
+        eval_dir=eval_dir,
+        provider_proof=proof_path,
+    )
+
+    assert report["production_quality_candidate"] is False
+    assert "provider proof is not external_verified" in report["blockers"]
+
+
+def test_ai_quality_certification_accepts_test_external_verified_proof(tmp_path):
+    eval_dir = _write_quality_inputs(tmp_path)
+    proof_path = tmp_path / "provider.json"
+    proof_path.write_text(
+        json.dumps(
+            {
+                "proof_type": "provider",
+                "provider_mode": "external_verified",
+                "production_quality_candidate_signal": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = run_ai_quality_certification.build_report(
+        eval_dir=eval_dir,
+        provider_proof=proof_path,
+    )
+
+    assert report["production_quality_candidate"] is True
+    assert report["production_quality_candidate_status"] == "candidate_with_limitations"
+    assert report["blockers"] == []
+
+
+def test_provider_docs_commands_match_cli_arguments():
+    docs = "\n".join(
+        [
+            (ROOT / "docs" / "provider-proof-runbook.md").read_text(encoding="utf-8"),
+            (ROOT / "docs" / "external-production-evidence-package.md").read_text(
+                encoding="utf-8"
+            ),
+            (ROOT / "README.md").read_text(encoding="utf-8"),
+        ]
+    )
+    help_result = subprocess.run(
+        [
+            "python3",
+            "scripts/run_external_provider_proof.py",
+            "--help",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    help_text = help_result.stdout
+    for flag in ["--llm-base-url", "--embedding-base-url", "--redact", "--fail-on-not-verified"]:
+        assert flag in docs
+        assert flag in help_text
+    assert "scripts/check_provider_proof_readiness.py" in docs
 
 
 def test_templates_do_not_contain_secret_like_material():

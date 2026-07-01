@@ -4,7 +4,12 @@
   "created_at": "YYYY-MM-DDTHH:MM:SSZ",
   "provider": "openai_compatible",
   "provider_mode": "not_verified",
-  "base_url_redacted": "[set length=0 sha256:placeholder]",
+  "llm_provider": "openai_compatible",
+  "embedding_provider": "openai_compatible",
+  "base_url_redacted": {
+    "llm": "[set length=0 sha256:placeholder]",
+    "embedding": "[set length=0 sha256:placeholder]"
+  },
   "embedding_model": "provider-embedding-model-name",
   "llm_model": "provider-llm-model-name",
   "embedding_validation_passed": false,

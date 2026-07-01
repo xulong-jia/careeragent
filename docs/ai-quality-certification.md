@@ -51,7 +51,7 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/run_ai_quality_certification
   --output-dir /tmp/careeragent-ai-quality-report
 ```
 
-`production_quality_candidate` is true only when provider proof is `provider_verified`, benchmark pass rate is high, human agreement is acceptable and judge hallucination rate is within threshold.
+`production_quality_candidate` is true only when provider proof is `external_verified`, benchmark pass rate is high, human agreement is acceptable and judge hallucination rate is within threshold.
 
 ## Remaining Limits
 

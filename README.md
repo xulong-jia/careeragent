@@ -157,11 +157,42 @@ scripts/run_final_readiness_gates.sh
 v3.5 外部证明包 dry-run / validator：
 
 ```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/check_provider_proof_readiness.py || true
 PYTHONPATH=backend backend/.venv/bin/python scripts/run_external_provider_proof.py --dry-run --output /tmp/careeragent-v35-provider-proof-dry-run.json
 PYTHONPATH=backend backend/.venv/bin/python scripts/validate_external_evidence_package.py --evidence-dir evidence/private_outputs --output /tmp/careeragent-v35-evidence-summary.json
 ```
 
 真实外部证明只能写入 ignored `evidence/private_outputs/` 或 `/tmp`。dry-run、offline、local deterministic、mocked 或 synthetic 输出不能作为 production-ready 证明。
+
+真实 provider proof 前，用户必须在私有 shell/secret manager 中准备：
+
+```bash
+export AI_PROVIDER_MODE=provider_verified
+export LLM_PROVIDER=openai_compatible
+export LLM_BASE_URL=...
+export LLM_MODEL=...
+export LLM_API_KEY=...
+export EMBEDDING_PROVIDER=openai_compatible
+export EMBEDDING_BASE_URL=...
+export EMBEDDING_MODEL=...
+export EMBEDDING_API_KEY=...
+export DATA_ENCRYPTION_KEY=...
+export AUTH_JWT_SECRET=...
+```
+
+然后运行：
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/run_external_provider_proof.py \
+  --provider openai_compatible \
+  --llm-base-url "$LLM_BASE_URL" \
+  --llm-model "$LLM_MODEL" \
+  --embedding-base-url "$EMBEDDING_BASE_URL" \
+  --embedding-model "$EMBEDDING_MODEL" \
+  --output evidence/private_outputs/provider_proof.$(date +%Y%m%d-%H%M%S).json \
+  --redact \
+  --fail-on-not-verified
+```
 
 ## 环境变量
 

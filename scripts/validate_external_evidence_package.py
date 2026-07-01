@@ -71,7 +71,7 @@ def _provider_ok(proofs: list[dict[str, Any]]) -> bool:
     for proof in proofs:
         if all(
             [
-                proof.get("provider_mode") == "provider_verified",
+                proof.get("provider_mode") == "external_verified",
                 proof.get("embedding_validation_passed") is True,
                 proof.get("llm_validation_passed") is True,
                 proof.get("timeout_retry_validation") is True,

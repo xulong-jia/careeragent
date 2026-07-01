@@ -28,7 +28,42 @@ The current conservative tag is `v3.4.0-production-foundation-reaudit-passed`. T
 PYTHONPATH=backend backend/.venv/bin/python scripts/run_external_provider_proof.py --dry-run --output /tmp/careeragent-v35-provider-proof-dry-run.json
 ```
 
-Dry-run output must report `provider_mode=not_verified` and `production_quality_candidate_signal=false`. It is only a schema/secret-leak check.
+Dry-run output must report `provider_mode=dry_run` and `production_quality_candidate_signal=false`. It is only a schema/secret-leak check.
+
+## Provider Proof Readiness
+
+Private provider execution requires:
+
+```bash
+export AI_PROVIDER_MODE=provider_verified
+export LLM_PROVIDER=openai_compatible
+export LLM_BASE_URL=...
+export LLM_MODEL=...
+export LLM_API_KEY=...
+export EMBEDDING_PROVIDER=openai_compatible
+export EMBEDDING_BASE_URL=...
+export EMBEDDING_MODEL=...
+export EMBEDDING_API_KEY=...
+export DATA_ENCRYPTION_KEY=...
+export AUTH_JWT_SECRET=...
+PYTHONPATH=backend backend/.venv/bin/python scripts/check_provider_proof_readiness.py
+```
+
+Then run:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/run_external_provider_proof.py \
+  --provider openai_compatible \
+  --llm-base-url "$LLM_BASE_URL" \
+  --llm-model "$LLM_MODEL" \
+  --embedding-base-url "$EMBEDDING_BASE_URL" \
+  --embedding-model "$EMBEDDING_MODEL" \
+  --output evidence/private_outputs/provider_proof.$(date +%Y%m%d-%H%M%S).json \
+  --redact \
+  --fail-on-not-verified
+```
+
+The generated proof must stay in ignored private outputs or `/tmp`.
 
 ## Private Evidence Validation
 
