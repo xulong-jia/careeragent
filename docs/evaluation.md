@@ -2,6 +2,8 @@
 
 This document is the stable entrypoint for the v1.5B deterministic evaluation regression foundation and the v1.5C version/privacy governance additions. The detailed design remains in `docs/evaluation-design.md`.
 
+Phase 2.0 status: this is synthetic contract regression only. It is useful as a production baseline gate, but it is not a real quality evaluation system.
+
 ## Scope
 
 - 7 smoke modules: `jd_parser`, `resume_parser`, `match`, `rag`, `agent`, `application`, `bad_case`.
@@ -22,6 +24,8 @@ backend/.venv/bin/python scripts/run_evals.py --dataset regression
 ## Boundaries
 
 Evaluation is deterministic regression tracking only. It is not a real LLM judge, not model comparison, not production AI governance, and not an automatic apply system. Fixtures and results must use synthetic refs, summaries, and short signals only.
+
+Phase 2.1 must add de-identified real JD, resume, project, RAG, match, agent workflow, and bad-case samples. The eval runner must call the actual service/retriever/parser/agent paths instead of constructing `actual` inside a script. Until then, smoke pass must not be interpreted as parser, RAG, match, or agent production quality.
 
 ## v1.5C Governance Additions
 

@@ -12,6 +12,7 @@ from app.core.errors import AppError
 
 HASH_NAME = "pbkdf2_sha256"
 HASH_ITERATIONS = 260_000
+FORBIDDEN_PRODUCTION_SECRET_MARKERS = ("dev-only", "replace-me", "change-me")
 
 
 def hash_password(password: str) -> str:
@@ -69,13 +70,22 @@ def _auth_secret(settings: Settings | None = None) -> str:
             status_code=500,
             details={"env": "AUTH_JWT_SECRET"},
         )
-    if resolved.app_env == "production" and len(secret) < 32:
-        raise AppError(
-            code="auth_secret_too_short",
-            message="Authentication secret is too short for production.",
-            status_code=500,
-            details={"env": "AUTH_JWT_SECRET", "min_length": 32},
-        )
+    if resolved.app_env == "production":
+        if len(secret) < 32:
+            raise AppError(
+                code="auth_secret_too_short",
+                message="Authentication secret is too short for production.",
+                status_code=500,
+                details={"env": "AUTH_JWT_SECRET", "min_length": 32},
+            )
+        lowered_secret = secret.lower()
+        if any(marker in lowered_secret for marker in FORBIDDEN_PRODUCTION_SECRET_MARKERS):
+            raise AppError(
+                code="auth_secret_not_allowed",
+                message="Authentication secret is a placeholder and cannot be used in production.",
+                status_code=500,
+                details={"env": "AUTH_JWT_SECRET"},
+            )
     return secret
 
 

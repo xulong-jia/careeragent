@@ -49,7 +49,7 @@ class Settings:
 def get_settings() -> Settings:
     return Settings(
         app_name=os.getenv("APP_NAME", "CareerAgent API"),
-        app_env=os.getenv("APP_ENV", "development"),
+        app_env=os.getenv("APP_ENV", "development").strip().lower(),
         backend_host=os.getenv("BACKEND_HOST", "0.0.0.0"),
         backend_port=int(os.getenv("BACKEND_PORT", "8000")),
         cors_origins=_csv_env("BACKEND_CORS_ORIGINS", "http://localhost:5173"),

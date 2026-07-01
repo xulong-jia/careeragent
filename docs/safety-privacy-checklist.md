@@ -23,8 +23,9 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 
 ## API Key
 
-- [ ] `.env.example` 只保留空 placeholder。
-- [ ] `AUTH_JWT_SECRET` 在 `.env.example` 中只能是 placeholder；production 必须通过 secret manager 或部署环境注入足够长的真实 secret。
+- [ ] `.env.example` 只保留空 API key placeholder 和明确 dev-only auth placeholder。
+- [ ] `AUTH_JWT_SECRET` 在 `.env.example` 中只能是 dev-only placeholder；production 必须通过 secret manager 或部署环境注入足够长的强随机真实 secret。
+- [ ] `APP_ENV=production` 不允许使用 dev-only、replace-me 或 change-me placeholder secret。
 - [ ] `LLM_API_KEY`、`EMBEDDING_API_KEY` 和 `OPENAI_API_KEY` 当前默认不需要填写。
 - [ ] 默认 deterministic MVP 不依赖任何真实 LLM 或外部 embedding provider。
 - [ ] 只有本地 `.env` 或部署平台 secret manager 注入真实 key；不把 key 写入 docs、tests、eval artifacts 或 Docker image。
@@ -43,7 +44,7 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 
 ## Provider / Vector Readiness
 
-- [ ] `ENABLE_REAL_LLM=false` 和 `ENABLE_REAL_EMBEDDING=false` 时，backend tests、frontend build 和 Docker Compose config 可 keyless 运行。
+- [ ] `ENABLE_REAL_LLM=false` 和 `ENABLE_REAL_EMBEDDING=false` 时，backend tests、frontend build 和 Docker Compose config 不需要真实 AI provider key；Docker Compose 仍必须有本地 dev-only `AUTH_JWT_SECRET`。
 - [ ] `ENABLE_REAL_LLM=true` 或 `ENABLE_REAL_EMBEDDING=true` 时，缺少 base URL / key / model 应返回受控配置错误，不静默降级为假成功。
 - [ ] LLM structured output 必须经过 Pydantic schema validation。
 - [ ] RAG vector/hybrid retrieval 默认使用 local deterministic embeddings，不提交 FAISS/pgvector/remote vector DB artifacts。
@@ -89,6 +90,15 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] `GET /api/privacy/export` 只导出当前 user/workspace 的 preview/ref/summary，不返回 secret 或大段 raw payload。
 - [ ] `DELETE /api/privacy/delete-all` 只删除当前 user/workspace 的业务数据，并写入 audit log counts。
 - [ ] `GET /api/privacy/audit-log` 只返回当前 user/workspace 的 audit events。
+
+当前 delete/export/audit-log 能力是 P1 baseline，不等于生产级 retention、backup erasure proof、audit compliance 或 legal hold 策略。
+
+## Production Blockers
+
+- [ ] Resume / JD / RAG `raw_text` 当前仍以明文保存在本地 DB 或本地数据路径中，属于 production blocker。
+- [ ] 当前没有生产级 encryption-at-rest、key rotation、backup retention、backup erasure proof、audit log pipeline 或 observability。
+- [ ] SQLite 仍是默认本地路径；PostgreSQL 只处于 driver/readiness 状态，不是生产默认部署。
+- [ ] 阶段 2.6 必须补齐 encryption / retention / audit / observability / production DB / deployment hardening。
 
 ## Bad Case
 

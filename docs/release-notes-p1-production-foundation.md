@@ -23,7 +23,7 @@ P1 adds the first production-foundation layer for Auth, Workspace, Data Isolatio
 
 ## Operational Notes
 
-- `AUTH_JWT_SECRET` is required. In `APP_ENV=production`, it must be at least 32 characters.
+- `AUTH_JWT_SECRET` is required. In `APP_ENV=production`, it must be at least 32 characters and must not use dev-only / replace-me / change-me placeholder values.
 - `API_RATE_LIMIT_PER_MINUTE=0` disables the local in-process limiter. Set a positive value for a basic per-process guard; production should use an edge/API gateway limiter.
 - Existing local SQLite rows are backfilled to default owner/workspace by migration for prototype continuity. A real production migration needs explicit user/workspace mapping.
 - Privacy delete-all returns delete counts and records an audit event. It does not prove backup erasure or legal compliance.

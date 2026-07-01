@@ -1,6 +1,6 @@
 # CareerAgent Final Acceptance Report
 
-状态说明：本文档保留 v1.6 Production AI & Deployment Readiness 当时的验收记录。P1 后 Auth、Workspace、Data Isolation 和 privacy export/delete/audit baseline 已在后续 checkpoint 中补齐；当前 P1 状态以 README、`docs/current-architecture.md` 和 `docs/release-notes-p1-production-foundation.md` 为准。P1 仍不代表 CareerAgent 已 production-ready。
+状态说明：本文档保留 v1.6 Production AI & Deployment Readiness 当时的验收记录。P1 后 Auth、Workspace、Data Isolation 和 privacy export/delete/audit baseline 已在后续 checkpoint 中补齐；阶段 2.0 后当前状态以 README、`docs/current-architecture.md`、`docs/production-gap-baseline.md`、`docs/quality-gates.md` 和 `docs/release-notes-p1-production-foundation.md` 为准。本文中的“完成 / final / acceptance”仅表示当时 deterministic 或 local foundation 范围内的验收记录，不等于 production-grade DONE。CareerAgent 当前仍不是 production-ready。
 
 本报告记录 v1.6 Production AI & Deployment Readiness 开发后的当前项目状态。结论基于当前仓库真实代码、测试和文档，不代表生产就绪系统，也不表示任何 v1.6 tag 已完成。
 
