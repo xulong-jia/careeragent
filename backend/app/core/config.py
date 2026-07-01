@@ -39,6 +39,11 @@ class Settings:
     auth_jwt_secret: str
     auth_token_expire_minutes: int
     rate_limit_per_minute: int
+    db_pool_size: int
+    db_max_overflow: int
+    db_pool_timeout_seconds: float
+    db_echo_sql: bool
+    local_data_dir: str
     ai_provider_mode: str
     llm_provider: str
     llm_api_base_url: str
@@ -76,6 +81,13 @@ def _mask_config_value(value: str) -> str:
     return f"[set length={len(value)}]"
 
 
+def _mask_database_url(database_url: str) -> str:
+    try:
+        return make_url(database_url).render_as_string(hide_password=True)
+    except Exception:
+        return "[invalid]"
+
+
 def _is_placeholder_secret(value: str) -> bool:
     lowered = value.strip().lower()
     return any(marker in lowered for marker in FORBIDDEN_PRODUCTION_SECRET_MARKERS)
@@ -100,6 +112,12 @@ def validate_runtime_settings(settings: Settings) -> None:
         raise RuntimeError("DATABASE_URL is invalid.")
     if settings.data_encryption_key and not _is_valid_fernet_key(settings.data_encryption_key):
         raise RuntimeError("DATA_ENCRYPTION_KEY must be a valid Fernet key.")
+    if settings.db_pool_size < 1:
+        raise RuntimeError("DB_POOL_SIZE must be at least 1.")
+    if settings.db_max_overflow < 0:
+        raise RuntimeError("DB_MAX_OVERFLOW must be 0 or greater.")
+    if settings.db_pool_timeout_seconds <= 0:
+        raise RuntimeError("DB_POOL_TIMEOUT_SECONDS must be greater than 0.")
 
     if settings.app_env != "production":
         return
@@ -113,6 +131,8 @@ def validate_runtime_settings(settings: Settings) -> None:
         raise RuntimeError("AUTH_JWT_SECRET must not be a placeholder in production.")
     if is_sqlite_database_url(settings.database_url):
         raise RuntimeError("SQLite DATABASE_URL is not allowed in production.")
+    if settings.db_echo_sql:
+        raise RuntimeError("DB_ECHO_SQL must be false in production.")
     if "*" in settings.cors_origins:
         raise RuntimeError("BACKEND_CORS_ORIGINS must not contain * in production.")
     data_key = settings.data_encryption_key.strip()
@@ -133,6 +153,11 @@ def settings_summary(settings: Settings) -> dict[str, object]:
         "app_env": settings.app_env,
         "database_driver": _database_driver_name(settings.database_url),
         "database_is_sqlite": is_sqlite_database_url(settings.database_url),
+        "database_url": _mask_database_url(settings.database_url),
+        "db_pool_size": settings.db_pool_size,
+        "db_max_overflow": settings.db_max_overflow,
+        "db_pool_timeout_seconds": settings.db_pool_timeout_seconds,
+        "db_echo_sql": settings.db_echo_sql,
         "auth_jwt_secret": _mask_config_value(settings.auth_jwt_secret),
         "auth_token_expire_minutes": settings.auth_token_expire_minutes,
         "ai_provider_mode": settings.ai_provider_mode,
@@ -165,6 +190,11 @@ def get_settings() -> Settings:
         auth_jwt_secret=os.getenv("AUTH_JWT_SECRET", "").strip(),
         auth_token_expire_minutes=int(os.getenv("AUTH_TOKEN_EXPIRE_MINUTES", "60")),
         rate_limit_per_minute=int(os.getenv("API_RATE_LIMIT_PER_MINUTE", "0")),
+        db_pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
+        db_max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
+        db_pool_timeout_seconds=float(os.getenv("DB_POOL_TIMEOUT_SECONDS", "30")),
+        db_echo_sql=_bool_env("DB_ECHO_SQL", False),
+        local_data_dir=os.getenv("LOCAL_DATA_DIR", "local_data").strip(),
         ai_provider_mode=os.getenv("AI_PROVIDER_MODE", "deterministic").strip().lower(),
         llm_provider=os.getenv("LLM_PROVIDER", "deterministic").strip().lower(),
         llm_api_base_url=os.getenv("LLM_API_BASE_URL", "").strip(),

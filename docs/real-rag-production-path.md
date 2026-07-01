@@ -88,4 +88,4 @@ RAG metrics include:
 - Benchmark remains small.
 - v3.0 encrypts RAG document `raw_text`, chunk `text` and persisted answer-run private fields at the repository write path, but KMS, key rotation backfill, retention, backup purge, legal hold and centralized audit hardening remain production blockers.
 
-v3.0 Security / Privacy / Data Governance is completed as production foundation candidate. Next phase should be v3.1 Production Deployment, Database & Operations Foundation. Match Scoring and Project Rewrite remain deterministic and not production-ready.
+v3.1 Production Deployment, Database & Operations Foundation is completed as production foundation candidate. Next phase should be v3.2 Production AI Quality Upgrade. Match Scoring, Project Rewrite and current RAG retrieval remain deterministic/local foundation and not production-ready semantic AI.

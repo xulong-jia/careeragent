@@ -9,6 +9,7 @@
 | Git state | `git status -sb` | 确认当前分支和未提交变更范围 | 不替代 code review |
 | Revision | `git rev-parse HEAD` | 记录验证起点 | 不代表 release tag |
 | Backend tests | `PYTHONPATH=backend backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests` | 后端 contract、API、migration-adjacent tests 通过 | 主要是 deterministic/local tests |
+| Aggregate v3.1 gate | `scripts/run_quality_gates.sh` | 聚合 backend tests、synthetic/service-level eval、frontend build、prod-like compose config、Alembic temp DB、diff/artifact/secret scan | 仍不是 cloud production certification |
 | Frontend build | `cd frontend && npm run build -- --outDir /tmp/careeragent-frontend-build-26` | TypeScript/Vite build 通过 | 不包含完整 UI regression |
 | Docker Compose config | `docker compose config` | Compose 文件可解析，前提是 `.env` 或环境中提供 `AUTH_JWT_SECRET` | 不是 container build/push/deploy 证明 |
 | Docker missing-secret negative check | `COMPOSE_DISABLE_ENV_FILE=1 env -u AUTH_JWT_SECRET docker compose config` | 在没有 `.env`/env secret 时应明确失败 | 验证 Compose 不接受空 secret |
@@ -54,6 +55,19 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 - Viewer/member/owner route permissions must be enforced before mutating protected APIs.
 - Privacy delete-all must support `dry_run=true` and execute proof with retained-record and backup-purge limitation fields.
 - Evaluation case/result payloads and audit metadata must remain redacted and JSON-serializable.
+
+## v3.1 Production Deployment / Database / Operations Gates
+
+- `docker-compose.prod-like.yml` must parse with production-like secrets and fail when required secrets such as `AUTH_JWT_SECRET` are missing.
+- `APP_ENV=production` must reject SQLite, wildcard CORS, placeholder auth/data keys and `DB_ECHO_SQL=true`.
+- `/live` must return process liveness.
+- `/ready` must check DB reachability, config validity, local storage writability and Alembic current/head status.
+- `/metrics` must return non-secret HTTP counters plus Agent/Eval/RAG DB counts.
+- `scripts/db_migrate.sh` must run Alembic against a supplied `DATABASE_URL`.
+- `scripts/db_backup.sh` and `scripts/db_restore.sh` must refuse SQLite and require PostgreSQL tooling.
+- `scripts/db_restore.sh` must require `CONFIRM_RESTORE=restore`.
+- Frontend production image must use build output served by nginx, not Vite dev server.
+- Backup dump artifacts must remain ignored and untracked.
 
 ## Evaluation Boundary
 

@@ -91,7 +91,7 @@ This is not centralized observability, SIEM, alerting, tracing, metrics SLO, or 
 - No KMS/HSM integration, no multi-key decrypt set, no online key rotation/backfill job.
 - No refresh token rotation, session/device management, SSO or MFA.
 - RBAC is route-level role foundation, not a full policy engine or database RLS.
-- Backup purge, restore, legal hold and deletion attestation remain v3.1 operations work.
+- v3.1 adds backup/restore scripts and retention policy docs; automated backup purge, legal hold and deletion attestation remain future production hardening.
 - Audit logs are DB-local redacted records, not centralized immutable audit/SIEM.
 - Frontend privacy-safe display, selectors and E2E coverage remain v3.3 work.
 - Production AI quality, semantic provider, large benchmark and human review remain v3.2 work.

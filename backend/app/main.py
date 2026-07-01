@@ -33,6 +33,7 @@ from app.core.errors import (
     validation_error_handler,
 )
 from app.core.logging import configure_logging, log_event
+from app.core.metrics import record_http_request
 
 
 def _validate_startup_security(settings) -> None:
@@ -59,14 +60,16 @@ def create_app() -> FastAPI:
         request.state.request_id = request_id
         started = time.perf_counter()
         response = await call_next(request)
+        duration_ms = round((time.perf_counter() - started) * 1000)
         response.headers["X-Request-ID"] = request_id
+        record_http_request(response.status_code, duration_ms)
         log_event(
             "http_request",
             request_id=request_id,
             method=request.method,
             path=request.url.path,
             status_code=response.status_code,
-            duration_ms=round((time.perf_counter() - started) * 1000),
+            duration_ms=duration_ms,
         )
         return response
 

@@ -23,6 +23,7 @@ build/
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # Local private data
 local_data/
@@ -37,6 +38,10 @@ vector_index
 **/vector_index/
 exports/
 **/exports/
+backups/
+**/backups/
+*.dump
+*.backup
 evals/results/*
 !evals/results/.gitkeep
 logs/

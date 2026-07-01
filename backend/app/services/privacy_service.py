@@ -224,7 +224,7 @@ def _proof_payload(
         ),
         "backup_purge_status": "not_implemented",
         "backup_purge_note": (
-            "v3.0 does not operate managed backups. Production backup purge remains a v3.1 operations gate."
+            "v3.1 defines retention/backup policy and restore runbooks, but automated managed-backup purge is not implemented."
         ),
         "audit_event_id": audit_event_id,
         "verification_status": "dry_run_not_deleted" if status == "dry_run" else "database_rows_deleted",

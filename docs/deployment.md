@@ -1,6 +1,6 @@
 # CareerAgent Deployment Baseline
 
-This is a security/privacy/deployment production foundation for local development and repeatable checks. It is not a production SaaS runbook and does not make CareerAgent production-ready.
+This is a security/privacy/deployment/operations production foundation for local development, production-like deployment checks and repeatable gates. It is not production-readiness certification and does not make CareerAgent production-ready.
 
 ## Local Docker Compose
 
@@ -41,14 +41,29 @@ Run that command after copying `.env.example` to `.env`, or provide a local secr
 AUTH_JWT_SECRET=dev-only-change-me-careeragent-local-auth-secret-32chars docker compose config
 ```
 
-## Health Check
+## Production-like Compose
+
+v3.1 adds a production-like profile with PostgreSQL/pgvector, backend probes and nginx-hosted frontend build:
 
 ```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/ready
+cp .env.production.example .env.production
+docker compose --env-file .env.production -f docker-compose.prod-like.yml config
+docker compose --env-file .env.production -f docker-compose.prod-like.yml build
+docker compose --env-file .env.production -f docker-compose.prod-like.yml up -d
 ```
 
-The health response exposes provider modes and feature flags, but not API keys or database credentials. The readiness response checks DB reachability and runtime config validity, and returns only masked config summary.
+`.env.production.example` is a template only. Real values must come from a secret manager or private deployment environment.
+
+## Health / Readiness / Metrics
+
+```bash
+curl http://localhost:8000/live
+curl http://localhost:8000/health
+curl http://localhost:8000/ready
+curl http://localhost:8000/metrics
+```
+
+The health response exposes provider modes and feature flags, but not API keys or database credentials. The readiness response checks DB reachability, runtime config validity, local storage writability and Alembic current/head status, and returns only masked config summary. The metrics response exposes non-secret HTTP counters and Agent/Eval/RAG run counts.
 
 ## Auth Secret Rules
 
@@ -71,7 +86,7 @@ Production must use a PostgreSQL-compatible URL injected by the deployment envir
 DATABASE_URL=postgresql+psycopg://...
 ```
 
-This repository does not provision managed PostgreSQL, backups, restore jobs or retention policies.
+v3.1 provides `scripts/db_migrate.sh`, `scripts/db_backup.sh`, `scripts/db_restore.sh`, `docs/database-operations.md` and `docs/retention-backup-policy.md`. Managed PostgreSQL, encrypted backup storage, restore jobs and purge attestation remain deployment responsibilities.
 
 ## Logging and Readiness
 
@@ -108,8 +123,18 @@ python3 scripts/run_evals.py --dataset smoke
 
 The smoke eval is synthetic contract regression only. Phase 2.1 adds `service_level` evaluation, which uses de-identified sample sets and runner paths that call the actual current service/retriever/parser/agent implementations.
 
+## v3.1 Operations Gates
+
+Run the aggregate gate:
+
+```bash
+scripts/run_quality_gates.sh
+```
+
+It runs backend tests, synthetic/service-level evals, frontend build, production-like compose config positive/negative checks, Alembic temp DB migration, diff check, artifact scan and secret scan.
+
 ## Production Limits
 
-Current v3.0 has token auth, workspace scope, token revoke, route-level RBAC gate, privacy export/delete/delete-summary/audit baseline, sensitive field envelope encryption, structured request logging, readiness checks, production config validation, data encryption key validation, and PostgreSQL runtime requirement for production. It still does not include production SSO, MFA, refresh-token rotation, DB RLS, cloud deployment scripts, Kubernetes, centralized monitoring, automatic backup, retention policy, backup erasure proof, recruitment scraping, or auto-apply.
+Current v3.1 has token auth, workspace scope, token revoke, route-level RBAC gate, privacy export/delete/delete-summary/audit baseline, sensitive field envelope encryption, structured request logging, readiness checks, production config validation, data encryption key validation, PostgreSQL runtime requirement, production-like compose profile, DB operation scripts, JSON metrics snapshot and operations runbooks. It still does not include production SSO, MFA, refresh-token rotation, DB RLS, Kubernetes, managed observability, automated backup purge, cloud deployment certification, recruitment scraping, or auto-apply.
 
-Current deployment status is `security/privacy/data-governance production foundation candidate`, not `production-ready`. The next phase should be v3.1 Production Deployment, Database & Operations Foundation.
+Current deployment status is `production deployment/database/operations foundation candidate`, not `production-ready`. The next phase should be v3.2 Production AI Quality Upgrade.

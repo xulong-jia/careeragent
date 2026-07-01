@@ -79,6 +79,26 @@ def test_production_runtime_validation_rejects_sqlite(monkeypatch):
         get_settings.cache_clear()
 
 
+def test_production_runtime_validation_rejects_sql_echo(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "prod-secret-value-with-more-than-32-chars")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://user:pass@db/careeragent")
+    monkeypatch.setenv("BACKEND_CORS_ORIGINS", "https://careeragent.example.com")
+    monkeypatch.setenv(
+        "DATA_ENCRYPTION_KEY",
+        "MKlKIfl6Htn3qasq6OmUZrAptCgKZk_unRl07h5u6Ew=",
+    )
+    monkeypatch.setenv("DATA_ENCRYPTION_KEY_ID", "prod-2026-07-v1")
+    monkeypatch.setenv("DB_ECHO_SQL", "true")
+
+    try:
+        with pytest.raises(RuntimeError, match="DB_ECHO_SQL"):
+            validate_runtime_settings(get_settings())
+    finally:
+        get_settings.cache_clear()
+
+
 def test_production_runtime_validation_requires_data_encryption_key(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("APP_ENV", "production")
@@ -119,6 +139,10 @@ def test_config_summary_masks_secret_values(monkeypatch):
     monkeypatch.setenv("AUTH_JWT_SECRET", "visible-secret-value")
     monkeypatch.setenv("LLM_API_KEY", "sk-testsecret123456789")
     monkeypatch.setenv("EMBEDDING_API_KEY", "embedding-secret")
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql+psycopg://careeragent:db-secret-password@db/careeragent",
+    )
 
     try:
         summary = settings_summary(get_settings())
@@ -126,7 +150,12 @@ def test_config_summary_masks_secret_values(monkeypatch):
         assert "visible-secret-value" not in dumped
         assert "sk-testsecret" not in dumped
         assert "embedding-secret" not in dumped
+        assert "db-secret-password" not in dumped
         assert summary["auth_jwt_secret"] == "[set length=20]"
+        assert summary["database_url"] == (
+            "postgresql+psycopg://careeragent:***@db/careeragent"
+        )
+        assert summary["db_pool_size"] == 5
         assert summary["data_encryption_key"] != get_settings().data_encryption_key
         assert summary["data_encryption_key_id"]
     finally:

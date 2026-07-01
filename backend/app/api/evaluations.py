@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.logging import log_event
+from app.core.metrics import record_domain_event
 from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
 from app.schemas.evaluations import (
@@ -37,6 +39,16 @@ async def create_evaluation_run(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     run = evaluation_service.run_evaluation(db, payload)
+    record_domain_event("evaluation.run.created")
+    log_event(
+        "evaluation_run_created",
+        request_id=request.state.request_id,
+        run_id=run.run.id,
+        module=run.run.module,
+        dataset_name=run.run.dataset_name,
+        status=run.run.status,
+        results_count=run.results_count,
+    )
     return {"data": run, "request_id": request.state.request_id}
 
 
@@ -120,6 +132,15 @@ async def create_evaluation_case(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     evaluation_case = evaluation_service.create_evaluation_case(db, payload)
+    record_domain_event("evaluation.case.created")
+    log_event(
+        "evaluation_case_created",
+        request_id=request.state.request_id,
+        case_id=evaluation_case.id,
+        module=evaluation_case.module,
+        dataset_name=evaluation_case.dataset_name,
+        source_type=evaluation_case.source_type,
+    )
     return {"data": evaluation_case, "request_id": request.state.request_id}
 
 
@@ -148,6 +169,15 @@ async def create_evaluation_case_from_bad_case(
     evaluation_case = evaluation_service.create_evaluation_case_from_bad_case(
         db,
         case_id,
+    )
+    record_domain_event("evaluation.case.created_from_bad_case")
+    log_event(
+        "evaluation_case_created_from_bad_case",
+        request_id=request.state.request_id,
+        bad_case_id=case_id,
+        case_id=evaluation_case.id,
+        module=evaluation_case.module,
+        dataset_name=evaluation_case.dataset_name,
     )
     return {"data": evaluation_case, "request_id": request.state.request_id}
 

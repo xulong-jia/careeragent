@@ -18,6 +18,11 @@ services:
       DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-MKlKIfl6Htn3qasq6OmUZrAptCgKZk_unRl07h5u6Ew=}
       DATA_ENCRYPTION_KEY_ID: ${DATA_ENCRYPTION_KEY_ID:-local-dev-v1}
       DATABASE_URL: ${DATABASE_URL:-sqlite:////app/backend/local_data/careeragent.db}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-30}
+      DB_ECHO_SQL: ${DB_ECHO_SQL:-false}
+      LOCAL_DATA_DIR: ${LOCAL_DATA_DIR:-/app/backend/local_data}
       AI_PROVIDER_MODE: ${AI_PROVIDER_MODE:-deterministic}
       LLM_PROVIDER: ${LLM_PROVIDER:-deterministic}
       LLM_API_BASE_URL: ${LLM_API_BASE_URL:-}

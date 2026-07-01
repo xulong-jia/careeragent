@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.logging import log_event
+from app.core.metrics import record_domain_event
 from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
 from app.schemas.rag import (
@@ -33,6 +35,14 @@ async def create_rag_document(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     document = rag_service.create_document(db, payload)
+    record_domain_event("rag.document.created")
+    log_event(
+        "rag_document_created",
+        request_id=request.state.request_id,
+        doc_id=document.doc_id,
+        source_type=document.source_type,
+        index_status=document.index_status,
+    )
     return {"data": document, "request_id": request.state.request_id}
 
 
@@ -85,6 +95,16 @@ async def index_rag_document(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     result = rag_service.index_document(db, doc_id, payload)
+    first_chunk = result.chunks[0] if result.chunks else None
+    record_domain_event("rag.document.indexed")
+    log_event(
+        "rag_document_indexed",
+        request_id=request.state.request_id,
+        doc_id=doc_id,
+        chunk_count=result.chunk_count,
+        embedding_provider=first_chunk.embedding_provider if first_chunk else None,
+        embedding_model=first_chunk.embedding_model if first_chunk else None,
+    )
     return {"data": result, "request_id": request.state.request_id}
 
 
@@ -109,6 +129,15 @@ async def search_rag_documents(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     result = rag_service.search_documents(db, payload)
+    record_domain_event("rag.search.completed")
+    log_event(
+        "rag_search_completed",
+        request_id=request.state.request_id,
+        retrieval_mode=(
+            result.retrieval_debug.retrieval_mode if result.retrieval_debug else None
+        ),
+        returned_count=len(result.sources),
+    )
     return {"data": result, "request_id": request.state.request_id}
 
 
@@ -119,6 +148,16 @@ async def answer_rag_question(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     result = rag_service.answer_question(db, payload)
+    record_domain_event("rag.answer.completed")
+    log_event(
+        "rag_answer_completed",
+        request_id=request.state.request_id,
+        answer_run_id=result.answer_run_id,
+        retrieval_mode=result.retrieval_mode,
+        grounded=result.grounded,
+        uncertainty=result.uncertainty,
+        citation_count=len(result.citations),
+    )
     return {"data": result, "request_id": request.state.request_id}
 
 

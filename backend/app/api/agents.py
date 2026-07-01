@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.logging import log_event
+from app.core.metrics import record_domain_event
 from app.db.session import get_db
 from app.schemas.agents import (
     AgentRunCreateRequest,
@@ -33,6 +35,15 @@ async def create_agent_run(
         run=AgentRunRecord.model_validate(run),
         steps_count=steps_count,
     )
+    record_domain_event("agent.run.created")
+    log_event(
+        "agent_run_created",
+        request_id=request.state.request_id,
+        run_id=run.id,
+        workflow_name=run.workflow_name,
+        status=run.status,
+        steps_count=steps_count,
+    )
     return {"data": data, "request_id": request.state.request_id}
 
 
@@ -56,6 +67,15 @@ async def resume_agent_run(
         run=AgentRunRecord.model_validate(run),
         steps_count=steps_count,
     )
+    record_domain_event("agent.run.resumed")
+    log_event(
+        "agent_run_resumed",
+        request_id=request.state.request_id,
+        run_id=run.id,
+        workflow_name=run.workflow_name,
+        status=run.status,
+        steps_count=steps_count,
+    )
     return {"data": data, "request_id": request.state.request_id}
 
 
@@ -74,6 +94,16 @@ async def retry_agent_run(
         run=AgentRunRecord.model_validate(run),
         steps_count=steps_count,
     )
+    record_domain_event("agent.run.retried")
+    log_event(
+        "agent_run_retried",
+        request_id=request.state.request_id,
+        run_id=run.id,
+        workflow_name=run.workflow_name,
+        status=run.status,
+        retry_attempt=run.retry_attempt,
+        steps_count=steps_count,
+    )
     return {"data": data, "request_id": request.state.request_id}
 
 
@@ -90,6 +120,15 @@ async def cancel_agent_run(
     steps_count = agent_service.count_steps_for_run(db, run.id)
     data = AgentRunCreateResponse(
         run=AgentRunRecord.model_validate(run),
+        steps_count=steps_count,
+    )
+    record_domain_event("agent.run.cancelled")
+    log_event(
+        "agent_run_cancelled",
+        request_id=request.state.request_id,
+        run_id=run.id,
+        workflow_name=run.workflow_name,
+        status=run.status,
         steps_count=steps_count,
     )
     return {"data": data, "request_id": request.state.request_id}
