@@ -1,0 +1,16 @@
+{
+  "proof_type": "monitoring",
+  "proof_id": "monitoring-proof-template",
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "metrics_backend": "",
+  "log_drain": "",
+  "tracing_backend": "",
+  "error_reporting": "",
+  "alert_rules_verified": false,
+  "privacy_redaction_verified": false,
+  "incident_runbook_verified": false,
+  "limitations": [
+    "Template only; real observability screenshots, alert IDs and traces belong in ignored private outputs.",
+    "Do not commit logs containing resume text, JD text, RAG chunks, interview answers or tokens."
+  ]
+}

@@ -2,9 +2,9 @@
 
 CareerAgent 是面向校招学生和留学生回国求职场景的 AI 求职工作台。项目目标是把用户画像、简历版本、JD 理解、匹配评分、项目优化、面试准备、学习计划、投递管理、RAG 知识库、Agent Workflow、Bad Case 和评测体系组织成可运行、可追踪、可复查的工程链路。
 
-CareerAgent 不是简历润色器，也不是 ChatGPT 套壳。本仓库当前已在 SQLite + SQLAlchemy 基础上支持 Profile Center MVP、Resume / JD / Match Report 持久化、Resume Version 历史管理、真实 PDF / DOCX / Markdown / txt 文本提取、JD/Resume real parser production foundation、deterministic risk-check、2.4 trustworthy Match Scoring + Project Rewrite foundation、Interview Center 题目生成、答案提交、deterministic scoring 前端工作流和 Dashboard training stats、Study Plan Center 11A/11B/11C/11D backend generate/list/detail/task status/stats API、StudyPlanPage 和 Dashboard study stats、RAG local vector production foundation、v3.2 semantic provider/reranker/LLM grounded RAG optional foundation、2.5 Agent Workflow production foundation、2.6 security/privacy/deployment production foundation、v3.0 security/privacy/data-governance production foundation candidate、v3.1 production deployment/database/operations foundation candidate、v3.2 production AI quality foundation candidate、v3.3 frontend productization / selector / mocked E2E foundation candidate、v3.4 blocker rework evidence foundation、v1.4 Product Operations / Application Management hardening、人工 Quality Review / Bad Case 闭环、v1.5B deterministic evaluation regression foundation、v1.5C privacy / security / data governance controls、v1.6 Production AI & Deployment Readiness baseline，以及 P1 Production Foundation 的 token auth、workspace scope、data isolation、session list/revoke 和 privacy export/delete/audit baseline。默认仍不调用真实 LLM，不做真实 LLM judge、不做多模型生产评测、不做自动投递。
+CareerAgent 不是简历润色器，也不是 ChatGPT 套壳。本仓库当前已在 SQLite + SQLAlchemy 基础上支持 Profile Center MVP、Resume / JD / Match Report 持久化、Resume Version 历史管理、真实 PDF / DOCX / Markdown / txt 文本提取、JD/Resume real parser production foundation、deterministic risk-check、2.4 trustworthy Match Scoring + Project Rewrite foundation、Interview Center 题目生成、答案提交、deterministic scoring 前端工作流和 Dashboard training stats、Study Plan Center 11A/11B/11C/11D backend generate/list/detail/task status/stats API、StudyPlanPage 和 Dashboard study stats、RAG local vector production foundation、v3.2 semantic provider/reranker/LLM grounded RAG optional foundation、2.5 Agent Workflow production foundation、2.6 security/privacy/deployment production foundation、v3.0 security/privacy/data-governance production foundation candidate、v3.1 production deployment/database/operations foundation candidate、v3.2 production AI quality foundation candidate、v3.3 frontend productization / selector / mocked E2E foundation candidate、v3.4 blocker rework evidence foundation、v3.5 external production evidence package preparation、v1.4 Product Operations / Application Management hardening、人工 Quality Review / Bad Case 闭环、v1.5B deterministic evaluation regression foundation、v1.5C privacy / security / data governance controls、v1.6 Production AI & Deployment Readiness baseline，以及 P1 Production Foundation 的 token auth、workspace scope、data isolation、session list/revoke 和 privacy export/delete/audit baseline。默认仍不调用真实 LLM，不做真实 LLM judge、不做多模型生产评测、不做自动投递。
 
-v3.4 blocker rework 定位：当前仓库只能称为 production foundation + blocker evidence foundation candidate，不能称为 production-ready。deterministic、mock、synthetic、prototype、本地可演示或骨架完整的模块均不是生产级 DONE；真实缺口以 `docs/production-readiness-rework.md`、`docs/production-gap-baseline.md`、`docs/quality-gates.md`、`docs/ai-quality-certification.md`、`docs/browser-e2e-certification.md`、`docs/production-evidence-templates.md`、`docs/session-security.md`、`docs/security-privacy-deployment-hardening.md`、`docs/production-deployment-runbook.md`、`docs/database-operations.md`、`docs/operations-runbook.md`、`docs/production-ai-quality-upgrade.md`、`docs/real-evaluation-foundation.md`、`docs/real-rag-production-path.md`、`docs/real-parser-foundation.md`、`docs/trustworthy-match-foundation.md` 和 `docs/agent-workflow-productionization.md` 为准。下一阶段应重新执行 v3.4 Final Production Readiness Certification，不是直接打 production-ready tag。
+v3.5 定位：当前仓库只能称为 production foundation + blocker evidence foundation + external evidence package preparation，不能称为 production-ready。deterministic、mock、synthetic、prototype、本地可演示或骨架完整的模块均不是生产级 DONE；真实缺口以 `docs/external-production-evidence-package.md`、`docs/provider-proof-runbook.md`、`docs/human-review-proof-runbook.md`、`docs/cloud-kms-backup-monitoring-proof-runbook.md`、`docs/production-readiness-rework.md`、`docs/production-gap-baseline.md`、`docs/quality-gates.md`、`docs/ai-quality-certification.md`、`docs/browser-e2e-certification.md`、`docs/production-evidence-templates.md`、`docs/session-security.md`、`docs/security-privacy-deployment-hardening.md`、`docs/production-deployment-runbook.md`、`docs/database-operations.md`、`docs/operations-runbook.md`、`docs/production-ai-quality-upgrade.md`、`docs/real-evaluation-foundation.md`、`docs/real-rag-production-path.md`、`docs/real-parser-foundation.md`、`docs/trustworthy-match-foundation.md` 和 `docs/agent-workflow-productionization.md` 为准。下一阶段必须收集真实外部证明并重新执行最终只读认证，不是直接打 production-ready tag。
 
 ## 技术栈
 
@@ -14,7 +14,7 @@ v3.4 blocker rework 定位：当前仓库只能称为 production foundation + bl
 - Deployment: Docker Compose 本地开发骨架、v3.1 production-like PostgreSQL/pgvector compose profile、production runtime config fail-fast baseline
 - Auth foundation: PBKDF2 password hash、HS256 bearer token、workspace membership、request-scoped owner filter
 - AI readiness: deterministic LLM provider interface, local/vector semantic-shaped embedding providers, optional OpenAI-compatible HTTP providers, persisted RAG chunk vectors, lexical/vector/hybrid retrieval, optional reranker and LLM grounded RAG answer contract
-- Later phase: v3.4 Final Production Readiness Certification re-audit
+- Later phase: collect external production evidence, then rerun final read-only certification
 
 ## 当前能力
 
@@ -39,6 +39,7 @@ v3.4 blocker rework 定位：当前仓库只能称为 production foundation + bl
 - v3.2 Production AI Quality：新增 semantic embedding provider metadata、offline semantic-shaped provider、OpenAI-compatible embedding retry、RAG reranker contract、LLM grounded RAG answer optional path、LLM parser mode、OCR/table/bilingual resume foundation metadata、100-case benchmark dataset、human review calibration、score stability 和 bad-case regression trend。v3.2 仍不是 production-ready；v3.4 已补 anonymized benchmark / provider validation / review protocol foundation，但真实 external provider proof、外部人审、production vector DB 应用路径和 final audit 仍是缺口。
 - v3.3 Frontend Productization / E2E Foundation：新增 centralized object selectors、Resume Version/JD/Match/Project/Application/Agent/Knowledge/Bad Case 主流程选择器、Match compare UI、Knowledge retrieval/answer mode controls、Dashboard business-summary deep links，以及 `npm run lint` / `typecheck` / `test` / `test:e2e` frontend gates。v3.3 仍不是 production-ready；v3.4 已补 Playwright Chromium browser E2E，但 deployed-backend E2E、accessibility/visual regression、cross-browser matrix、session storage hardening 和 v3.4 final audit 仍未完成。
 - v3.4 Production Readiness Blocker Rework：新增 AI provider validation proof path、155-case anonymized benchmark foundation、formal human review / advisory LLM judge protocol、AI quality report、Playwright Chromium `npm run test:e2e:browser`、auth session list/revoke API + UI、deployment proof validation script、production evidence templates、backup purge/legal deletion template 和 `scripts/run_final_readiness_gates.sh`。v3.4 rework 仍不是 production-ready；真实 provider proof、外部人审、真实 cloud deployment、managed DB/KMS/observability、backup purge attestation、external security review 和 final read-only audit 仍未完成。
+- v3.5 External Production Evidence Package：新增 `evidence/schemas/`、`evidence/templates/`、`evidence/checklists/`、ignored `evidence/private_outputs/`、外部 provider proof runner、人审导入/汇总脚本、外部证据包 validator 和 v3.5 runbooks。v3.5 只是证明包准备；没有真实 provider、人审、cloud/KMS/backup/monitoring/security proof 时仍不能称为 production-ready。
 - Dashboard：集中展示 Profile readiness、Resume、JD、Match、Project count / latest project status、Interview Training、Study Plan stats、RAG document/chunk/answer stats、Agent run status/score、Application operations stats、Bad Case、Evaluation 统计。
 
 当前明确不做：
@@ -53,7 +54,7 @@ v3.4 blocker rework 定位：当前仓库只能称为 production foundation + bl
 - 不声明完整生产级多租户权限体系；P1 只完成 token auth、workspace scope 和基础 data isolation。
 - 不把 pgvector deployment profile 等同于应用已完成 pgvector semantic retrieval；v3.2 已补 semantic provider metadata / reranker / benchmark foundation，但真实 provider + production vector DB application path 仍未认证。
 - 不提交真实简历、真实 JD、投递记录、面试复盘或 API key。
-- 不把当前 v3.4 blocker evidence foundation candidate 误标成 production-ready；KMS/rotation backfill、备份擦除证明、集中审计、完整 SSO/MFA/httpOnly refresh-token、DB RLS、deployed-backend/cross-browser E2E、真实 provider benchmark、外部人审和 v3.4 final audit 仍是缺口。
+- 不把当前 v3.5 external evidence package preparation 误标成 production-ready；KMS/rotation backfill、备份擦除证明、集中审计、完整 SSO/MFA/httpOnly refresh-token、DB RLS、deployed-backend/cross-browser E2E、真实 provider benchmark、外部人审、真实 cloud/KMS/observability/security proof 和最终只读认证仍是缺口。
 
 ## 目录结构
 
@@ -153,6 +154,15 @@ scripts/run_final_readiness_gates.sh
 
 该脚本输出在 `/tmp/careeragent-final-readiness-gates`，不要提交这些 runtime artifacts。
 
+v3.5 外部证明包 dry-run / validator：
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/run_external_provider_proof.py --dry-run --output /tmp/careeragent-v35-provider-proof-dry-run.json
+PYTHONPATH=backend backend/.venv/bin/python scripts/validate_external_evidence_package.py --evidence-dir evidence/private_outputs --output /tmp/careeragent-v35-evidence-summary.json
+```
+
+真实外部证明只能写入 ignored `evidence/private_outputs/` 或 `/tmp`。dry-run、offline、local deterministic、mocked 或 synthetic 输出不能作为 production-ready 证明。
+
 ## 环境变量
 
 复制 `.env.example` 为 `.env` 后再按需填写本地配置。当前默认使用本地 SQLite，不需要任何真实 AI API key，但 Auth 需要 `AUTH_JWT_SECRET`，敏感字段加密需要 `DATA_ENCRYPTION_KEY`。
@@ -247,6 +257,10 @@ CAREERAGENT_API_BASE_URL=http://localhost:8000 python3 scripts/seed_demo_data.py
 - Human Review Protocol：[docs/human-review-protocol.md](docs/human-review-protocol.md)
 - Browser E2E Certification：[docs/browser-e2e-certification.md](docs/browser-e2e-certification.md)
 - Production Evidence Templates：[docs/production-evidence-templates.md](docs/production-evidence-templates.md)
+- External Production Evidence Package v3.5：[docs/external-production-evidence-package.md](docs/external-production-evidence-package.md)
+- Provider Proof Runbook v3.5：[docs/provider-proof-runbook.md](docs/provider-proof-runbook.md)
+- Human Review Proof Runbook v3.5：[docs/human-review-proof-runbook.md](docs/human-review-proof-runbook.md)
+- Cloud / KMS / Backup / Monitoring Proof Runbook v3.5：[docs/cloud-kms-backup-monitoring-proof-runbook.md](docs/cloud-kms-backup-monitoring-proof-runbook.md)
 - Session Security：[docs/session-security.md](docs/session-security.md)
 - Bad Cases v1.5B/v1.5C：[docs/bad-cases.md](docs/bad-cases.md)
 - Safety / Privacy Checklist：[docs/safety-privacy-checklist.md](docs/safety-privacy-checklist.md)

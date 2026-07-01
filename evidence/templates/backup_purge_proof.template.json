@@ -1,0 +1,15 @@
+{
+  "proof_type": "backup_purge",
+  "proof_id": "backup-purge-proof-template",
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "deletion_proof_id": "privacy-delete-proof-id",
+  "affected_backup_ids_redacted": [],
+  "backup_purge_status": "not_implemented",
+  "legal_hold_status": "not_reviewed",
+  "restore_block_rule_verified": false,
+  "audit_artifact_redacted": "",
+  "limitations": [
+    "Template only; real backup purge attestations belong in ignored private outputs.",
+    "Do not commit backup IDs, customer identifiers, raw deletion logs or legal documents."
+  ]
+}

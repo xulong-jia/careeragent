@@ -1,0 +1,15 @@
+{
+  "proof_type": "security_review",
+  "proof_id": "security-review-proof-template",
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "reviewer_redacted": "external-reviewer-redacted",
+  "scope": [],
+  "critical_findings_open": 0,
+  "high_findings_open": 0,
+  "privacy_review_passed": false,
+  "remediation_plan_attached": false,
+  "limitations": [
+    "Template only; external security report details belong in ignored private outputs.",
+    "Do not commit pentest reports, vulnerability details, customer data or infrastructure identifiers."
+  ]
+}

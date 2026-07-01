@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "CareerAgent External Human Review Proof",
+  "type": "object",
+  "required": [
+    "proof_type",
+    "review_batch_id",
+    "generated_at",
+    "reviewer_count",
+    "reviewer_ids_redacted",
+    "rubric_version",
+    "case_count",
+    "modules_covered",
+    "agreement_rate",
+    "adjudication_required_count",
+    "privacy_review_passed",
+    "limitations"
+  ],
+  "properties": {
+    "proof_type": { "const": "human_review" },
+    "review_batch_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "reviewer_count": { "type": "integer", "minimum": 0 },
+    "reviewer_ids_redacted": { "type": "array", "items": { "type": "string" } },
+    "rubric_version": { "type": "string", "minLength": 1 },
+    "case_count": { "type": "integer", "minimum": 0 },
+    "modules_covered": { "type": "array", "items": { "type": "string" } },
+    "agreement_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "adjudication_required_count": { "type": "integer", "minimum": 0 },
+    "privacy_review_passed": { "type": "boolean" },
+    "limitations": { "type": "array", "items": { "type": "string" } }
+  }
+}

@@ -48,6 +48,8 @@ backups/
 *.backup
 evals/results/*
 !evals/results/.gitkeep
+evidence/private_outputs/*
+!evidence/private_outputs/.gitkeep
 logs/
 **/logs/
 cache/

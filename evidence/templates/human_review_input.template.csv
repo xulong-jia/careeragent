@@ -1,0 +1,2 @@
+reviewer_id,rubric_version,module,case_id,human_score,human_label,confidence,accepted_output,rejected_output,correction_note,privacy_review_passed,adjudication_status
+reviewer_placeholder,human-review-v3.5,match,case_placeholder,0,needs_review,0.0,false,false,template_only,false,required

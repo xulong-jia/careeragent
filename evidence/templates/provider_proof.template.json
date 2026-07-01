@@ -1,0 +1,22 @@
+{
+  "proof_type": "provider",
+  "proof_id": "provider-proof-template",
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "provider": "openai_compatible",
+  "provider_mode": "not_verified",
+  "base_url_redacted": "[set length=0 sha256:placeholder]",
+  "embedding_model": "provider-embedding-model-name",
+  "llm_model": "provider-llm-model-name",
+  "embedding_validation_passed": false,
+  "llm_validation_passed": false,
+  "timeout_retry_validation": false,
+  "schema_validation_passed": false,
+  "rag_grounded_answer_sample_passed": false,
+  "llm_judge_sample_passed": false,
+  "secret_leak_check_passed": true,
+  "production_quality_candidate_signal": false,
+  "limitations": [
+    "Template only; replace with private output from scripts/run_external_provider_proof.py.",
+    "Do not commit generated provider proof, provider keys, provider traces or raw prompts."
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "CareerAgent External Deployment Proof",
+  "type": "object",
+  "required": [
+    "proof_type",
+    "proof_id",
+    "created_at",
+    "provider",
+    "region",
+    "service",
+    "git_commit",
+    "cloud_deployment_validation_passed",
+    "managed_db_validation_passed",
+    "secret_manager_validation_passed",
+    "kms_validation_passed",
+    "tls_validation_passed",
+    "readiness_validation_passed",
+    "rollback_validation_passed",
+    "proof_artifacts_redacted",
+    "limitations"
+  ],
+  "properties": {
+    "proof_type": { "const": "deployment" },
+    "proof_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "region": { "type": "string" },
+    "service": { "type": "string" },
+    "git_commit": { "type": "string" },
+    "cloud_deployment_validation_passed": { "type": "boolean" },
+    "managed_db_validation_passed": { "type": "boolean" },
+    "secret_manager_validation_passed": { "type": "boolean" },
+    "kms_validation_passed": { "type": "boolean" },
+    "tls_validation_passed": { "type": "boolean" },
+    "readiness_validation_passed": { "type": "boolean" },
+    "rollback_validation_passed": { "type": "boolean" },
+    "proof_artifacts_redacted": { "type": "array", "items": { "type": "string" } },
+    "limitations": { "type": "array", "items": { "type": "string" } }
+  }
+}

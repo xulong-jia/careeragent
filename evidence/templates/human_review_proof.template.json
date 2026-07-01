@@ -1,0 +1,17 @@
+{
+  "proof_type": "human_review",
+  "review_batch_id": "human-review-template",
+  "generated_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "reviewer_count": 0,
+  "reviewer_ids_redacted": [],
+  "rubric_version": "human-review-v3.5",
+  "case_count": 0,
+  "modules_covered": [],
+  "agreement_rate": 0.0,
+  "adjudication_required_count": 0,
+  "privacy_review_passed": false,
+  "limitations": [
+    "Template only; import private CSV/JSONL review data with scripts/import_human_review_proof.py.",
+    "Reviewer names, emails, employer names and private case text must not be committed."
+  ]
+}

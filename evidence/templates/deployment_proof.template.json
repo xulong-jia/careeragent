@@ -1,0 +1,21 @@
+{
+  "proof_type": "deployment",
+  "proof_id": "deployment-proof-template",
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "provider": "cloud-provider-name",
+  "region": "region-name",
+  "service": "careeragent-production-service",
+  "git_commit": "commit-sha",
+  "cloud_deployment_validation_passed": false,
+  "managed_db_validation_passed": false,
+  "secret_manager_validation_passed": false,
+  "kms_validation_passed": false,
+  "tls_validation_passed": false,
+  "readiness_validation_passed": false,
+  "rollback_validation_passed": false,
+  "proof_artifacts_redacted": [],
+  "limitations": [
+    "Template only; attach redacted cloud deployment evidence in private outputs.",
+    "Do not commit screenshots, URLs, logs or account identifiers that expose private infrastructure."
+  ]
+}
