@@ -88,4 +88,4 @@ RAG metrics include:
 - Benchmark remains small.
 - `raw_text` and chunk `text` remain plaintext DB fields; 2.6 must address encryption, retention, deletion proof, backup policy, and audit hardening.
 
-Next phase: 2.5 Agent Workflow Productionization. Match Scoring and Project Rewrite have 2.4 trustworthy foundation, but remain deterministic and not production-ready.
+Phase 2.5 Agent Workflow Productionization is now completed as production foundation. Next phase: 2.6 Security / Privacy / Deployment Hardening. Match Scoring and Project Rewrite remain deterministic and not production-ready.

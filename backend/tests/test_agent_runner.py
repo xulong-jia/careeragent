@@ -1,7 +1,9 @@
 import pytest
 
 from app.core.errors import AppError
+from app.models.application import Application
 from app.models.agent import AgentRun
+from app.models.evaluation import BadCase
 from app.models.job import JobDescription, JobProfile
 from app.models.project import Project
 from app.models.rag import RagAnswerRun
@@ -400,3 +402,177 @@ def test_failed_step_records_error_and_marks_run_failed(db_session, monkeypatch)
     assert failed_steps[0].error_code == state.ERROR_MATCH_REPORT_FAILED
     assert persisted.error_code == state.ERROR_MATCH_REPORT_FAILED
     assert "raw_text" not in (persisted.error_message or "")
+
+
+def test_failed_step_creates_bad_case_payload_and_privacy_safe_step_payload(
+    db_session,
+    monkeypatch,
+):
+    _, version = _create_resume_with_version(db_session)
+    _create_job_with_profile(db_session)
+
+    def fail_match_report(db, payload):
+        raise RuntimeError("synthetic match failure without private text")
+
+    monkeypatch.setattr("app.agents.steps.match_service.run_match_report", fail_match_report)
+
+    run = agent_service.create_run_for_workflow(
+        db_session,
+        {
+            "workflow_name": state.WORKFLOW_JOB_APPLICATION_PREPARATION,
+            "resume_version_id": version.id,
+            "jd_id": "jd_agent_0001",
+            "use_rag": False,
+        },
+    )
+
+    persisted = db_session.get(AgentRun, run.id)
+    failed_step = [step for step in persisted.steps if step.status == state.STEP_STATUS_FAILED][0]
+
+    assert persisted.bad_case_id
+    assert db_session.get(BadCase, persisted.bad_case_id) is not None
+    assert persisted.bad_case_payload["suggested_bad_case_type"] == "agent_step_failed"
+    assert persisted.bad_case_payload["failed_step"] == "run_match_report"
+    assert failed_step.privacy_safe_payload["error"]["code"] == state.ERROR_MATCH_REPORT_FAILED
+    _assert_refs_are_private_safe(failed_step.privacy_safe_payload)
+    assert "Synthetic resume text" not in str(failed_step.privacy_safe_payload)
+
+
+def test_need_more_info_run_can_resume_with_second_attempt(db_session):
+    _, version = _create_resume_with_version(db_session)
+    _create_job_with_profile(db_session)
+    _create_project(db_session, version)
+
+    run = agent_service.create_run_for_workflow(
+        db_session,
+        {"workflow_name": state.WORKFLOW_JOB_APPLICATION_PREPARATION},
+    )
+    assert run.status == state.RUN_STATUS_NEED_MORE_INFO
+
+    resumed = agent_service.resume_run(
+        db_session,
+        run.id,
+        {
+            "resume_version_id": version.id,
+            "jd_id": "jd_agent_0001",
+            "use_rag": False,
+        },
+    )
+    persisted = db_session.get(AgentRun, run.id)
+
+    assert resumed.id == run.id
+    assert persisted.status == state.RUN_STATUS_COMPLETED
+    assert persisted.retry_attempt == 2
+    assert sorted({step.attempt for step in persisted.steps}) == [1, 2]
+    assert [step.step_name for step in persisted.steps if step.attempt == 1] == [
+        "validate_inputs"
+    ]
+    assert persisted.output_refs["match_report_id"].startswith("match_")
+
+
+def test_failed_run_retry_appends_attempt_and_can_succeed(db_session, monkeypatch):
+    _, version = _create_resume_with_version(db_session)
+    _create_job_with_profile(db_session)
+    original_match = __import__(
+        "app.agents.steps",
+        fromlist=["match_service"],
+    ).match_service.run_match_report
+
+    def fail_match_report(db, payload):
+        raise RuntimeError("synthetic match failure without private text")
+
+    monkeypatch.setattr("app.agents.steps.match_service.run_match_report", fail_match_report)
+    run = agent_service.create_run_for_workflow(
+        db_session,
+        {
+            "workflow_name": state.WORKFLOW_JOB_APPLICATION_PREPARATION,
+            "resume_version_id": version.id,
+            "jd_id": "jd_agent_0001",
+            "use_rag": False,
+            "create_application": False,
+        },
+    )
+    assert run.status == state.RUN_STATUS_FAILED
+
+    monkeypatch.setattr("app.agents.steps.match_service.run_match_report", original_match)
+    retried = agent_service.retry_run(db_session, run.id)
+    persisted = db_session.get(AgentRun, run.id)
+
+    assert retried.status == state.RUN_STATUS_COMPLETED
+    assert persisted.retry_attempt == 2
+    assert sorted({step.attempt for step in persisted.steps}) == [1, 2]
+    assert [step for step in persisted.steps if step.attempt == 1 and step.status == state.STEP_STATUS_FAILED]
+    assert persisted.output_refs["match_report_id"].startswith("match_")
+
+
+def test_need_more_info_run_can_be_cancelled(db_session):
+    run = agent_service.create_run_for_workflow(
+        db_session,
+        {"workflow_name": state.WORKFLOW_JOB_APPLICATION_PREPARATION},
+    )
+
+    cancelled = agent_service.cancel_run(db_session, run.id)
+
+    assert cancelled.status == state.RUN_STATUS_CANCELLED
+    assert cancelled.finished_at is not None
+
+    with pytest.raises(AppError) as exc_info:
+        agent_service.resume_run(db_session, run.id, {})
+    assert exc_info.value.code == "agent_run_invalid_status"
+
+
+def test_multiple_workflows_complete_or_request_expected_slots(db_session):
+    _, version = _create_resume_with_version(db_session)
+    _create_job_with_profile(db_session)
+    application = Application(
+        id="app_agent_review_0001",
+        company="Synthetic Company",
+        role_title="Backend Engineer",
+        role_category="Python Backend Developer",
+        jd_id="jd_agent_0001",
+        resume_version_id=version.id,
+        status="saved",
+        priority="medium",
+        tags=["agent_workflow"],
+    )
+    db_session.add(application)
+    db_session.commit()
+
+    interview = agent_service.create_run_for_workflow(
+        db_session,
+        {
+            "workflow_name": state.WORKFLOW_INTERVIEW_PREPARATION,
+            "resume_version_id": version.id,
+            "jd_id": "jd_agent_0001",
+            "use_rag": False,
+        },
+    )
+    study = agent_service.create_run_for_workflow(
+        db_session,
+        {
+            "workflow_name": state.WORKFLOW_STUDY_GAP_PLANNING,
+            "resume_version_id": version.id,
+            "jd_id": "jd_agent_0001",
+            "use_rag": False,
+        },
+    )
+    review = agent_service.create_run_for_workflow(
+        db_session,
+        {
+            "workflow_name": state.WORKFLOW_APPLICATION_REVIEW,
+            "application_id": application.id,
+        },
+    )
+    missing_review = agent_service.create_run_for_workflow(
+        db_session,
+        {"workflow_name": state.WORKFLOW_APPLICATION_REVIEW},
+    )
+
+    assert interview.status == state.RUN_STATUS_COMPLETED
+    assert study.status == state.RUN_STATUS_COMPLETED
+    assert review.status == state.RUN_STATUS_COMPLETED
+    assert review.output_refs["final_summary"]["application_id"] == application.id
+    assert missing_review.status == state.RUN_STATUS_NEED_MORE_INFO
+    assert {slot["name"] for slot in missing_review.missing_slots or []} == {
+        "application_id"
+    }

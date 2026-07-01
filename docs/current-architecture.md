@@ -127,8 +127,8 @@ sqlite:///./local_data/careeragent.db
 - JD：parser production foundation，输出 required/preferred、role_category、responsibilities、business scenarios、hidden requirements、evidence、confidence、warnings 和 metadata；默认 local deterministic parser，optional LLM path 需显式开启。
 - Match：2.4 deterministic trustworthy foundation scoring，包含六维评分、维度 evidence、score_breakdown、risk deduction、rewrite priorities、recommended project order 和 compare API；不是 production-ready scorer。
 - RAG：chunking + lexical/vector/hybrid local retrieval + DB-persisted chunk vectors + deterministic grounded answer。v1.2 RAG Completion deterministic MVP 已完成，覆盖 contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs；阶段 2.2 增加 local bag-of-words embedding、embedding metadata persistence、score threshold 和 provider metadata。默认 retrieval mode 仍为 lexical，不接真实 LLM、外部 semantic embedding 或 production vector DB。
-- Agent：v1.3 deterministic workflow baseline，固定 `job_application_preparation` state machine 串联 Resume Version、JD、Match、可选 RAG search、RAG context summary、Project Rewrite、Interview Questions、Study Plan 和 Application linkage；不是自由工具调用 Agent，不自动投递。
-- Evaluation：v1.5B deterministic smoke/regression foundation，包含 7 模块 smoke set、Bad Case regression linkage 和文件化 eval runner，不是 LLM judge；v1.5C 在 API run_config 和 fileized metrics 中加入 prompt/schema/retrieval/model/code/evaluation version metadata；阶段 2.1 新增 `service_level` 脱敏样例集，runner 真实调用当前 service/retriever/parser/agent 路径；阶段 2.3 扩展 JD 12 cases、Resume 8 cases 和 parser evidence/confidence/warnings metrics；阶段 2.4 扩展 Match 9 cases 并新增 Project Rewrite 6 cases。
+- Agent：v1.3 deterministic workflow baseline + 2.5 production foundation，支持 `job_application_preparation`、`interview_preparation`、`application_review`、`study_gap_planning`，并补齐 run lifecycle、attempt-aware step timeline、resume/retry/cancel、missing slots/questions、failure Bad Case draft、run_config 和 privacy-safe payload；不是自由工具调用 Agent，不自动投递。
+- Evaluation：v1.5B deterministic smoke/regression foundation，包含 7 模块 smoke set、Bad Case regression linkage 和文件化 eval runner，不是 LLM judge；v1.5C 在 API run_config 和 fileized metrics 中加入 prompt/schema/retrieval/model/code/evaluation version metadata；阶段 2.1 新增 `service_level` 脱敏样例集，runner 真实调用当前 service/retriever/parser/agent 路径；阶段 2.3 扩展 JD 12 cases、Resume 8 cases 和 parser evidence/confidence/warnings metrics；阶段 2.4 扩展 Match 9 cases 并新增 Project Rewrite 6 cases；阶段 2.5 扩展 Agent Workflow 8 cases，覆盖 resume/retry/cancel、Bad Case payload 和多 workflow。
 - Privacy / Data Governance：v1.5C 新增 `app.core.privacy` redaction helpers、`app.core.versioning` constants、Resume/JD/Application/RAG delete/archive endpoints、默认列表隐藏 deleted/archived 数据，以及前端确认式删除/归档入口。P1 增加当前 user/workspace scope 的 privacy export、delete-all 和 audit-log baseline。Resume/JD/RAG 默认响应只展示短 preview；Agent step/final summary、Bad Case、Evaluation 和 Application 只保存 refs、summary、counts 或 version metadata，不保存大段原文。
 
 ### Resume Center v0.8
@@ -208,11 +208,11 @@ Study Plan 11A/11B/11C/11D 当前链路：
 
 Study Plan 模块自身仍不接真实 LLM，不接 embedding/vector DB，不接外部学习平台或日历提醒，不自动修改简历、项目、面试答案或投递状态。v1.2 12D 支持 optional grounded RAG answer run refs；v1.3 Agent Workflow 可以调用 Study Plan generation，但不会自动写回简历、项目、面试答案或投递状态。
 
-### Agent Workflow v1.3
+### Agent Workflow v1.3 + 2.5
 
 Agent Workflow 当前链路：
 
-1. `POST /api/agents/runs` 创建 `job_application_preparation` run。
+1. `POST /api/agents/runs` 创建固定 workflow run；当前支持 `job_application_preparation`、`interview_preparation`、`application_review` 和 `study_gap_planning`。
 2. `validate_inputs` 校验 resume / resume version、JD、可选 project refs、可选 application ref、RAG query 和 RAG answer run refs。
 3. `load_resume_version` 和 `load_job_profile` 读取已有 DB-backed refs。
 4. `run_match_report` 调用已有 Match service，生成并保存 match report。
@@ -224,9 +224,18 @@ Agent Workflow 当前链路：
 10. `create_or_link_application` 创建 draft application，或绑定已有 application；如果 `create_application=false` 且未传 `application_id`，则跳过。
 11. `build_final_summary` 汇总 `match_report_id`、`project_rewrite_ids`、`interview_question_ids`、`study_plan_id`、`application_id`、summarized RAG context 和 deterministic next actions。
 
+阶段 2.5 增强：
+
+- Run status 支持 `pending`、`running`、`completed`、`failed`、`need_more_info`、`cancelled` 和 `retrying`。
+- `POST /api/agents/runs/{run_id}/resume` 只允许从 `need_more_info` 合并补充输入继续。
+- `POST /api/agents/runs/{run_id}/retry` 只允许从 `failed` 新增 attempt 重跑，旧 step 不覆盖。
+- `POST /api/agents/runs/{run_id}/cancel` 允许取消 pending/running/need_more_info/retrying run。
+- Failed step 自动生成 Bad Case draft；run 同时保存 `bad_case_payload`。
+- 每个 run/step 记录 `run_config`，每个 step 记录 `privacy_safe_payload` 和 `attempt`。
+
 `applications.agent_run_id` 将投递 tracking record 与 workflow run 连接。Application 仍由用户手动维护状态，workflow 不自动投递、不接招聘网站、不自动提交材料、不自动状态流转。
 
-AgentRunsPage 支持输入 project IDs、existing application ID、create application 开关、RAG query 和 RAG Answer Run IDs，展示 run detail、step timeline 和 final summary。ApplicationTrackerPage 支持查看和筛选 `agent_run_id`。Dashboard 展示 latest agent run score/status 和 linked application 摘要。
+AgentRunsPage 支持选择 workflow、输入 project IDs、existing application ID、create application 开关、RAG query 和 RAG Answer Run IDs，执行 resume/retry/cancel，并展示 run detail、missing slots/questions、run_config、Bad Case payload、step timeline、privacy-safe payload 和 final summary。ApplicationTrackerPage 支持查看和筛选 `agent_run_id`。Dashboard 展示 latest agent run score/status 和 linked application 摘要。
 
 ### Application Operations v1.4
 
@@ -340,6 +349,7 @@ Dashboard 当前展示：
 | v1.2 RAG Completion 12D | 新增 `GET /api/rag/stats`、Dashboard RAG stats，并为 Interview / Study Plan generation 增加可选 `rag_answer_run_ids`；仅 grounded answer runs 作为 preview-first refs 补充，ungrounded runs 不作为强来源 |
 | v1.2 RAG Completion 12E | 新增 release notes，并完成 README、architecture、API reference、database schema、demo script 和 final acceptance report 最终口径收口；不创建 tag |
 | v1.3 Agent Workflow Baseline + Application Linkage | `job_application_preparation` 扩展为 11 步 deterministic workflow，串联 Match、RAG context summary、Project Rewrite、Interview、Study Plan 和 Application draft/linkage；AgentRunsPage、ApplicationTrackerPage、Dashboard 和 docs 已接入 `agent_run_id` 与 `final_summary` |
+| 2.5 Agent Workflow Productionization | Run lifecycle、attempt-aware steps、resume/retry/cancel API、多 workflow、Agent failure Bad Case draft、Agent service-level 8 cases 和 AgentRunsPage action controls 已完成；仍是同步 deterministic foundation |
 | v1.4 Product Operations / Application Management Hardening | Application tracking 已补强 JD/Resume 强绑定、status history、reflection、Application Board、enhanced stats 和 Dashboard operations overview；不自动投递、不接招聘网站、不接真实 LLM |
 | v1.5B Bad Case + Evaluation Regression Foundation | Bad Case lifecycle / regression linkage、7 模块 deterministic evaluation、fileized smoke fixtures、run_evals script、QualityReviewPage / EvaluationPage 增强已完成；不接真实 LLM judge 或多模型评测 |
 | v1.5C Privacy / Security / Data Governance | Redaction utilities、delete/archive APIs、short safe previews、version metadata tracking、frontend governance controls 和 privacy regression tests 已完成；不声明生产级合规删除或多用户安全 |

@@ -328,6 +328,85 @@ def test_missing_agent_run_returns_404():
     assert get_error(steps_response)["code"] == "agent_run_not_found"
 
 
+def test_agent_run_resume_retry_cancel_endpoints(db_session, monkeypatch):
+    client = make_client()
+    _, version = _create_resume_with_version(db_session)
+    _create_job_with_profile(db_session)
+
+    need_more_info = get_data(
+        client.post(
+            "/api/agents/runs",
+            json={"workflow_name": state.WORKFLOW_JOB_APPLICATION_PREPARATION},
+        )
+    )["run"]
+
+    cancel_response = client.post(f"/api/agents/runs/{need_more_info['id']}/cancel")
+    assert cancel_response.status_code == 200
+    assert get_data(cancel_response)["run"]["status"] == state.RUN_STATUS_CANCELLED
+
+    resume_cancelled = client.post(
+        f"/api/agents/runs/{need_more_info['id']}/resume",
+        json={"resume_version_id": version.id, "jd_id": "jd_api_0001"},
+    )
+    assert resume_cancelled.status_code == 400
+    assert get_error(resume_cancelled)["code"] == "agent_run_invalid_status"
+
+    resumable = get_data(
+        client.post(
+            "/api/agents/runs",
+            json={"workflow_name": state.WORKFLOW_JOB_APPLICATION_PREPARATION},
+        )
+    )["run"]
+    resume_response = client.post(
+        f"/api/agents/runs/{resumable['id']}/resume",
+        json={
+            "resume_version_id": version.id,
+            "jd_id": "jd_api_0001",
+            "use_rag": False,
+            "create_application": False,
+        },
+    )
+    assert resume_response.status_code == 200
+    resumed = get_data(resume_response)["run"]
+    assert resumed["status"] == state.RUN_STATUS_COMPLETED
+    assert resumed["retry_attempt"] == 2
+
+    original_match = __import__(
+        "app.agents.steps",
+        fromlist=["match_service"],
+    ).match_service.run_match_report
+
+    def fail_match_report(db, payload):
+        raise RuntimeError("synthetic API failure without private text")
+
+    monkeypatch.setattr("app.agents.steps.match_service.run_match_report", fail_match_report)
+    failed = get_data(
+        client.post(
+            "/api/agents/runs",
+            json={
+                "workflow_name": state.WORKFLOW_JOB_APPLICATION_PREPARATION,
+                "resume_version_id": version.id,
+                "jd_id": "jd_api_0001",
+                "use_rag": False,
+                "create_application": False,
+            },
+        )
+    )["run"]
+    assert failed["status"] == state.RUN_STATUS_FAILED
+    assert failed["bad_case_payload"]["suggested_bad_case_type"] == "agent_step_failed"
+
+    monkeypatch.setattr("app.agents.steps.match_service.run_match_report", original_match)
+    retry_response = client.post(f"/api/agents/runs/{failed['id']}/retry")
+    assert retry_response.status_code == 200
+    retried = get_data(retry_response)["run"]
+    assert retried["status"] == state.RUN_STATUS_COMPLETED
+    assert retried["retry_attempt"] == 2
+
+    retry_completed = client.post(f"/api/agents/runs/{retried['id']}/retry")
+    assert retry_completed.status_code == 400
+    assert get_error(retry_completed)["code"] == "agent_run_invalid_status"
+
+
 def test_agent_api_response_does_not_include_private_text_keys(db_session):
     client = make_client()
     _, version = _create_resume_with_version(db_session)

@@ -89,14 +89,14 @@ def test_service_level_loader_reads_dataset_cases():
         by_module[module] = by_module.get(module, 0) + 1
 
     assert by_module == {
-        "agent_workflow": 3,
+        "agent_workflow": 8,
         "jd_parser": 12,
         "match": 9,
         "project_rewrite": 6,
         "rag_retrieval": 6,
         "resume_parser": 8,
     }
-    assert len(cases) == 44
+    assert len(cases) == 49
 
 
 def test_eval_metrics_aggregate_module_metrics():

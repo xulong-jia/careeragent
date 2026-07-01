@@ -30,6 +30,7 @@ from app.services import (
 @dataclass
 class WorkflowContext:
     payload: dict[str, object]
+    workflow_name: str
     resolved: dict[str, object] = field(default_factory=dict)
 
 
@@ -45,6 +46,7 @@ class StepResult:
 
 def initial_input_refs(payload: dict[str, object]) -> dict[str, object]:
     return {
+        "workflow_name": payload.get("workflow_name"),
         "resume_id": payload.get("resume_id"),
         "resume_version_id": payload.get("resume_version_id"),
         "jd_id": payload.get("jd_id"),
@@ -254,6 +256,68 @@ def validate_inputs(db: Session, context: WorkflowContext) -> StepResult:
             "use_rag": use_rag,
             "rag_query_present": bool(rag_query),
             "rag_answer_run_ids": rag_answer_run_ids,
+        },
+    )
+
+
+def validate_application_review_inputs(db: Session, context: WorkflowContext) -> StepResult:
+    payload = context.payload
+    application_id = str(payload.get("application_id") or "").strip() or None
+    missing_slots: list[dict[str, str]] = []
+    questions: list[dict[str, str]] = []
+
+    if not application_id:
+        slot, question = _missing_slot(
+            "application_id",
+            "An application_id is required for application_review.",
+            "请选择一个 Application 后再运行 application_review workflow。",
+        )
+        missing_slots.append(slot)
+        questions.append(question)
+
+    application = db.get(Application, application_id) if application_id else None
+    if application_id and not application:
+        slot, question = _missing_slot(
+            "application_id",
+            "Application was not found.",
+            "请选择存在的 Application。",
+        )
+        missing_slots.append(slot)
+        questions.append(question)
+
+    if missing_slots:
+        return StepResult(
+            status=state.STEP_STATUS_NEED_MORE_INFO,
+            output_refs={"missing_slot_count": len(missing_slots)},
+            missing_slots=missing_slots,
+            questions=questions,
+        )
+
+    assert application is not None
+    context.resolved.update(
+        {
+            "application_id": application.id,
+            "company": application.company,
+            "job_title": application.role_title,
+            "role_category": application.role_category,
+            "application_status": application.status,
+            "priority": application.priority,
+            "jd_id": application.jd_id,
+            "resume_version_id": application.resume_version_id,
+            "match_report_id": application.match_report_id,
+            "linked_agent_run_id": application.agent_run_id,
+        }
+    )
+    return StepResult(
+        status=state.STEP_STATUS_COMPLETED,
+        output_refs={
+            "application_id": application.id,
+            "status": application.status,
+            "priority": application.priority,
+            "jd_id": application.jd_id,
+            "resume_version_id": application.resume_version_id,
+            "match_report_id": application.match_report_id,
+            "agent_run_id": application.agent_run_id,
         },
     )
 
@@ -665,6 +729,79 @@ def create_or_link_application(db: Session, context: WorkflowContext) -> StepRes
     )
 
 
+def load_application_context(db: Session, context: WorkflowContext) -> StepResult:
+    application_id = str(context.resolved["application_id"])
+    application = db.get(Application, application_id)
+    if not application:
+        raise AppError(
+            code=state.ERROR_APPLICATION_LINK_FAILED,
+            message="Application was not found.",
+            status_code=404,
+            details={"application_id": application_id},
+        )
+
+    missing_refs = [
+        name
+        for name, value in {
+            "jd_id": application.jd_id,
+            "resume_version_id": application.resume_version_id,
+            "match_report_id": application.match_report_id,
+            "agent_run_id": application.agent_run_id,
+        }.items()
+        if not value
+    ]
+    review_flags = [
+        {"type": "missing_ref", "field": ref}
+        for ref in missing_refs
+    ]
+    if not application.reflection:
+        review_flags.append({"type": "missing_reflection"})
+    if not application.next_step_date:
+        review_flags.append({"type": "missing_next_step_date"})
+
+    context.resolved["application_review_flags"] = review_flags
+    return StepResult(
+        status=state.STEP_STATUS_COMPLETED,
+        output_refs={
+            "application_id": application.id,
+            "status": application.status,
+            "priority": application.priority,
+            "missing_refs": missing_refs,
+            "review_flag_count": len(review_flags),
+            "review_flags": review_flags,
+        },
+    )
+
+
+def build_application_review_summary(db: Session, context: WorkflowContext) -> StepResult:
+    application_id = str(context.resolved["application_id"])
+    review_flags = list(context.resolved.get("application_review_flags") or [])
+    metadata = version_metadata()
+    final_summary = {
+        "application_id": application_id,
+        "status": context.resolved.get("application_status"),
+        "priority": context.resolved.get("priority"),
+        "review_flag_count": len(review_flags),
+        "review_flags": review_flags,
+        "version_metadata": metadata,
+        "next_actions": [
+            "Fill missing application refs before using this record for decisions.",
+            "Keep reflection and next step date short, specific, and privacy-safe.",
+            "Review linked Match and Agent outputs before changing application status.",
+        ],
+        "created_records": [{"type": "application", "id": application_id}],
+    }
+    return StepResult(
+        status=state.STEP_STATUS_COMPLETED,
+        output_refs={
+            "application_id": application_id,
+            "review_flags": review_flags,
+            "version_metadata": metadata,
+            "final_summary": final_summary,
+        },
+    )
+
+
 def build_final_summary(db: Session, context: WorkflowContext) -> StepResult:
     resume_version_id = str(context.resolved["resume_version_id"])
     jd_id = str(context.resolved["jd_id"])
@@ -739,6 +876,7 @@ def build_final_summary(db: Session, context: WorkflowContext) -> StepResult:
 
 STEP_EXECUTORS = {
     "validate_inputs": validate_inputs,
+    "validate_application_review_inputs": validate_application_review_inputs,
     "load_resume_version": load_resume_version,
     "load_job_profile": load_job_profile,
     "run_match_report": run_match_report,
@@ -748,5 +886,7 @@ STEP_EXECUTORS = {
     "generate_interview_questions": generate_interview_questions,
     "generate_study_plan": generate_study_plan,
     "create_or_link_application": create_or_link_application,
+    "load_application_context": load_application_context,
+    "build_application_review_summary": build_application_review_summary,
     "build_final_summary": build_final_summary,
 }

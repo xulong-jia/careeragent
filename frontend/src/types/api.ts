@@ -815,7 +815,9 @@ export type AgentRunStatus =
   | "running"
   | "completed"
   | "failed"
-  | "need_more_info";
+  | "need_more_info"
+  | "cancelled"
+  | "retrying";
 
 export type AgentStepStatus =
   | "pending"
@@ -841,12 +843,18 @@ export type AgentRunRecord = {
   status: AgentRunStatus;
   input_refs: Record<string, unknown>;
   output_refs: Record<string, unknown>;
+  final_output_ref: Record<string, unknown>;
+  run_config: Record<string, unknown>;
   final_summary: AgentFinalSummary | null;
   missing_slots: Record<string, unknown>[] | null;
   questions: Record<string, unknown>[] | null;
   error_code: string | null;
   error_message: string | null;
+  bad_case_id: string | null;
+  bad_case_payload: Record<string, unknown>;
+  retry_attempt: number;
   created_at: string;
+  updated_at: string;
   started_at: string | null;
   finished_at: string | null;
   duration_ms: number | null;
@@ -857,9 +865,12 @@ export type AgentStepRecord = {
   run_id: string;
   step_name: string;
   step_order: number;
+  attempt: number;
   status: AgentStepStatus;
   input_refs: Record<string, unknown>;
   output_refs: Record<string, unknown>;
+  run_config: Record<string, unknown>;
+  privacy_safe_payload: Record<string, unknown>;
   error_code: string | null;
   error_message: string | null;
   created_at: string;
@@ -880,6 +891,8 @@ export type AgentRunCreatePayload = {
   rag_query?: string | null;
   rag_answer_run_ids?: string[];
 };
+
+export type AgentRunResumePayload = Partial<AgentRunCreatePayload>;
 
 export type AgentRunCreateResponse = {
   run: AgentRunRecord;

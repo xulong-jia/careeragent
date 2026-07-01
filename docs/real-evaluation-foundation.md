@@ -13,7 +13,7 @@
 | Match | 9 | `resume_service`, `job_service`, `match_service.run_match_report`, `match_service.compare_matches` |
 | Project Rewrite | 6 | `project_service.create_project`, `job_service.create_job`, `project_rewrite_service.create_project_rewrite` |
 | RAG Retrieval | 6 | `rag_service.create_document`, `index_document`, `answer_question` |
-| Agent Workflow | 3 | `agent.runner.run_workflow` |
+| Agent Workflow | 8 | `agent_service.create_run_for_workflow`, `resume_run`, `retry_run`, `cancel_run`, `agent.runner.run_workflow` |
 
 The samples use Example companies, Example schools, synthetic candidate names, and no real phone, email, API key, job link, or private document.
 
@@ -39,7 +39,7 @@ Each run writes:
 - Match: `dimension_score_present_rate`, `evidence_dimension_coverage`, `strength_keyword_hit_rate`, `gap_keyword_hit_rate`, `score_in_expected_range`, `risk_flag_hit_rate`, `rewrite_priority_hit_rate`, `scoring_method_present`, `confidence_present`, `case_pass`.
 - Project Rewrite: `before_after_present`, `evidence_required_present`, `forbidden_changes_present`, `risk_level_present`, `matched_requirement_hit_rate`, `missing_point_hit_rate`, `risk_flag_hit_rate`, `bullet_keyword_hit_rate`, `fabrication_guard_pass`, `case_pass`.
 - RAG: `recall_at_k_term_hit`, `citation_present`, `expected_source_type_match`, `retrieval_mode_match`, `average_top_score`, `vector_index_used`, `uncertainty_match`, `case_pass`.
-- Agent: `expected_status_match`, `expected_step_coverage`, `expected_missing_slot_match`, `case_pass`.
+- Agent: `expected_status_match`, `expected_step_coverage`, `missing_slot_match`, `resume_success`, `retry_success`, `cancel_success`, `bad_case_payload_present`, `run_config_present`, `privacy_safe_payload_present`, `case_pass`.
 - Overall: total, passed, failed, pass rate, failed case ids, by-module pass rate.
 
 ## Bad Case Connection
@@ -56,7 +56,7 @@ Each run writes:
 - `failure_reason`
 - `suggested_bad_case_type`
 
-This is enough for manual Bad Case creation. Automatic Bad Case draft creation is left for Agent Workflow/quality-loop hardening; it should not block 2.1.
+This is enough for manual Bad Case creation across most modules. Phase 2.5 adds automatic Agent step failure Bad Case draft creation and `bad_case_payload` persistence for Agent Workflow runs.
 
 ## DB Boundary
 
@@ -67,7 +67,7 @@ The current CLI writes fileized outputs only. The output shape maps to existing 
 - JD/Resume parsing now has parser production foundation fields, evidence, confidence, warnings, parser metadata, and optional LLM provider fallback. Default tests still use deterministic local parser foundation.
 - RAG has a local vector production foundation with persisted chunk vectors, but local bag-of-words vectors are not final semantic embeddings or a production-scale vector DB.
 - Match and Project Rewrite now have 2.4 trustworthy foundation fields and service-level metrics, but remain deterministic and uncalibrated against large human agreement benchmarks.
-- Agent remains a synchronous fixed workflow.
+- Agent Workflow now has 2.5 production foundation lifecycle, resume/retry/cancel, multiple fixed workflows, and failure Bad Case drafts. It remains a synchronous local runner, not a durable production workflow engine.
 - Service-level eval is a foundation for finding failures, not proof of production quality.
 
-Next phase should be 2.5 Agent Workflow Productionization.
+Next phase should be 2.6 Security / Privacy / Deployment Hardening.

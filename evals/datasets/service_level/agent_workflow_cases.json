@@ -55,25 +55,180 @@
         "workflow_name": "job_application_preparation",
         "seed_data": {
           "resume": {
-            "filename": "agent_rag.md",
-            "raw_text": "Agent RAG Candidate\n\nEducation\nExample University | Master of Computing | 2023-02 to 2024-11\n\nProjects\nProject: Grounded Search\nTech: Python, RAG, LLM\nResponsibilities: Built retrieval checks\n\nSkills\nPython, RAG, LLM"
+            "filename": "agent_resume_resume.md",
+            "raw_text": "Resume Recovery Candidate\n\nProjects\nProject: Workflow Resume\nTech: Python, SQL\nResponsibilities: Maintained backend workflows\n\nSkills\nPython, SQL"
           },
           "jd": {
-            "company": "Example RAG Co",
-            "job_title": "AI Application Engineer",
+            "company": "Example Resume Co",
+            "job_title": "Workflow Engineer",
             "location": "Remote",
-            "raw_text": "Build RAG services with Python and LLM review."
+            "raw_text": "Maintain Python workflow services with SQL persistence."
           }
         },
         "payload": {
           "workflow_name": "job_application_preparation",
           "create_application": false,
           "use_rag": false
+        },
+        "defer_seed_refs_until_resume": true,
+        "actions": [
+          {
+            "type": "resume",
+            "payload": {
+              "create_application": false,
+              "use_rag": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "expected_status": "completed",
+        "expected_steps_should_include": ["validate_inputs", "run_match_report", "build_final_summary"],
+        "expected_missing_slots": [],
+        "resume_success": true
+      }
+    },
+    {
+      "case_id": "agent_service_004",
+      "module": "agent_workflow",
+      "input": {
+        "workflow_name": "job_application_preparation",
+        "seed_data": {
+          "resume": {
+            "filename": "agent_failure.md",
+            "raw_text": "Failure Candidate\n\nProjects\nProject: Service Failure\nTech: Python, FastAPI\nResponsibilities: Tested failure handling\n\nSkills\nPython, FastAPI"
+          },
+          "jd": {
+            "company": "Example Failure Co",
+            "job_title": "Backend Reliability Engineer",
+            "location": "Sydney",
+            "raw_text": "Build reliable backend services and handle failed workflow steps."
+          }
+        },
+        "payload": {
+          "workflow_name": "job_application_preparation",
+          "create_application": false,
+          "use_rag": false
+        },
+        "force_step_failure": "run_match_report"
+      },
+      "expected": {
+        "expected_status": "failed",
+        "expected_steps_should_include": ["validate_inputs", "load_resume_version", "load_job_profile", "run_match_report"],
+        "expected_missing_slots": [],
+        "bad_case_payload_present": true
+      }
+    },
+    {
+      "case_id": "agent_service_005",
+      "module": "agent_workflow",
+      "input": {
+        "workflow_name": "job_application_preparation",
+        "seed_data": {
+          "resume": {
+            "filename": "agent_retry.md",
+            "raw_text": "Retry Candidate\n\nProjects\nProject: Retry Path\nTech: Python, FastAPI\nResponsibilities: Recovered workflow failures\n\nSkills\nPython, FastAPI"
+          },
+          "jd": {
+            "company": "Example Retry Co",
+            "job_title": "Platform Engineer",
+            "location": "Remote",
+            "raw_text": "Own Python platform services with reliable retry behavior."
+          }
+        },
+        "payload": {
+          "workflow_name": "job_application_preparation",
+          "create_application": false,
+          "use_rag": false
+        },
+        "force_step_failure": "run_match_report",
+        "actions": [
+          {
+            "type": "retry"
+          }
+        ]
+      },
+      "expected": {
+        "expected_status": "completed",
+        "expected_steps_should_include": ["run_match_report", "build_final_summary"],
+        "expected_missing_slots": [],
+        "retry_success": true
+      }
+    },
+    {
+      "case_id": "agent_service_006",
+      "module": "agent_workflow",
+      "input": {
+        "workflow_name": "application_review",
+        "payload": {
+          "workflow_name": "application_review"
+        },
+        "actions": [
+          {
+            "type": "cancel"
+          }
+        ]
+      },
+      "expected": {
+        "expected_status": "cancelled",
+        "expected_steps_should_include": ["validate_application_review_inputs"],
+        "expected_missing_slots": ["application_id"],
+        "cancel_success": true
+      }
+    },
+    {
+      "case_id": "agent_service_007",
+      "module": "agent_workflow",
+      "input": {
+        "workflow_name": "interview_preparation",
+        "seed_data": {
+          "resume": {
+            "filename": "agent_interview.md",
+            "raw_text": "Interview Candidate\n\nProjects\nProject: API Interview\nTech: Python, FastAPI\nResponsibilities: Explained API tradeoffs\n\nSkills\nPython, FastAPI, SQL"
+          },
+          "jd": {
+            "company": "Example Interview Co",
+            "job_title": "Backend Interview Role",
+            "location": "Melbourne",
+            "raw_text": "Interview for Python FastAPI backend systems and SQL design."
+          }
+        },
+        "payload": {
+          "workflow_name": "interview_preparation",
+          "use_rag": false
         }
       },
       "expected": {
         "expected_status": "completed",
-        "expected_steps_should_include": ["validate_inputs", "load_resume_version", "load_job_profile", "run_match_report", "generate_interview_questions", "generate_study_plan", "build_final_summary"],
+        "expected_steps_should_include": ["validate_inputs", "run_match_report", "generate_interview_questions", "build_final_summary"],
+        "expected_missing_slots": []
+      }
+    },
+    {
+      "case_id": "agent_service_008",
+      "module": "agent_workflow",
+      "input": {
+        "workflow_name": "study_gap_planning",
+        "seed_data": {
+          "resume": {
+            "filename": "agent_study.md",
+            "raw_text": "Study Candidate\n\nProjects\nProject: Data API\nTech: Python, SQL\nResponsibilities: Built reporting APIs\n\nSkills\nPython, SQL"
+          },
+          "jd": {
+            "company": "Example Study Co",
+            "job_title": "AI Backend Engineer",
+            "location": "Sydney",
+            "raw_text": "Requires Python backend, RAG basics, evaluation, and production debugging."
+          }
+        },
+        "payload": {
+          "workflow_name": "study_gap_planning",
+          "use_rag": false
+        }
+      },
+      "expected": {
+        "expected_status": "completed",
+        "expected_steps_should_include": ["validate_inputs", "run_match_report", "generate_study_plan", "build_final_summary"],
         "expected_missing_slots": []
       }
     }

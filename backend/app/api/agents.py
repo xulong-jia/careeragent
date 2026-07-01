@@ -7,6 +7,7 @@ from app.schemas.agents import (
     AgentRunCreateResponse,
     AgentRunDetailResponse,
     AgentRunRecord,
+    AgentRunResumeRequest,
     AgentStepListResponse,
 )
 from app.schemas.common import ApiResponse, ListResponse
@@ -27,6 +28,65 @@ async def create_agent_run(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     run = agent_service.create_run_for_workflow(db, payload.model_dump())
+    steps_count = agent_service.count_steps_for_run(db, run.id)
+    data = AgentRunCreateResponse(
+        run=AgentRunRecord.model_validate(run),
+        steps_count=steps_count,
+    )
+    return {"data": data, "request_id": request.state.request_id}
+
+
+@router.post(
+    "/{run_id}/resume",
+    response_model=ApiResponse[AgentRunCreateResponse],
+)
+async def resume_agent_run(
+    request: Request,
+    run_id: str,
+    payload: AgentRunResumeRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    run = agent_service.resume_run(
+        db,
+        run_id,
+        payload.model_dump(exclude_none=True),
+    )
+    steps_count = agent_service.count_steps_for_run(db, run.id)
+    data = AgentRunCreateResponse(
+        run=AgentRunRecord.model_validate(run),
+        steps_count=steps_count,
+    )
+    return {"data": data, "request_id": request.state.request_id}
+
+
+@router.post(
+    "/{run_id}/retry",
+    response_model=ApiResponse[AgentRunCreateResponse],
+)
+async def retry_agent_run(
+    request: Request,
+    run_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    run = agent_service.retry_run(db, run_id)
+    steps_count = agent_service.count_steps_for_run(db, run.id)
+    data = AgentRunCreateResponse(
+        run=AgentRunRecord.model_validate(run),
+        steps_count=steps_count,
+    )
+    return {"data": data, "request_id": request.state.request_id}
+
+
+@router.post(
+    "/{run_id}/cancel",
+    response_model=ApiResponse[AgentRunCreateResponse],
+)
+async def cancel_agent_run(
+    request: Request,
+    run_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    run = agent_service.cancel_run(db, run_id)
     steps_count = agent_service.count_steps_for_run(db, run.id)
     data = AgentRunCreateResponse(
         run=AgentRunRecord.model_validate(run),

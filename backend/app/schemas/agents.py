@@ -16,6 +16,18 @@ class AgentRunCreateRequest(BaseModel):
     rag_answer_run_ids: list[str] = Field(default_factory=list)
 
 
+class AgentRunResumeRequest(BaseModel):
+    resume_id: str | None = None
+    resume_version_id: str | None = None
+    jd_id: str | None = None
+    project_ids: list[str] | None = None
+    application_id: str | None = None
+    create_application: bool | None = None
+    use_rag: bool | None = None
+    rag_query: str | None = None
+    rag_answer_run_ids: list[str] | None = None
+
+
 class AgentRunRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,12 +37,18 @@ class AgentRunRecord(BaseModel):
     status: str
     input_refs: dict[str, object] = Field(default_factory=dict)
     output_refs: dict[str, object] = Field(default_factory=dict)
+    final_output_ref: dict[str, object] = Field(default_factory=dict)
+    run_config: dict[str, object] = Field(default_factory=dict)
     final_summary: dict[str, object] | None = None
     missing_slots: list[dict[str, object]] | None = None
     questions: list[dict[str, object]] | None = None
     error_code: str | None = None
     error_message: str | None = None
+    bad_case_id: str | None = None
+    bad_case_payload: dict[str, object] = Field(default_factory=dict)
+    retry_attempt: int = 1
     created_at: datetime
+    updated_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None
     duration_ms: int | None = None
@@ -53,9 +71,12 @@ class AgentStepRecord(BaseModel):
     run_id: str
     step_name: str
     step_order: int
+    attempt: int = 1
     status: str
     input_refs: dict[str, object] = Field(default_factory=dict)
     output_refs: dict[str, object] = Field(default_factory=dict)
+    run_config: dict[str, object] = Field(default_factory=dict)
+    privacy_safe_payload: dict[str, object] = Field(default_factory=dict)
     error_code: str | None = None
     error_message: str | None = None
     created_at: datetime

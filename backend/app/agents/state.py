@@ -1,10 +1,15 @@
 WORKFLOW_JOB_APPLICATION_PREPARATION = "job_application_preparation"
+WORKFLOW_INTERVIEW_PREPARATION = "interview_preparation"
+WORKFLOW_APPLICATION_REVIEW = "application_review"
+WORKFLOW_STUDY_GAP_PLANNING = "study_gap_planning"
 
 RUN_STATUS_PENDING = "pending"
 RUN_STATUS_RUNNING = "running"
 RUN_STATUS_COMPLETED = "completed"
 RUN_STATUS_FAILED = "failed"
 RUN_STATUS_NEED_MORE_INFO = "need_more_info"
+RUN_STATUS_CANCELLED = "cancelled"
+RUN_STATUS_RETRYING = "retrying"
 
 STEP_STATUS_PENDING = "pending"
 STEP_STATUS_RUNNING = "running"

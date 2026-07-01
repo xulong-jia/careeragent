@@ -4,6 +4,7 @@ import type {
   AgentRunCreateResponse,
   AgentRunDetailResponse,
   AgentRunRecord,
+  AgentRunResumePayload,
   AgentRunStatus,
   AgentStepListResponse,
   ListResponse,
@@ -54,4 +55,29 @@ export function listAgentRunSteps(
   runId: string,
 ): Promise<AgentStepListResponse> {
   return requestJson<AgentStepListResponse>(`/api/agents/runs/${runId}/steps`);
+}
+
+export function resumeAgentRun(
+  runId: string,
+  payload: AgentRunResumePayload,
+): Promise<AgentRunCreateResponse> {
+  return requestJson<AgentRunCreateResponse>(`/api/agents/runs/${runId}/resume`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function retryAgentRun(runId: string): Promise<AgentRunCreateResponse> {
+  return requestJson<AgentRunCreateResponse>(`/api/agents/runs/${runId}/retry`, {
+    method: "POST",
+  });
+}
+
+export function cancelAgentRun(runId: string): Promise<AgentRunCreateResponse> {
+  return requestJson<AgentRunCreateResponse>(`/api/agents/runs/${runId}/cancel`, {
+    method: "POST",
+  });
 }

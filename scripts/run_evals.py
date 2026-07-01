@@ -1064,34 +1064,99 @@ def _evaluate_service_agent_workflow(
     case: dict[str, Any],
     expected: dict[str, Any],
 ) -> dict[str, Any]:
-    from app.agents.runner import run_workflow
-    from app.agents.workflows import get_workflow_definition
+    from app.agents import steps as agent_steps
+    from app.models.application import Application
     from app.repositories import agent_repository
+    from app.services import agent_service
 
     case_input = dict(case.get("input") or {})
     seed = dict(case_input.get("seed_data") or {})
     payload = dict(case_input.get("payload") or {})
+    defer_seed_refs = bool(case_input.get("defer_seed_refs_until_resume"))
+    created_resume_version_id: str | None = None
+    created_jd_id: str | None = None
     if seed:
         resume_seed = dict(seed.get("resume") or {})
         jd_seed = dict(seed.get("jd") or {})
-        resume = _create_resume_from_text(
-            db,
-            str(resume_seed.get("filename") or "agent_resume.txt"),
-            str(resume_seed.get("raw_text") or ""),
-        )
-        job = _create_job_from_input(db, jd_seed)
-        payload.setdefault("resume_version_id", resume.resume_id + "_version_0001")
-        payload.setdefault("jd_id", job.jd_id)
+        if resume_seed:
+            resume = _create_resume_from_text(
+                db,
+                str(resume_seed.get("filename") or "agent_resume.txt"),
+                str(resume_seed.get("raw_text") or ""),
+            )
+            created_resume_version_id = resume.resume_id + "_version_0001"
+            if not defer_seed_refs:
+                payload.setdefault("resume_version_id", created_resume_version_id)
+        if jd_seed:
+            job = _create_job_from_input(db, jd_seed)
+            created_jd_id = job.jd_id
+            if not defer_seed_refs:
+                payload.setdefault("jd_id", created_jd_id)
+        application_seed = dict(seed.get("application") or {})
+        if application_seed:
+            application_id = str(
+                application_seed.get("id")
+                or f"app_eval_{str(case.get('case_id') or 'agent').lower()}"
+            )
+            db.add(
+                Application(
+                    id=application_id,
+                    company=str(application_seed.get("company") or "Example Company"),
+                    role_title=str(application_seed.get("role_title") or "Example Role"),
+                    role_category=application_seed.get("role_category"),
+                    jd_id=application_seed.get("jd_id") or created_jd_id,
+                    resume_version_id=(
+                        application_seed.get("resume_version_id")
+                        or created_resume_version_id
+                    ),
+                    match_report_id=application_seed.get("match_report_id"),
+                    agent_run_id=application_seed.get("agent_run_id"),
+                    status=str(application_seed.get("status") or "saved"),
+                    priority=str(application_seed.get("priority") or "medium"),
+                    reflection=application_seed.get("reflection"),
+                    tags=list(application_seed.get("tags") or ["agent_eval"]),
+                )
+            )
+            db.commit()
+            payload.setdefault("application_id", application_id)
 
     workflow_name = str(
         payload.get("workflow_name")
         or case_input.get("workflow_name")
         or "job_application_preparation"
     )
-    workflow = get_workflow_definition(workflow_name)
-    if workflow is None:
-        raise ValueError(f"Unsupported workflow: {workflow_name}")
-    run = run_workflow(db, workflow=workflow, payload=payload)
+    force_step_failure = str(case_input.get("force_step_failure") or "")
+    original_match = agent_steps.match_service.run_match_report
+    if force_step_failure == "run_match_report":
+        def fail_match_report(db: Any, payload: Any) -> Any:
+            raise RuntimeError("synthetic service-level agent failure")
+
+        agent_steps.match_service.run_match_report = fail_match_report
+
+    action_results = {"resume": False, "retry": False, "cancel": False}
+    try:
+        run = agent_service.create_run_for_workflow(db, payload)
+        for action in list(case_input.get("actions") or []):
+            action_type = str(action.get("type") or "")
+            if action_type == "resume":
+                resume_payload = dict(action.get("payload") or {})
+                if created_resume_version_id:
+                    resume_payload.setdefault("resume_version_id", created_resume_version_id)
+                if created_jd_id:
+                    resume_payload.setdefault("jd_id", created_jd_id)
+                run = agent_service.resume_run(db, run.id, resume_payload)
+                action_results["resume"] = run.status == expected.get("expected_status")
+            elif action_type == "retry":
+                if force_step_failure:
+                    agent_steps.match_service.run_match_report = original_match
+                run = agent_service.retry_run(db, run.id)
+                action_results["retry"] = run.status == expected.get("expected_status")
+            elif action_type == "cancel":
+                run = agent_service.cancel_run(db, run.id)
+                action_results["cancel"] = run.status == expected.get("expected_status")
+    finally:
+        agent_steps.match_service.run_match_report = original_match
+
     steps = agent_repository.list_steps_for_run(db, run.id)
     step_names = [step.step_name for step in steps]
     missing_slots = [
@@ -1103,16 +1168,46 @@ def _evaluate_service_agent_workflow(
     expected_missing = expected.get("expected_missing_slots", [])
     step_coverage = _hit_rate(expected_steps, step_names)
     missing_slot_match = sorted(missing_slots) == sorted(expected_missing)
+    privacy_safe_payload_present = bool(steps) and all(
+        bool(step.privacy_safe_payload) for step in steps
+    )
+    private_payload_leak = any(
+        key in _flatten_text([step.input_refs, step.output_refs, step.privacy_safe_payload])
+        for key in PRIVATE_TEXT_KEYS
+        for step in steps
+    )
+    expected_bad_case_payload = bool(expected.get("bad_case_payload_present"))
     metrics = {
         "expected_status_match": run.status == expected.get("expected_status"),
         "expected_step_coverage": step_coverage,
-        "expected_missing_slot_match": missing_slot_match,
+        "missing_slot_match": missing_slot_match,
+        "resume_success": (
+            action_results["resume"] if expected.get("resume_success") else True
+        ),
+        "retry_success": (
+            action_results["retry"] if expected.get("retry_success") else True
+        ),
+        "cancel_success": (
+            action_results["cancel"] if expected.get("cancel_success") else True
+        ),
+        "bad_case_payload_present": (
+            bool(run.bad_case_payload) if expected_bad_case_payload else True
+        ),
+        "run_config_present": bool(run.run_config),
+        "privacy_safe_payload_present": privacy_safe_payload_present
+        and not private_payload_leak,
     }
     passed = all(
         [
             metrics["expected_status_match"],
             step_coverage == 1.0,
             missing_slot_match,
+            metrics["resume_success"],
+            metrics["retry_success"],
+            metrics["cancel_success"],
+            metrics["bad_case_payload_present"],
+            metrics["run_config_present"],
+            metrics["privacy_safe_payload_present"],
         ]
     )
     actual = {
@@ -1123,13 +1218,20 @@ def _evaluate_service_agent_workflow(
             {
                 "step_name": step.step_name,
                 "step_order": step.step_order,
+                "attempt": step.attempt,
                 "status": step.status,
+                "privacy_safe_payload_present": bool(step.privacy_safe_payload),
             }
             for step in steps
         ],
         "missing_slots": run.missing_slots or [],
         "questions": run.questions or [],
         "output_refs": run.output_refs,
+        "run_config": run.run_config,
+        "retry_attempt": run.retry_attempt,
+        "bad_case_id": run.bad_case_id,
+        "bad_case_payload": run.bad_case_payload,
+        "action_results": action_results,
     }
     return _service_result(
         case=case,
@@ -1140,7 +1242,11 @@ def _evaluate_service_agent_workflow(
         passed=passed,
         error="Agent workflow service-level expectations were not met.",
         input_summary=_safe_text(workflow_name),
-        service_calls=["agent.runner.run_workflow"],
+        service_calls=[
+            "agent_service.create_run_for_workflow",
+            "agent_service.resume_run/retry_run/cancel_run",
+            "agent.runner.run_workflow",
+        ],
     )
 
 

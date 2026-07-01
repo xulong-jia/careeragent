@@ -37,6 +37,11 @@ def test_alembic_migration_creates_agent_tables(tmp_path, monkeypatch):
         "output_refs",
         "missing_slots",
         "questions",
+        "run_config",
+        "final_output_ref",
+        "bad_case_payload",
+        "retry_attempt",
+        "updated_at",
         "duration_ms",
     }.issubset({column["name"] for column in inspector.get_columns("agent_runs")})
     assert {
@@ -44,8 +49,11 @@ def test_alembic_migration_creates_agent_tables(tmp_path, monkeypatch):
         "step_name",
         "step_order",
         "status",
+        "attempt",
         "input_refs",
         "output_refs",
+        "run_config",
+        "privacy_safe_payload",
         "duration_ms",
     }.issubset({column["name"] for column in inspector.get_columns("agent_steps")})
     assert "ix_agent_runs_workflow_name" in {
@@ -60,7 +68,7 @@ def test_alembic_migration_creates_agent_tables(tmp_path, monkeypatch):
     assert "ix_agent_steps_status" in {
         index["name"] for index in inspector.get_indexes("agent_steps")
     }
-    assert "uq_agent_steps_run_id_step_order" in {
+    assert "uq_agent_steps_run_id_step_order_attempt" in {
         constraint["name"]
         for constraint in inspector.get_unique_constraints("agent_steps")
     }
@@ -80,8 +88,11 @@ def test_agent_run_and_step_insert_with_json_refs(db_session):
             id="agent_step_0001",
             step_name="validate_inputs",
             step_order=1,
+            attempt=1,
             input_refs={"resume_version_id": "resume_version_001", "jd_id": "jd_001"},
             output_refs={"validated": True},
+            run_config={"workflow_version": "test"},
+            privacy_safe_payload={"input_refs": {"resume_version_id": "resume_version_001"}},
             duration_ms=12,
         )
     )
@@ -95,13 +106,18 @@ def test_agent_run_and_step_insert_with_json_refs(db_session):
     assert persisted.status == "pending"
     assert persisted.input_refs["resume_version_id"] == "resume_version_001"
     assert persisted.output_refs == {}
+    assert persisted.run_config == {}
+    assert persisted.final_output_ref == {}
+    assert persisted.retry_attempt == 1
     assert persisted.steps[0].status == "pending"
     assert persisted.steps[0].run_id == "agent_run_0001"
+    assert persisted.steps[0].attempt == 1
     assert persisted.steps[0].output_refs["validated"] is True
+    assert persisted.steps[0].privacy_safe_payload["input_refs"]["resume_version_id"] == "resume_version_001"
     assert persisted.steps[0].duration_ms == 12
 
 
-def test_agent_step_run_order_unique_constraint(db_session):
+def test_agent_step_run_order_unique_constraint_is_attempt_scoped(db_session):
     run = AgentRun(
         id="agent_run_unique",
         workflow_name="job_application_preparation",
@@ -114,6 +130,7 @@ def test_agent_step_run_order_unique_constraint(db_session):
                 id="agent_step_unique_1",
                 step_name="validate_inputs",
                 step_order=1,
+                attempt=1,
                 input_refs={},
                 output_refs={},
             ),
@@ -121,6 +138,7 @@ def test_agent_step_run_order_unique_constraint(db_session):
                 id="agent_step_unique_2",
                 step_name="load_resume_version",
                 step_order=1,
+                attempt=1,
                 input_refs={},
                 output_refs={},
             ),
@@ -132,6 +150,37 @@ def test_agent_step_run_order_unique_constraint(db_session):
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()
+
+    run = AgentRun(
+        id="agent_run_unique_attempt",
+        workflow_name="job_application_preparation",
+        input_refs={},
+        output_refs={},
+    )
+    run.steps.extend(
+        [
+            AgentStep(
+                id="agent_step_unique_attempt_1",
+                step_name="validate_inputs",
+                step_order=1,
+                attempt=1,
+                input_refs={},
+                output_refs={},
+            ),
+            AgentStep(
+                id="agent_step_unique_attempt_2",
+                step_name="validate_inputs",
+                step_order=1,
+                attempt=2,
+                input_refs={},
+                output_refs={},
+            ),
+        ]
+    )
+    db_session.add(run)
+    db_session.commit()
+
+    assert len(db_session.get(AgentRun, "agent_run_unique_attempt").steps) == 2
 
 
 def test_agent_run_delete_orphan_removes_steps(db_session):

@@ -33,6 +33,8 @@ Phase 2.4 match cases cover 9 Match service-level cases, including strong/weak m
 
 Phase 2.4 project rewrite cases cover 6 Project Rewrite service-level cases, including missing required skills, unsupported metrics, learning-to-business overclaim, empty original bullets, and no fabricated technologies. Project Rewrite metrics include before/after presence, evidence required presence, forbidden changes presence, risk level presence, matched/missing point hit rates, risk flag hit rate, fabrication guard pass, and case pass.
 
+Phase 2.5 agent workflow cases cover 8 Agent service-level cases, including success, need_more_info, resume, failed-step Bad Case payload, retry, cancel, interview preparation, and study gap planning. Agent metrics include status match, step coverage, missing slot match, resume/retry/cancel success, bad case payload presence, run config presence, privacy-safe payload presence, and case pass.
+
 Phase 2.2 RAG cases cover `lexical`, `vector`, `hybrid`, and no-evidence behavior. RAG metrics include recall/citation/source type plus `retrieval_mode_match`, `average_top_score`, `vector_index_used`, and uncertainty matching.
 
 The current RAG path uses a local bag-of-words vectorizer with DB-persisted chunk vectors. It is a production foundation, not a final semantic embedding benchmark. Run the smoke dataset before enabling any real LLM or external embedding provider, and keep real-provider experiments out of committed `evals/results/` artifacts unless they are sanitized and explicitly reviewed.
@@ -40,6 +42,8 @@ The current RAG path uses a local bag-of-words vectorizer with DB-persisted chun
 The current parser path uses local deterministic parser foundation by default. Optional LLM parser runs must use runtime secrets only and must not commit raw private outputs or provider traces.
 
 The current Match and Project Rewrite paths use deterministic trustworthy foundation logic by default. Do not treat service-level pass rates as production job-search judgment quality or as permission to use rewritten bullets without human confirmation.
+
+The current Agent Workflow path uses deterministic local services and a synchronous runner. Do not treat service-level pass rates as proof of durable production workflow execution or real LLM agent behavior.
 
 ## Boundaries
 

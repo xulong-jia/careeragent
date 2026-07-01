@@ -1,12 +1,12 @@
 # CareerAgent Production Gap Baseline
 
-阶段 2.4 后，当前仓库是 production hardening + real evaluation + real RAG + real parser + trustworthy match/project rewrite foundation。本文档不声明 production-ready。
+阶段 2.5 后，当前仓库是 production hardening + real evaluation + real RAG + real parser + trustworthy match/project rewrite + agent workflow production foundation。本文档不声明 production-ready。
 
 ## 1. 当前总体判断
 
-当前版本可以作为 production hardening + real evaluation + real RAG + real parser + trustworthy match/project rewrite foundation，因为主业务对象已经有持久化、Auth/Workspace 基础隔离、隐私 preview 收敛、Docker 本地骨架、Alembic migration、后端测试、前端 build、synthetic smoke regression、service-level evaluation runner、RAG local vector embedding persistence、JD/Resume parser evidence/confidence/warnings baseline，以及 Match 六维评分、风险扣分、compare API 和 Project Rewrite 反编造字段。
+当前版本可以作为 production hardening + real evaluation + real RAG + real parser + trustworthy match/project rewrite + agent workflow production foundation，因为主业务对象已经有持久化、Auth/Workspace 基础隔离、隐私 preview 收敛、Docker 本地骨架、Alembic migration、后端测试、前端 build、synthetic smoke regression、service-level evaluation runner、RAG local vector embedding persistence、JD/Resume parser evidence/confidence/warnings baseline、Match 六维评分、风险扣分、compare API、Project Rewrite 反编造字段，以及 Agent run lifecycle、attempt-aware step timeline、resume/retry/cancel API、多 workflow 和失败 Bad Case draft。
 
-当前版本不是 production-ready，原因是核心 AI 能力仍大量依赖 deterministic、synthetic 或本地 foundation 路径：RAG 已有 local vector path 和 DB-persisted chunk vectors，但没有最终 semantic embedding、reranker 或 production-scale vector DB；JD/Resume parser 已有 production foundation 字段和 optional LLM path，但默认仍是 deterministic local parser，未接 OCR、未做大规模真实 benchmark；Match/Rewrite 已有六维评分、证据绑定、风险扣分和防编造字段，但仍是 deterministic foundation，未经过大规模 human agreement / ranking stability 校准；Agent 是同步固定 workflow，Evaluation 仍只是 foundation benchmark，raw_text 仍明文保存，生产 DB、observability、retention、backup、RBAC 和部署策略不足。
+当前版本不是 production-ready，原因是核心 AI 能力仍大量依赖 deterministic、synthetic 或本地 foundation 路径：RAG 已有 local vector path 和 DB-persisted chunk vectors，但没有最终 semantic embedding、reranker 或 production-scale vector DB；JD/Resume parser 已有 production foundation 字段和 optional LLM path，但默认仍是 deterministic local parser，未接 OCR、未做大规模真实 benchmark；Match/Rewrite 已有六维评分、证据绑定、风险扣分和防编造字段，但仍是 deterministic foundation，未经过大规模 human agreement / ranking stability 校准；Agent 已有 production foundation 状态机和恢复 API，但仍是同步 local runner，不是 durable queue/worker/LLM tool-calling agent；Evaluation 仍只是 foundation benchmark，raw_text 仍明文保存，生产 DB、observability、retention、backup、RBAC 和部署策略不足。
 
 完成标准口径：mock、stub、deterministic、synthetic、prototype、本地可演示、骨架完整都不能标为 DONE，只能标为 PARTIAL、FOUNDATION、MOCK_ONLY、DETERMINISTIC_ONLY、SYNTHETIC_ONLY 或 RISKY。
 
@@ -24,9 +24,9 @@
 | Application | PARTIAL | 手动 application tracking、status history、reflection | 不接招聘系统，不处理真实投递合规、通知、审计 | 2.5, 2.6 | 数据完整性和操作审计不足 |
 | Dashboard | PARTIAL | 聚合本地 stats 和 latest summaries | 很多页面仍需手填 ID，缺少 production selectors 和测试 | 2.6 | 主流程误操作、可用性弱 |
 | RAG | FOUNDATION | document/chunk、lexical/vector/hybrid、local bag-of-words embedding、DB-persisted chunk vectors、citations/source_refs、RAG service-level eval | local vectorizer 不是最终 semantic embedding；无 reranker、pgvector/FAISS、production-scale vector DB、真实 LLM grounded generation、大 benchmark | 2.2 foundation, 2.6 | 检索质量、规模化和引用可信度仍不足 |
-| Agent | DETERMINISTIC_ONLY | 固定 `job_application_preparation` 同步 state machine、timeline refs | 无 resume/retry/cancel、缺槽追问、失败恢复、多 workflow production path | 2.5 | 同步 demo 无法承载真实长流程 |
-| Bad Case | PARTIAL | 人工 bad case、root cause、regression linkage | 自动 draft、真实失败样例入库、triage workflow 不足 | 2.1, 2.5 | 问题沉淀不完整 |
-| Evaluation | PARTIAL | `synthetic_smoke_v1`、service-level de-identified dataset、fileized runner、metrics/failed cases/actual outputs/run_config | 仍不是 production benchmark；当前不自动写 DB，不自动生成 Bad Case draft | 2.1 foundation, 2.2-2.6 持续 | service-level pass/fail 可能被误读为生产质量 |
+| Agent | FOUNDATION | `job_application_preparation`、`interview_preparation`、`application_review`、`study_gap_planning`，run lifecycle、attempt-aware step timeline、resume/retry/cancel、missing slots/questions、failure Bad Case draft、run_config/privacy-safe payload | 仍是同步 local runner；无 durable worker/queue/heartbeat/cancellation token，无真实 LLM planning/tool-calling | 2.5 foundation, 2.6/future durable workflow | 短流程可追踪，但不能承载真实长任务 SLA |
+| Bad Case | PARTIAL | 人工 bad case、root cause、regression linkage、Agent step failure auto draft | 真实失败样例 triage、owner/priority SLA、自动 eval DB 闭环不足 | 2.1, 2.5, 2.6 | 问题沉淀仍需运营流程 |
+| Evaluation | PARTIAL | `synthetic_smoke_v1`、service-level de-identified dataset、fileized runner、metrics/failed cases/actual outputs/run_config；Agent workflow 8 cases 覆盖 resume/retry/cancel/bad-case payload | 仍不是 production benchmark；当前不自动写 DB | 2.1 foundation, 2.2-2.6 持续 | service-level pass/fail 可能被误读为生产质量 |
 | Auth / Workspace | PRODUCTION_FOUNDATION | register/login/me/logout、bearer token、workspace owner filtering、basic audit | 无 SSO/MFA/refresh token/full RBAC/session 管理/SIEM | 2.6 | 多租户和认证强度不足 |
 | Database | RISKY | Alembic、SQLite default、PostgreSQL driver readiness | PostgreSQL 不是生产默认，无 backup/restore/retention/erasure proof | 2.6 | 本地 DB 路径不可作为生产数据层 |
 | Frontend | PARTIAL | React workbench、多页面业务流、auth token client | 缺 lint/minimal tests/object selectors，主流程仍有手填 ID | 2.6 | 生产操作易错且回归难发现 |
@@ -46,7 +46,7 @@
 
 ### P1
 
-- Agent 是同步单 workflow，缺少 pending/running/failed/retrying/cancelled/resume/retry/cancel 生产状态机。
+- Agent 已有 2.5 foundation 状态机，但仍缺 durable queue/worker、heartbeat、true async cancellation token、workflow lease 和 production observability。
 - 前端大量流程仍依赖手填 ID，缺少对象选择器、主流程防错和 minimal UI tests。
 - PostgreSQL 不是生产默认，SQLite/local_data 仅适合 local dev。
 - Observability 不足：缺 structured logging、request_id trace、readiness check、eval trace、audit pipeline。
@@ -64,5 +64,5 @@
 - 2.2 Real RAG Production Path：已建立 local vector embedding provider、DB-persisted chunk vectors、lexical/vector/hybrid mode、metadata filter、top-k、threshold、citation、no-evidence refusal 和 RAG 指标。仍只是 production foundation。
 - 2.3 Real JD Parser + Resume Parser：已补 parser schema validation、evidence、confidence、warnings、risk flags、service-level parser eval、optional LLM provider path、timeout/retry/fallback/prompt/model metadata。默认仍是 deterministic local parser foundation，不是 full production parser。
 - 2.4 Trustworthy Match Scoring + Project Rewrite：已建立六维评分、证据绑定、风险扣分、多 JD/多简历对比、Project Rewrite 反编造字段和 service-level metrics。仍只是 trustworthy foundation。
-- 2.5 Agent Workflow Productionization：补 pending/running/completed/failed/need_more_info/cancelled/retrying、step refs、resume/retry/cancel API、失败 Bad Case draft 和多 workflow。
+- 2.5 Agent Workflow Productionization：已补 pending/running/completed/failed/need_more_info/cancelled/retrying、step refs、resume/retry/cancel API、失败 Bad Case draft、多 workflow、Agent service-level eval 和前端兼容。仍只是 production foundation。
 - 2.6 Security / Privacy / Deployment Hardening：补 encryption/retention/audit/observability、PostgreSQL production default、RBAC、secret handling、frontend lint/tests/selectors 和可复现部署。

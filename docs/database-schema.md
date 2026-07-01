@@ -426,7 +426,7 @@ JSON 字段说明：
 
 ## agent_runs
 
-用途：记录 deterministic workflow run。v1.3 `job_application_preparation` 会串联 Resume Version、JD、Match、可选 RAG search、Project Rewrite、Interview Questions、Study Plan 和 Application linkage。
+用途：记录 deterministic workflow run。阶段 2.5 支持 `job_application_preparation`、`interview_preparation`、`application_review` 和 `study_gap_planning`，并记录 lifecycle、resume/retry/cancel、attempt、run_config 和 Bad Case draft refs。
 
 关键字段：
 
@@ -437,11 +437,18 @@ JSON 字段说明：
 - `status`
 - `input_refs`
 - `output_refs`
+- `final_output_ref`
+- `run_config`
 - `output_refs.final_summary`
 - `missing_slots`
 - `questions`
 - `error_code`
 - `error_message`
+- `bad_case_id`
+- `bad_case_payload`
+- `retry_attempt`
+- `created_at`
+- `updated_at`
 - `started_at`
 - `finished_at`
 - `duration_ms`
@@ -450,8 +457,11 @@ JSON 字段说明：
 
 - `input_refs`：workflow 输入 ID、布尔开关和是否提供 query 的短 metadata。
 - `output_refs`：workflow 输出 ID、下游 created record IDs 和聚合摘要。
+- `final_output_ref`：成功 completion 的最终 output refs，便于和中间 `need_more_info` output 区分。
+- `run_config`：workflow version、attempt、step list、schema/model/code version 和 execution mode。
 - `output_refs.final_summary`：`total_score`、`top_strengths`、`top_gaps`、`next_actions` 和 `created_records`。`AgentRunRecord.final_summary` 从该字段派生，便于前端直接展示。
 - `missing_slots` / `questions`：缺少 resume version、JD、project 或 application refs 时的可恢复提示。
+- `bad_case_payload`：failed step 的 privacy-safe Bad Case draft payload；`bad_case_id` 指向自动创建的 bad case（如果创建成功）。
 
 隐私说明：只保存 refs、短 metadata、分数、warnings 和 created record IDs，不复制 resume/JD/RAG 原文、完整 interview answer 或投递材料。
 
@@ -465,12 +475,17 @@ JSON 字段说明：
 - `run_id`
 - `step_name`
 - `step_order`
+- `attempt`
 - `status`
 - `input_refs`
 - `output_refs`
+- `run_config`
+- `privacy_safe_payload`
 - `error_code`
 - `error_message`
 - `duration_ms`
+
+约束：`agent_steps` 使用 `(run_id, step_order, attempt)` 唯一约束。retry/resume 不覆盖旧 step，而是在同一 run 下追加新的 attempt timeline。
 
 ## applications
 

@@ -3,9 +3,12 @@ import { useEffect, useState } from "react";
 import { MarkBadCasePanel } from "../components/MarkBadCasePanel";
 import {
   createAgentRun,
+  cancelAgentRun,
   getAgentRun,
   listAgentRuns,
   listAgentRunSteps,
+  resumeAgentRun,
+  retryAgentRun,
 } from "../api/agents";
 import type {
   AgentFinalSummary,
@@ -16,7 +19,12 @@ import type {
   AgentStepRecord,
 } from "../types/api";
 
-const workflowName = "job_application_preparation";
+const workflowOptions = [
+  "job_application_preparation",
+  "interview_preparation",
+  "application_review",
+  "study_gap_planning",
+];
 const sensitiveKeyPatterns = [
   "raw_text",
   "jd_raw_text",
@@ -160,6 +168,22 @@ function BusinessState({ run }: { run: AgentRunRecord }) {
       </div>
     );
   }
+  if (run.status === "cancelled") {
+    return (
+      <div className="state-callout warning">
+        <strong>Workflow cancelled</strong>
+        <span>Run was stopped before producing a final output.</span>
+      </div>
+    );
+  }
+  if (run.status === "running" || run.status === "retrying") {
+    return (
+      <div className="state-callout warning">
+        <strong>Workflow in progress</strong>
+        <span>{run.status}</span>
+      </div>
+    );
+  }
   if (run.status === "completed") {
     return (
       <div className="state-callout success">
@@ -191,6 +215,9 @@ export function AgentRunsPage({
   );
   const [runDetail, setRunDetail] = useState<AgentRunDetailResponse | null>(null);
   const [steps, setSteps] = useState<AgentStepRecord[]>([]);
+  const [selectedWorkflowName, setSelectedWorkflowName] = useState(
+    workflowOptions[0],
+  );
   const [resumeId, setResumeId] = useState("");
   const [resumeVersionId, setResumeVersionId] = useState("");
   const [jdId, setJdId] = useState("");
@@ -204,6 +231,7 @@ export function AgentRunsPage({
     useState<AgentRunCreateResponse | null>(null);
   const [isListLoading, setIsListLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isActing, setIsActing] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isStepsLoading, setIsStepsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -274,7 +302,7 @@ export function AgentRunsPage({
     setLastCreatedRun(null);
     try {
       const result = await createAgentRun({
-        workflow_name: workflowName,
+        workflow_name: selectedWorkflowName,
         resume_id: resumeId.trim() || null,
         resume_version_id: resumeVersionId.trim() || null,
         jd_id: jdId.trim() || null,
@@ -296,6 +324,44 @@ export function AgentRunsPage({
     }
   };
 
+  const actionPayload = () => ({
+    resume_id: resumeId.trim() || null,
+    resume_version_id: resumeVersionId.trim() || null,
+    jd_id: jdId.trim() || null,
+    project_ids: parseIdList(projectIds),
+    application_id: applicationId.trim() || null,
+    create_application: createApplication,
+    use_rag: useRag,
+    rag_query: ragQuery.trim() || null,
+    rag_answer_run_ids: parseIdList(ragAnswerRunIds),
+  });
+
+  const handleRunAction = async (
+    action: "resume" | "retry" | "cancel",
+    runId: string,
+  ) => {
+    setIsActing(true);
+    setErrorMessage(null);
+    try {
+      if (action === "resume") {
+        await resumeAgentRun(runId, actionPayload());
+      } else if (action === "retry") {
+        await retryAgentRun(runId);
+      } else {
+        await cancelAgentRun(runId);
+      }
+      const items = await refreshRuns();
+      const updated = items.find((item) => item.id === runId);
+      await loadRun(updated?.id ?? runId);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Agent run action failed.",
+      );
+    } finally {
+      setIsActing(false);
+    }
+  };
+
   const detailRun = runDetail?.run ?? null;
 
   return (
@@ -303,7 +369,7 @@ export function AgentRunsPage({
       <div className="page-heading">
         <p className="eyebrow">Agent Workflow</p>
         <h2 id="agent-runs-title">Agent Runs</h2>
-        <p>阶段 4E 前端最小 UI：创建 deterministic workflow run，查看 run list、detail 和 steps timeline。</p>
+        <p>阶段 2.5 workflow workbench：创建、查看、resume、retry、cancel，并检查 step timeline。</p>
       </div>
 
       <article className="panel warning-panel">
@@ -326,7 +392,16 @@ export function AgentRunsPage({
           <div className="form-stack">
             <label>
               Workflow
-              <input readOnly value={workflowName} />
+              <select
+                value={selectedWorkflowName}
+                onChange={(event) => setSelectedWorkflowName(event.target.value)}
+              >
+                {workflowOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Resume ID
@@ -486,6 +561,14 @@ export function AgentRunsPage({
                   <span>{formatDate(detailRun.created_at)}</span>
                 </li>
                 <li>
+                  <strong>Updated</strong>
+                  <span>{formatDate(detailRun.updated_at)}</span>
+                </li>
+                <li>
+                  <strong>Attempt</strong>
+                  <span>{detailRun.retry_attempt}</span>
+                </li>
+                <li>
                   <strong>Duration</strong>
                   <span>{formatDuration(detailRun.duration_ms)}</span>
                 </li>
@@ -495,6 +578,37 @@ export function AgentRunsPage({
                 </li>
               </ul>
               <BusinessState run={detailRun} />
+              <div className="inline-actions">
+                <button
+                  className="ghost-action"
+                  disabled={isActing || detailRun.status !== "need_more_info"}
+                  onClick={() => void handleRunAction("resume", detailRun.id)}
+                  type="button"
+                >
+                  Resume
+                </button>
+                <button
+                  className="ghost-action"
+                  disabled={isActing || detailRun.status !== "failed"}
+                  onClick={() => void handleRunAction("retry", detailRun.id)}
+                  type="button"
+                >
+                  Retry
+                </button>
+                <button
+                  className="ghost-action"
+                  disabled={
+                    isActing ||
+                    !["pending", "running", "need_more_info", "retrying"].includes(
+                      detailRun.status,
+                    )
+                  }
+                  onClick={() => void handleRunAction("cancel", detailRun.id)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
               <FinalSummaryPanel summary={detailRun.final_summary} />
               <MarkBadCasePanel
                 defaultCategory={defaultRunBadCaseCategory(detailRun.status)}
@@ -505,6 +619,17 @@ export function AgentRunsPage({
               />
               <SafeJsonBlock label="Input refs" value={detailRun.input_refs} />
               <SafeJsonBlock label="Output refs" value={detailRun.output_refs} />
+              <SafeJsonBlock label="Final output ref" value={detailRun.final_output_ref} />
+              <SafeJsonBlock label="Run config" value={detailRun.run_config} />
+              {detailRun.bad_case_id ? (
+                <SafeJsonBlock
+                  label="Bad case payload"
+                  value={{
+                    bad_case_id: detailRun.bad_case_id,
+                    ...detailRun.bad_case_payload,
+                  }}
+                />
+              ) : null}
               {detailRun.missing_slots?.length ? (
                 <SafeJsonBlock label="Missing slots" value={detailRun.missing_slots} />
               ) : null}
@@ -545,7 +670,7 @@ export function AgentRunsPage({
                   <div className="timeline-step-header">
                     <div>
                       <strong>
-                        {step.step_order}. {step.step_name}
+                        Attempt {step.attempt} / {step.step_order}. {step.step_name}
                       </strong>
                       <small>{formatDuration(step.duration_ms)}</small>
                     </div>
@@ -553,6 +678,10 @@ export function AgentRunsPage({
                   </div>
                   <SafeJsonBlock label="Input refs" value={step.input_refs} />
                   <SafeJsonBlock label="Output refs" value={step.output_refs} />
+                  <SafeJsonBlock
+                    label="Privacy-safe payload"
+                    value={step.privacy_safe_payload}
+                  />
                   {step.error_code ? (
                     <ul className="compact-list">
                       <li>error_code: {step.error_code}</li>
