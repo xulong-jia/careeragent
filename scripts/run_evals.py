@@ -16,6 +16,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
+from app.evaluation import ai_quality  # noqa: E402
 from app.core.versioning import version_metadata  # noqa: E402
 
 EVALS_ROOT = REPO_ROOT / "evals"
@@ -43,7 +44,27 @@ SERVICE_LEVEL_MODULE_ALIASES = {
     "rag": "rag_retrieval",
     "agent": "agent_workflow",
 }
-MODULES = SYNTHETIC_MODULES | set(SERVICE_LEVEL_MODULE_FILES)
+BENCHMARK_DATASET = "benchmark"
+BENCHMARK_MODULE_FILES = {
+    "jd_parser": "jd_parser_benchmark.jsonl",
+    "resume_parser": "resume_parser_benchmark.jsonl",
+    "rag_retrieval": "rag_retrieval_benchmark.jsonl",
+    "rag_answer": "rag_answer_benchmark.jsonl",
+    "match": "match_benchmark.jsonl",
+    "project_rewrite": "project_rewrite_benchmark.jsonl",
+    "agent_workflow": "agent_workflow_benchmark.jsonl",
+}
+BENCHMARK_MODULE_ALIASES = {
+    "parser": ["jd_parser", "resume_parser"],
+    "rag": ["rag_retrieval", "rag_answer"],
+    "agent": ["agent_workflow"],
+}
+MODULES = (
+    SYNTHETIC_MODULES
+    | set(SERVICE_LEVEL_MODULE_FILES)
+    | set(BENCHMARK_MODULE_FILES)
+    | set(BENCHMARK_MODULE_ALIASES)
+)
 PRIVATE_TEXT_KEYS = {
     "raw_text",
     "jd_raw_text",
@@ -58,6 +79,10 @@ SERVICE_LEVEL_DATASET = "service_level"
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_jsonl(path: Path) -> list[dict[str, Any]]:
+    return ai_quality.load_jsonl(path)
 
 
 def _safe_text(value: Any, *, max_length: int = 180) -> str:
@@ -1260,6 +1285,16 @@ SERVICE_LEVEL_EVALUATORS = {
 }
 
 
+def _benchmark_module_names(module: str | None) -> list[str]:
+    if module is None:
+        return sorted(BENCHMARK_MODULE_FILES)
+    if module in BENCHMARK_MODULE_ALIASES:
+        return BENCHMARK_MODULE_ALIASES[module]
+    if module in BENCHMARK_MODULE_FILES:
+        return [module]
+    raise ValueError(f"Unsupported benchmark module: {module}")
+
+
 def _expected_by_case_id(dataset: str, module: str) -> dict[str, dict[str, Any]]:
     expected_path = (
         EXPECTED_ROOT
@@ -1316,6 +1351,355 @@ def _load_service_level_cases(module: str | None = None) -> list[tuple[str, dict
         for case in payload.get("cases", []):
             cases.append((str(case.get("module") or current_module), case))
     return cases
+
+
+def _load_benchmark_cases(module: str | None = None) -> list[tuple[str, dict[str, Any]]]:
+    dataset_dir = DATASET_ROOT / BENCHMARK_DATASET
+    cases: list[tuple[str, dict[str, Any]]] = []
+    for current_module in _benchmark_module_names(module):
+        path = dataset_dir / BENCHMARK_MODULE_FILES[current_module]
+        if not path.exists():
+            continue
+        for case in _load_jsonl(path):
+            cases.append((str(case.get("module") or current_module), case))
+    return cases
+
+
+def _benchmark_result(
+    *,
+    case: dict[str, Any],
+    module: str,
+    actual: dict[str, Any],
+    expected: dict[str, Any],
+    metrics: dict[str, Any],
+    passed: bool,
+    error: str,
+) -> dict[str, Any]:
+    return {
+        "case_id": case.get("case_id") or case.get("id"),
+        "case_name": case.get("name") or case.get("case_id"),
+        "module": module,
+        "case_type": "benchmark_foundation",
+        "input_payload": _case_input_payload(case),
+        "input_summary": _safe_text(case.get("summary") or case.get("name")),
+        "expected_output": _sanitize_private_keys(expected),
+        "actual_output": _sanitize_private_keys(
+            {**actual, "dataset_kind": "benchmark_foundation"}
+        ),
+        "metrics": metrics,
+        "passed": passed,
+        "score": 1.0 if passed else _metric_score(metrics),
+        "error": None if passed else error,
+    }
+
+
+def _evaluate_benchmark_case(module: str, case: dict[str, Any]) -> dict[str, Any]:
+    expected = dict(case.get("expected") or {})
+    signals = dict(case.get("signals") or {})
+    if module == "jd_parser":
+        return _evaluate_benchmark_jd_parser(case, expected, signals)
+    if module == "resume_parser":
+        return _evaluate_benchmark_resume_parser(case, expected, signals)
+    if module == "rag_retrieval":
+        return _evaluate_benchmark_rag_retrieval(case, expected, signals)
+    if module == "rag_answer":
+        return _evaluate_benchmark_rag_answer(case, expected, signals)
+    if module == "match":
+        return _evaluate_benchmark_match(case, expected, signals)
+    if module == "project_rewrite":
+        return _evaluate_benchmark_project_rewrite(case, expected, signals)
+    if module == "agent_workflow":
+        return _evaluate_benchmark_agent_workflow(case, expected, signals)
+    raise ValueError(f"Unsupported benchmark module: {module}")
+
+
+def _evaluate_benchmark_jd_parser(
+    case: dict[str, Any],
+    expected: dict[str, Any],
+    signals: dict[str, Any],
+) -> dict[str, Any]:
+    expected_required = expected.get("required_skills_should_include", [])
+    actual_required = signals.get("parsed_required_skills", [])
+    expected_preferred = expected.get("preferred_skills_should_include", [])
+    actual_preferred = signals.get("parsed_preferred_skills", [])
+    actual_risk_flags = signals.get("risk_flags", [])
+    metrics = {
+        "role_category_accuracy": str(signals.get("role_category")) == str(expected.get("role_category")),
+        "required_skill_precision": _precision(expected_required, actual_required),
+        "required_skill_recall": _hit_rate(expected_required, actual_required),
+        "preferred_skill_precision": _precision(expected_preferred, actual_preferred),
+        "preferred_skill_recall": _hit_rate(expected_preferred, actual_preferred),
+        "risk_flag_hit_rate": _hit_rate(
+            expected.get("risk_flags_should_include", []),
+            actual_risk_flags,
+        ),
+        "confidence_calibration": _confidence_calibration(signals, expected),
+    }
+    passed = (
+        metrics["role_category_accuracy"]
+        and metrics["required_skill_recall"] >= 0.8
+        and metrics["preferred_skill_recall"] >= 0.75
+        and metrics["confidence_calibration"] >= 0.8
+    )
+    return _benchmark_result(
+        case=case,
+        module="jd_parser",
+        actual=signals,
+        expected=expected,
+        metrics={**metrics, "case_pass": passed},
+        passed=passed,
+        error="JD parser benchmark expectations were not met.",
+    )
+
+
+def _evaluate_benchmark_resume_parser(
+    case: dict[str, Any],
+    expected: dict[str, Any],
+    signals: dict[str, Any],
+) -> dict[str, Any]:
+    metrics = {
+        "section_accuracy": _hit_rate(
+            expected.get("sections_should_include", []),
+            signals.get("sections", []),
+        ),
+        "project_extraction_hit_rate": _hit_rate(
+            expected.get("projects_should_include", []),
+            signals.get("projects", []),
+        ),
+        "skill_precision": _precision(
+            expected.get("skills_should_include", []),
+            signals.get("skills", []),
+        ),
+        "skill_recall": _hit_rate(
+            expected.get("skills_should_include", []),
+            signals.get("skills", []),
+        ),
+        "risk_flag_hit_rate": _hit_rate(
+            expected.get("risk_flags_should_include", []),
+            signals.get("risk_flags", []),
+        ),
+        "confidence_calibration": _confidence_calibration(signals, expected),
+    }
+    passed = (
+        metrics["section_accuracy"] >= 0.8
+        and metrics["project_extraction_hit_rate"] >= 0.8
+        and metrics["skill_recall"] >= 0.8
+        and metrics["confidence_calibration"] >= 0.8
+    )
+    return _benchmark_result(
+        case=case,
+        module="resume_parser",
+        actual=signals,
+        expected=expected,
+        metrics={**metrics, "case_pass": passed},
+        passed=passed,
+        error="Resume parser benchmark expectations were not met.",
+    )
+
+
+def _evaluate_benchmark_rag_retrieval(
+    case: dict[str, Any],
+    expected: dict[str, Any],
+    signals: dict[str, Any],
+) -> dict[str, Any]:
+    relevant_ids = [str(item) for item in expected.get("relevant_chunk_ids", [])]
+    retrieved_ids = [str(item) for item in signals.get("retrieved_chunk_ids", [])]
+    hit_ids = [chunk_id for chunk_id in retrieved_ids if chunk_id in set(relevant_ids)]
+    first_hit_rank = next(
+        (index + 1 for index, chunk_id in enumerate(retrieved_ids) if chunk_id in set(relevant_ids)),
+        None,
+    )
+    no_evidence_expected = bool(expected.get("no_evidence_expected"))
+    metrics = {
+        "recall_at_k": round(len(hit_ids) / len(relevant_ids), 4)
+        if relevant_ids
+        else 1.0,
+        "mrr": round(1 / first_hit_rank, 4) if first_hit_rank else 0.0,
+        "precision_at_k": round(len(hit_ids) / len(retrieved_ids), 4)
+        if retrieved_ids
+        else (1.0 if no_evidence_expected else 0.0),
+        "citation_coverage": _hit_rate(
+            relevant_ids,
+            signals.get("cited_chunk_ids", []),
+        ),
+        "source_type_match": str(signals.get("source_type")) == str(expected.get("source_type")),
+        "no_evidence_refusal_accuracy": (
+            bool(signals.get("refused_due_to_no_evidence"))
+            if no_evidence_expected
+            else not bool(signals.get("refused_due_to_no_evidence"))
+        ),
+        "reranker_improvement_rate": 1.0 if signals.get("reranker_improved") else 0.0,
+    }
+    passed = (
+        metrics["recall_at_k"] >= float(expected.get("minimum_recall_at_k", 0.8))
+        and metrics["mrr"] >= float(expected.get("minimum_mrr", 0.5))
+        and metrics["no_evidence_refusal_accuracy"]
+    )
+    return _benchmark_result(
+        case=case,
+        module="rag_retrieval",
+        actual=signals,
+        expected=expected,
+        metrics={**metrics, "case_pass": passed},
+        passed=passed,
+        error="RAG retrieval benchmark expectations were not met.",
+    )
+
+
+def _evaluate_benchmark_rag_answer(
+    case: dict[str, Any],
+    expected: dict[str, Any],
+    signals: dict[str, Any],
+) -> dict[str, Any]:
+    unsupported_claims = list(signals.get("unsupported_claims") or [])
+    citation_required = bool(expected.get("citation_required", True))
+    citations = list(signals.get("cited_chunk_ids") or [])
+    refusal_expected = bool(expected.get("refusal_expected"))
+    metrics = {
+        "groundedness": bool(signals.get("grounded")) and not unsupported_claims,
+        "unsupported_claim_rate": round(len(unsupported_claims) / max(1, len(citations)), 4),
+        "citation_required_pass_rate": bool(citations) if citation_required else True,
+        "refusal_accuracy": bool(signals.get("refused_due_to_no_evidence")) == refusal_expected,
+        "answer_schema_pass_rate": bool(signals.get("answer_schema_valid")),
+    }
+    passed = all(
+        [
+            metrics["groundedness"] or refusal_expected,
+            metrics["unsupported_claim_rate"] == 0.0,
+            metrics["citation_required_pass_rate"],
+            metrics["refusal_accuracy"],
+            metrics["answer_schema_pass_rate"],
+        ]
+    )
+    return _benchmark_result(
+        case=case,
+        module="rag_answer",
+        actual=signals,
+        expected=expected,
+        metrics={**metrics, "case_pass": passed},
+        passed=passed,
+        error="RAG answer benchmark expectations were not met.",
+    )
+
+
+def _evaluate_benchmark_match(
+    case: dict[str, Any],
+    expected: dict[str, Any],
+    signals: dict[str, Any],
+) -> dict[str, Any]:
+    score_range = expected.get("score_range") or [0, 100]
+    system_score = float(signals.get("system_score", 0))
+    human_score = float(signals.get("human_score", system_score))
+    expected_gaps = expected.get("gaps_should_include", [])
+    actual_gaps = signals.get("gaps", [])
+    metrics = {
+        "score_in_expected_range": float(score_range[0]) <= system_score <= float(score_range[1]),
+        "ranking_consistency": bool(signals.get("ranking_consistent")),
+        "evidence_completeness": _hit_rate(
+            expected.get("evidence_should_include", []),
+            signals.get("evidence", []),
+        ),
+        "gap_identification_precision": _precision(expected_gaps, actual_gaps),
+        "human_agreement": abs(system_score - human_score) <= 10,
+        "stability_delta": float(signals.get("stability_delta", 0)),
+    }
+    passed = (
+        metrics["score_in_expected_range"]
+        and metrics["ranking_consistency"]
+        and metrics["evidence_completeness"] >= 0.8
+        and metrics["gap_identification_precision"] >= 0.8
+        and metrics["human_agreement"]
+        and metrics["stability_delta"] <= 5
+    )
+    return _benchmark_result(
+        case=case,
+        module="match",
+        actual=signals,
+        expected=expected,
+        metrics={**metrics, "case_pass": passed},
+        passed=passed,
+        error="Match benchmark expectations were not met.",
+    )
+
+
+def _evaluate_benchmark_project_rewrite(
+    case: dict[str, Any],
+    expected: dict[str, Any],
+    signals: dict[str, Any],
+) -> dict[str, Any]:
+    metrics = {
+        "rewrite_schema_pass_rate": bool(signals.get("rewrite_schema_valid")),
+        "fabrication_guard_pass": not bool(signals.get("fabricated_claims")),
+        "evidence_required_present": bool(signals.get("evidence_required_present")),
+        "matched_requirement_hit_rate": _hit_rate(
+            expected.get("matched_requirements_should_include", []),
+            signals.get("matched_requirements", []),
+        ),
+        "risk_flag_hit_rate": _hit_rate(
+            expected.get("risk_flags_should_include", []),
+            signals.get("risk_flags", []),
+        ),
+    }
+    passed = all(
+        [
+            metrics["rewrite_schema_pass_rate"],
+            metrics["fabrication_guard_pass"],
+            metrics["evidence_required_present"],
+            metrics["matched_requirement_hit_rate"] >= 0.8,
+        ]
+    )
+    return _benchmark_result(
+        case=case,
+        module="project_rewrite",
+        actual=signals,
+        expected=expected,
+        metrics={**metrics, "case_pass": passed},
+        passed=passed,
+        error="Project rewrite benchmark expectations were not met.",
+    )
+
+
+def _evaluate_benchmark_agent_workflow(
+    case: dict[str, Any],
+    expected: dict[str, Any],
+    signals: dict[str, Any],
+) -> dict[str, Any]:
+    metrics = {
+        "workflow_success_rate": signals.get("status") == expected.get("status"),
+        "need_more_info_accuracy": signals.get("need_more_info") == expected.get("need_more_info"),
+        "bad_case_payload_present": bool(signals.get("bad_case_payload_present"))
+        if expected.get("bad_case_payload_expected")
+        else True,
+        "output_schema_pass_rate": bool(signals.get("output_schema_valid")),
+    }
+    passed = all(metrics.values())
+    return _benchmark_result(
+        case=case,
+        module="agent_workflow",
+        actual=signals,
+        expected=expected,
+        metrics={**metrics, "case_pass": passed},
+        passed=passed,
+        error="Agent workflow benchmark expectations were not met.",
+    )
+
+
+def _precision(expected_terms: list[Any], actual_terms: list[Any]) -> float:
+    actual = [str(item).strip().lower() for item in actual_terms if str(item).strip()]
+    if not actual:
+        return 1.0 if not expected_terms else 0.0
+    expected = {str(item).strip().lower() for item in expected_terms if str(item).strip()}
+    hits = sum(1 for item in actual if item in expected)
+    return round(hits / len(actual), 4)
+
+
+def _confidence_calibration(
+    signals: dict[str, Any],
+    expected: dict[str, Any],
+) -> float:
+    confidence = float(signals.get("confidence", 0.0))
+    target = float(expected.get("expected_confidence", confidence))
+    return round(max(0.0, 1 - abs(confidence - target)), 4)
 
 
 def _build_metrics(
@@ -1414,10 +1798,18 @@ def _write_outputs(
     results: list[dict[str, Any]],
     run_config: dict[str, Any],
 ) -> dict[str, Any]:
-    metrics = _build_metrics(results, run_config=run_config)
     failed_cases = [
         _failed_case_summary(result) for result in results if not result["passed"]
     ]
+    metrics = _build_metrics(results, run_config=run_config)
+    metrics["bad_case_regression_trend"] = ai_quality.bad_case_regression_trend(
+        failed_cases
+    )
+    if dataset == BENCHMARK_DATASET:
+        human_review_summary = _benchmark_human_review_summary()
+        metrics["human_review"] = human_review_summary
+    else:
+        human_review_summary = None
     actual_outputs = [
         {
             "case_id": result.get("case_id"),
@@ -1450,6 +1842,11 @@ def _write_outputs(
         json.dumps(run_config, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    if human_review_summary is not None:
+        (output_dir / "human_review_summary.json").write_text(
+            json.dumps(human_review_summary, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     generated_at = datetime.now(timezone.utc).isoformat()
     lines = [
         f"# Evaluation Summary: {dataset}",
@@ -1488,6 +1885,7 @@ def _write_outputs(
             "",
             "- Synthetic datasets are contract regression only.",
             "- Service-level datasets call current deterministic/mock services.",
+            "- Benchmark datasets are synthetic large-sample foundations with human-review sample metrics.",
             "- This is a real evaluation foundation, not a production-quality benchmark.",
         ]
     )
@@ -1500,6 +1898,18 @@ def _write_outputs(
             )
     (output_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return metrics
+
+
+def _benchmark_human_review_summary() -> dict[str, Any]:
+    path = DATASET_ROOT / BENCHMARK_DATASET / "human_review_sample.jsonl"
+    if not path.exists():
+        return {
+            "reviewed_count": 0,
+            "human_agreement_rate": 0.0,
+            "disagreement_rate": 0.0,
+        }
+    records = ai_quality.parse_human_review_records(_load_jsonl(path))
+    return ai_quality.compute_match_calibration(records)
 
 
 def _run_synthetic(dataset: str, module: str | None, output_dir: Path) -> int:
@@ -1611,7 +2021,58 @@ def _run_service_level(module: str | None, output_dir: Path) -> int:
     return 1 if infrastructure_failed else 0
 
 
+def _run_benchmark(module: str | None, output_dir: Path) -> int:
+    cases = _load_benchmark_cases(module)
+    results: list[dict[str, Any]] = []
+    for current_module, case in cases:
+        if _contains_private_key(case):
+            result = _benchmark_result(
+                case=case,
+                module=current_module,
+                actual={},
+                expected=dict(case.get("expected") or {}),
+                metrics={"case_pass": False},
+                passed=False,
+                error="Benchmark fixture contains private text keys.",
+            )
+        else:
+            result = _evaluate_benchmark_case(current_module, case)
+        results.append(result)
+
+    run_config = {
+        "requested_module": module or "all",
+        "dataset_name": BENCHMARK_DATASET,
+        "dataset_kind": "benchmark_foundation",
+        "service_level": False,
+        "production_quality": False,
+        **version_metadata(include_evaluation=True),
+        "deterministic": True,
+        "llm_judge": False,
+        "model_comparison": False,
+        "large_scale_foundation": True,
+        "case_count_target": 100,
+        "uses_real_private_data": False,
+        "uses_real_provider_network": False,
+    }
+    metrics = _write_outputs(
+        dataset=BENCHMARK_DATASET,
+        module=module,
+        output_dir=output_dir,
+        results=results,
+        run_config=run_config,
+    )
+    print(f"wrote {output_dir}")
+    print(
+        "total={total_count} passed={passed_count} failed={failed_count} pass_rate={pass_rate}".format(
+            **metrics
+        )
+    )
+    return 0 if metrics["failed_count"] == 0 else 1
+
+
 def run(dataset: str, module: str | None, output_dir: Path) -> int:
+    if dataset == BENCHMARK_DATASET:
+        return _run_benchmark(module, output_dir)
     if dataset == SERVICE_LEVEL_DATASET:
         return _run_service_level(module, output_dir)
     return _run_synthetic(dataset, module, output_dir)

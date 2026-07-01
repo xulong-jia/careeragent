@@ -66,7 +66,7 @@ class ResumeVersionCloneRequest(BaseModel):
 
 class ResumeParseRequest(BaseModel):
     resume_version_id: str | None = None
-    parser_mode: Literal["deterministic"] = "deterministic"
+    parser_mode: Literal["deterministic", "llm_parser"] = "deterministic"
 
 
 class ResumeParseResult(BaseModel):

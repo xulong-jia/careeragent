@@ -98,6 +98,17 @@ Project Rewrite metrics:
 - `fabrication_guard_pass`
 - `case_pass`
 
+v3.2 benchmark foundation adds Match calibration metrics:
+
+- `score_in_expected_range`
+- `ranking_consistency`
+- `evidence_completeness`
+- `gap_identification_precision`
+- `human_agreement`
+- `stability_delta`
+
+It also adds synthetic human-review summary and score stability helpers. These are production-quality scaffolds, not proof that the scoring model agrees with real recruiters or hiring managers.
+
 Run:
 
 ```bash
@@ -108,7 +119,7 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset servi
 ## Remaining Gaps
 
 - Scoring is still deterministic and must not be treated as human-equivalent judgment.
-- No large real human agreement benchmark yet.
+- No large real human agreement benchmark yet; v3.2 benchmark is synthetic foundation only.
 - No calibrated LLM reviewer, no ranking stability benchmark across broad real samples.
 - Project Rewrite suggestions still require human confirmation before use.
 - Phase 2.5 Agent Workflow now orchestrates Match/Rewrite through resumable fixed workflows, but this does not change Match/Rewrite production-readiness status.

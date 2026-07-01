@@ -7,6 +7,7 @@ This directory stores deterministic, privacy-safe evaluation fixtures.
 ```text
 evals/datasets/smoke/   Synthetic smoke inputs by module
 evals/datasets/service_level/  De-identified service-level cases
+evals/datasets/benchmark/  v3.2 synthetic benchmark foundation cases
 evals/expected/smoke/   Expected contract outputs by module
 evals/results/          Local generated run outputs, ignored except .gitkeep
 ```
@@ -17,7 +18,10 @@ evals/results/          Local generated run outputs, ignored except .gitkeep
 python scripts/run_evals.py --dataset smoke
 python scripts/run_evals.py --dataset synthetic
 python scripts/run_evals.py --dataset service_level
+python scripts/run_evals.py --dataset benchmark
 python scripts/run_evals.py --dataset smoke --module rag
+python scripts/run_evals.py --dataset benchmark --module parser
+python scripts/run_evals.py --dataset benchmark --module rag
 python scripts/run_evals.py --dataset regression
 ```
 
@@ -26,6 +30,8 @@ The runner writes `summary.md`, `metrics.json`, `failed_cases.json`, `actual_out
 `metrics.json` includes a non-secret `run_config` with prompt/schema/retrieval/model/code/evaluation version metadata. This is for deterministic regression traceability only; it is not model comparison or LLM judging.
 
 `service_level` uses a temporary SQLite database and calls current CareerAgent services. It is a real evaluation foundation, but it still evaluates foundation service behavior and is not a production-quality benchmark.
+
+`benchmark` uses v3.2 synthetic large-sample foundation fixtures. It covers 100 cases across JD parser, resume parser, RAG retrieval, RAG grounded answer, Match, Project Rewrite and Agent Workflow, and writes `human_review_summary.json`. It is still synthetic and must not be treated as production-quality certification.
 
 Phase 2.3 parser cases cover 12 JD parser cases and 8 resume parser cases. Parser metrics include role/category hits, section/skill/project/education hits, risk flag hit rate, evidence coverage, confidence presence, warning expectations, and case pass.
 
@@ -37,9 +43,11 @@ Phase 2.5 agent workflow cases cover 8 Agent service-level cases, including succ
 
 Phase 2.2 RAG cases cover `lexical`, `vector`, `hybrid`, and no-evidence behavior. RAG metrics include recall/citation/source type plus `retrieval_mode_match`, `average_top_score`, `vector_index_used`, and uncertainty matching.
 
-The current RAG path uses a local bag-of-words vectorizer with DB-persisted chunk vectors. It is a production foundation, not a final semantic embedding benchmark. Run the smoke dataset before enabling any real LLM or external embedding provider, and keep real-provider experiments out of committed `evals/results/` artifacts unless they are sanitized and explicitly reviewed.
+v3.2 benchmark RAG cases add recall@k, MRR, precision@k, citation coverage, source type, no-evidence refusal, reranker improvement, groundedness, unsupported claim rate, citation-required pass rate, refusal accuracy and answer schema metrics.
 
-The current parser path uses local deterministic parser foundation by default. Optional LLM parser runs must use runtime secrets only and must not commit raw private outputs or provider traces.
+The current RAG path uses local/offline vectorizers with DB-persisted chunk vectors, reranker contract and optional LLM grounded answer path. It is a production foundation, not a final semantic embedding benchmark. Run the smoke/service/benchmark datasets before enabling any real LLM or external embedding provider, and keep real-provider experiments out of committed `evals/results/` artifacts unless they are sanitized and explicitly reviewed.
+
+The current parser path uses local deterministic parser foundation by default. v3.2 adds `parser_mode=llm_parser` and OCR/table/bilingual metadata, but OCR remains unsupported. Optional LLM parser runs must use runtime secrets only and must not commit raw private outputs or provider traces.
 
 The current Match and Project Rewrite paths use deterministic trustworthy foundation logic by default. Do not treat service-level pass rates as production job-search judgment quality or as permission to use rewritten bullets without human confirmation.
 
@@ -49,4 +57,4 @@ Phase 2.6 security/privacy/deployment checks add readiness, redaction and deleti
 
 ## Boundaries
 
-Smoke fixtures use synthetic refs, summaries, and short signals only. Service-level fixtures may include de-identified JD/resume/RAG text so the current services can run; do not add real names, real employers, real contact details, credentials, private application materials, or committed eval run outputs.
+Smoke fixtures use synthetic refs, summaries, and short signals only. Service-level fixtures may include de-identified JD/resume/RAG text so the current services can run. Benchmark fixtures must stay synthetic/de-identified signals. Do not add real names, real employers, real contact details, credentials, private application materials, or committed eval run outputs.

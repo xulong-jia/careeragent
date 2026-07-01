@@ -41,6 +41,7 @@ class RagAnswerRequest(BaseModel):
     retrieval_mode: str | None = None
     score_threshold: float | None = Field(default=None, ge=0)
     persist: bool = True
+    answer_mode: str | None = None
 
 
 class RagDocumentRecord(BaseModel):
@@ -93,6 +94,11 @@ class RagSearchSource(BaseModel):
     embedding_provider: str | None = None
     embedding_model: str | None = None
     vector_index_used: bool | None = None
+    original_score: float | None = None
+    rerank_score: float | None = None
+    final_score: float | None = None
+    reranker_mode: str | None = None
+    reranker_model: str | None = None
 
 
 class RagCitation(BaseModel):
@@ -123,9 +129,14 @@ class RagRetrievalDebug(BaseModel):
     retrieval_version: str | None = None
     schema_version: str | None = None
     model_version: str | None = None
+    answer_mode: str | None = None
+    run_config: dict[str, object] = Field(default_factory=dict)
     embedding_provider: str | None = None
     embedding_model: str | None = None
     vector_index_used: bool = False
+    reranker_mode: str | None = None
+    reranker_model: str | None = None
+    reranker_applied: bool = False
     query_tokens: list[str] = Field(default_factory=list)
     candidate_count: int
     selected_chunk_ids: list[str] = Field(default_factory=list)
@@ -152,7 +163,14 @@ class RagAnswerResult(BaseModel):
     uncertainty: str | None = None
     grounded: bool
     answer_type: str = "deterministic_summary"
+    answer_mode: str = "deterministic_summary"
     retrieval_mode: str | None = None
+    prompt_version: str | None = None
+    model_provider: str | None = None
+    model_name: str | None = None
+    groundedness_flags: list[str] = Field(default_factory=list)
+    refused_due_to_no_evidence: bool = False
+    run_config: dict[str, object] = Field(default_factory=dict)
     evidence_used: list[str] = Field(default_factory=list)
     evidence_summary: list[str] = Field(default_factory=list)
     citations: list[RagCitation] = Field(default_factory=list)
@@ -168,6 +186,7 @@ class RagAnswerRunRecord(BaseModel):
     retrieval_mode: str
     answer: str
     answer_type: str
+    answer_mode: str | None = None
     grounded: bool
     uncertainty: str
     evidence_summary: list[str] = Field(default_factory=list)

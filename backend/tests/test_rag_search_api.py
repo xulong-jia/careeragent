@@ -250,6 +250,37 @@ def test_search_supports_vector_mode_without_full_text():
     assert "raw_text" not in str(result)
 
 
+def test_index_writes_embedding_metadata_without_raw_chunk_text():
+    client = make_client()
+    document_response = client.post(
+        "/api/rag/documents",
+        json={
+            "title": "Embedding Metadata Notes",
+            "source_type": "manual",
+            "raw_text": "FastAPI embedding metadata should store provider details only.",
+            "metadata": {"topic": "embedding"},
+        },
+    )
+    assert document_response.status_code == 201
+    document = get_data(document_response)
+
+    index_response = client.post(
+        f"/api/rag/documents/{document['doc_id']}/index",
+        json={"max_chars": 160, "overlap_chars": 0},
+    )
+
+    assert index_response.status_code == 200
+    chunk = get_data(index_response)["chunks"][0]
+    embedding_metadata = chunk["metadata"]["embedding"]
+    assert embedding_metadata["provider"] == "local_bow"
+    assert embedding_metadata["provider_config_id"] == "local-bow-default"
+    assert embedding_metadata["vector_source"] == "local_bow_hash"
+    assert embedding_metadata["semantic"] is False
+    assert embedding_metadata["input_hash"]
+    assert "FastAPI embedding metadata" not in str(embedding_metadata)
+    assert "text" not in embedding_metadata
+
+
 def test_vector_search_uses_persisted_chunk_vector(monkeypatch):
     client = make_client()
     document = _create_and_index_document(

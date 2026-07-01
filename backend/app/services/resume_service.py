@@ -142,7 +142,10 @@ def parse_resume(
         resume_id=resume_id,
         source_version_id=source.id,
         raw_text_preview=source.raw_text_preview,
-        structured_resume=parse_structured_resume(raw_text),
+        structured_resume=parse_structured_resume(
+            raw_text,
+            parser_mode=request.parser_mode,
+        ),
         extraction_method=PARSER_METHOD,
         extraction_warnings=list(source.extraction_warnings or []),
         parsed_at=_utc_now(),

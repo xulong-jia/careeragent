@@ -1,4 +1,5 @@
 from conftest import get_data, get_error, make_client
+from app.core.config import get_settings
 
 
 SENSITIVE_KEYS = {"raw_text", "text", "answer_text", "chunk_text", "full_text"}
@@ -243,3 +244,84 @@ def test_answer_persists_vector_retrieval_mode_and_filter_alias():
     assert [item["answer_run_id"] for item in listed["items"]] == [
         result["answer_run_id"]
     ]
+
+
+def test_answer_llm_grounded_mode_uses_offline_provider_contract():
+    client = make_client()
+    _create_and_index_document(
+        client,
+        title="Grounded RAG Notes",
+        raw_text="Grounded RAG answers must cite retrieved snippets and avoid unsupported claims.",
+        metadata={"topic": "rag"},
+    )
+
+    response = client.post(
+        "/api/rag/answer",
+        json={
+            "question": "How should grounded RAG answers behave?",
+            "top_k": 1,
+            "answer_mode": "llm_grounded",
+            "persist": False,
+        },
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert result["answer_type"] == "llm_grounded"
+    assert result["answer_mode"] == "llm_grounded"
+    assert result["prompt_version"] == "rag-llm-grounded-v3.2"
+    assert result["model_provider"] == "deterministic"
+    assert result["grounded"] is True
+    assert result["groundedness_flags"] == []
+    assert result["citations"]
+    assert result["run_config"]["fallback_used"] is True
+    assert result["retrieval_debug"]["answer_mode"] == "llm_grounded"
+    assert result["retrieval_debug"]["run_config"]["answer_mode"] == "llm_grounded"
+
+
+def test_answer_rejects_unknown_answer_mode():
+    client = make_client()
+
+    response = client.post(
+        "/api/rag/answer",
+        json={"question": "FastAPI", "answer_mode": "unsupported"},
+    )
+
+    assert response.status_code == 400
+    assert get_error(response)["code"] == "rag_answer_validation_error"
+
+
+def test_answer_llm_grounded_falls_back_when_provider_config_missing(monkeypatch):
+    monkeypatch.setenv("ENABLE_REAL_LLM", "true")
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_API_BASE_URL", "https://provider.example/v1")
+    monkeypatch.setenv("LLM_MODEL", "synthetic-model")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    get_settings.cache_clear()
+    try:
+        client = make_client()
+        _create_and_index_document(
+            client,
+            title="Fallback RAG Notes",
+            raw_text="Fallback grounded RAG answers should keep citations.",
+            metadata={"topic": "rag"},
+        )
+
+        response = client.post(
+            "/api/rag/answer",
+            json={
+                "question": "What should fallback grounded RAG keep?",
+                "answer_mode": "llm_grounded",
+                "persist": False,
+            },
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert result["answer_type"] == "llm_grounded"
+    assert result["run_config"]["fallback_used"] is True
+    assert result["run_config"]["fallback_reason"] == "ai_provider_config_error"
+    assert result["model_provider"] is None
+    assert result["citations"]

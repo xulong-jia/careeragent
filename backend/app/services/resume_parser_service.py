@@ -9,11 +9,16 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.versioning import PROMPT_VERSION, SCHEMA_VERSION
 from app.schemas.resumes import StructuredResume
+from app.services.resume_ocr_service import (
+    detect_resume_layout_signals,
+    layout_warnings,
+)
 
 
 PARSER_METHOD = "deterministic_resume_parser_v2"
 RESUME_PARSER_VERSION = "real-resume-parser-foundation-v1"
 RESUME_PROMPT_VERSION = "resume-parser-prompt-v2.3"
+PARSER_MODES = {"auto", "deterministic", "llm_parser"}
 
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?\d[\d\s().-]{7,}\d)(?!\d)")
@@ -131,8 +136,25 @@ STRONG_CLAIM_RE = re.compile(
 )
 
 
-def parse_structured_resume(raw_text: str) -> StructuredResume:
+def parse_structured_resume(
+    raw_text: str,
+    *,
+    parser_mode: str = "auto",
+) -> StructuredResume:
+    normalized_mode = _normalize_parser_mode(parser_mode)
+    layout_signals = detect_resume_layout_signals(raw_text)
     fallback = build_deterministic_structured_resume(raw_text)
+    if normalized_mode == "deterministic":
+        return _with_parser_metadata(
+            fallback,
+            provider_name="deterministic",
+            model=None,
+            fallback_used=False,
+            fallback_reason=None,
+            parser_mode=normalized_mode,
+            layout_signals=layout_signals,
+        )
+
     settings = get_settings()
     try:
         provider = build_llm_provider(settings)
@@ -143,6 +165,8 @@ def parse_structured_resume(raw_text: str) -> StructuredResume:
             model=None,
             fallback_used=True,
             fallback_reason=exc.code,
+            parser_mode=normalized_mode,
+            layout_signals=layout_signals,
             extra_warnings=["llm_provider_config_failed_fallback"],
         )
 
@@ -157,6 +181,8 @@ def parse_structured_resume(raw_text: str) -> StructuredResume:
             model=getattr(provider, "model", None),
             fallback_used=True,
             fallback_reason="llm_disabled_or_not_configured",
+            parser_mode=normalized_mode,
+            layout_signals=layout_signals,
         )
 
     try:
@@ -173,6 +199,8 @@ def parse_structured_resume(raw_text: str) -> StructuredResume:
             model=getattr(provider, "model", None),
             fallback_used=True,
             fallback_reason=exc.code,
+            parser_mode=normalized_mode,
+            layout_signals=layout_signals,
             extra_warnings=["llm_parser_failed_fallback"],
         )
     return _with_parser_metadata(
@@ -181,6 +209,8 @@ def parse_structured_resume(raw_text: str) -> StructuredResume:
         model=getattr(provider, "model", None),
         fallback_used=False,
         fallback_reason=None,
+        parser_mode=normalized_mode,
+        layout_signals=layout_signals,
     )
 
 
@@ -193,6 +223,7 @@ def build_deterministic_structured_resume(raw_text: str) -> StructuredResume:
     certificates = _parse_named_items(sections.get("certificates", []))
     awards = _parse_named_items(sections.get("awards", []))
     warnings = _resume_warnings(raw_text, sections, skills)
+    warnings.extend(layout_warnings(raw_text))
     warnings.extend(skill_warnings)
     evidence = _section_evidence(sections)
     evidence.extend(skill_evidence)
@@ -232,8 +263,22 @@ def build_deterministic_structured_resume(raw_text: str) -> StructuredResume:
             model=None,
             fallback_used=False,
             fallback_reason=None,
+            parser_mode="deterministic",
+            layout_signals=detect_resume_layout_signals(raw_text),
         ),
     )
+
+
+def _normalize_parser_mode(parser_mode: str | None) -> str:
+    normalized = (parser_mode or "auto").strip().lower()
+    if normalized not in PARSER_MODES:
+        raise AppError(
+            code="resume_parser_mode_invalid",
+            message="Unsupported resume parser mode.",
+            status_code=400,
+            details={"parser_mode": parser_mode},
+        )
+    return normalized
 
 
 def _split_sections(raw_text: str) -> dict[str, list[str]]:
@@ -341,6 +386,8 @@ def _with_parser_metadata(
     model: str | None,
     fallback_used: bool,
     fallback_reason: str | None,
+    parser_mode: str,
+    layout_signals: dict[str, bool],
     extra_warnings: list[str] | None = None,
 ) -> StructuredResume:
     warnings = _dedupe([*resume.warnings, *(extra_warnings or [])])
@@ -352,6 +399,8 @@ def _with_parser_metadata(
                 model=model,
                 fallback_used=fallback_used,
                 fallback_reason=fallback_reason,
+                parser_mode=parser_mode,
+                layout_signals=layout_signals,
             ),
         }
     )
@@ -363,16 +412,24 @@ def _parser_metadata(
     model: str | None,
     fallback_used: bool,
     fallback_reason: str | None,
+    parser_mode: str,
+    layout_signals: dict[str, bool],
 ) -> dict[str, object]:
     return {
         "parser_version": RESUME_PARSER_VERSION,
         "prompt_version": RESUME_PROMPT_VERSION,
+        "parser_mode": parser_mode,
         "provider": provider_name,
         "model": model,
         "schema_version": SCHEMA_VERSION,
         "base_prompt_version": PROMPT_VERSION,
         "fallback_used": fallback_used,
         "fallback_reason": fallback_reason,
+        "ocr_supported": False,
+        "ocr_provider": None,
+        "table_resume_foundation": True,
+        "bilingual_resume_foundation": True,
+        "layout_signals": dict(layout_signals),
         "foundation_only": True,
     }
 

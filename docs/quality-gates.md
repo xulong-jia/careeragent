@@ -20,6 +20,7 @@
 | Secret scan | `rg -n "sk-[A-Za-z0-9_-]{12,}|BEGIN (RSA|OPENSSH|PRIVATE)|AUTH_JWT_SECRET=|API_KEY=" --hidden -g '!frontend/node_modules/**' -g '!backend/.venv/**' .` | 查找明显 secret/private key/placeholder 命中 | `.env.example` 和测试 fake key 需要人工确认 |
 | Synthetic eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset synthetic --output-dir /tmp/careeragent-evals-synthetic-26` | synthetic contract runner 仍可执行 | 只防 contract fixture 破坏 |
 | Service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --output-dir /tmp/careeragent-evals-service-26` | runner 真实调用当前 service/retriever/parser/agent/match/rewrite 路径并输出 metrics/failed cases | foundation，不是 production benchmark |
+| Benchmark eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset benchmark --output-dir /tmp/careeragent-evals-benchmark-v32` | v3.2 100-case synthetic benchmark foundation 输出 RAG recall/MRR/groundedness、match human agreement、score stability、human review 和 bad-case trend metrics | synthetic foundation，不是真实生产质量认证 |
 | Readiness/redaction/privacy tests | `PYTHONPATH=backend backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_auth_secret_config.py backend/tests/test_data_encryption_governance.py backend/tests/test_health.py backend/tests/test_privacy_governance.py backend/tests/test_p1_auth_workspace_isolation.py` | 覆盖 production config rejection、masked config summary、readiness、encryption envelope、redacted logging/errors、delete-summary/proof、token revoke、RBAC gate | 不证明完整合规体系 |
 | Parser service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module jd_parser --output-dir /tmp/careeragent-evals-jd-parser && backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module resume_parser --output-dir /tmp/careeragent-evals-resume-parser` | JD/Resume parser foundation cases 通过并输出 evidence/confidence/warnings metrics | parser foundation，不是 full production parser |
 | RAG service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module rag --output-dir /tmp/careeragent-evals-rag` | RAG lexical/vector/hybrid/no-evidence cases 通过并输出 vector metrics | local vector foundation，不是 full production RAG |
@@ -69,6 +70,17 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 - Frontend production image must use build output served by nginx, not Vite dev server.
 - Backup dump artifacts must remain ignored and untracked.
 
+## v3.2 Production AI Quality Gates
+
+- RAG chunk metadata must include provider/model/dim/version, provider config id, vector source, semantic flag, input hash and created_at without raw chunk text.
+- `RAG_RERANKER_MODE=none|local_score|provider` must be safe to configure; default remains `none`.
+- `POST /api/rag/answer` must support `answer_mode=deterministic_summary|llm_grounded`; default remains deterministic and no network.
+- `llm_grounded` must validate schema output, enforce citation chunk ids from retrieved sources, return prompt/model/fallback metadata and refuse no-evidence answers.
+- `POST /api/resumes/{resume_id}/parse` must support `parser_mode=deterministic|llm_parser`; deterministic mode must not require provider config.
+- Resume parser metadata must report OCR unsupported status and table/bilingual/noisy layout signals without claiming OCR production readiness.
+- `scripts/run_evals.py --dataset benchmark` must write metrics, actual outputs, failed cases, run_config and human_review_summary under `/tmp` or ignored paths only.
+- Benchmark outputs must not include real private data, API keys, provider traces, raw resume/JD text or full RAG chunk text.
+
 ## Evaluation Boundary
 
 当前 smoke/synthetic eval 是 synthetic contract regression。它只检查 JD Parser、Resume Parser、Match、RAG、Agent、Application、Bad Case 的固定 contract 是否还跑得通。
@@ -108,4 +120,10 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 - RAG indexing 持久化 chunk embedding vector 和 provider/model/dim/version metadata。
 - RAG search 区分 `lexical`、`vector`、`hybrid`，并保留 legacy `deterministic_*` request alias。
 - RAG service-level metrics 包含 `retrieval_mode_match`、`average_top_score`、`vector_index_used` 和 no-evidence refusal。
-- 这仍不是 full production RAG；local bag-of-words vectorizer、SQLite JSON vector、无 reranker 和小 benchmark 都是后续缺口。
+- 这仍不是 full production RAG；local/offline vectorizer、SQLite JSON vector、未校准 reranker、optional LLM grounded path 和 synthetic benchmark 都是 foundation，不是生产认证。
+
+v3.2 已新增 Production AI Quality foundation：
+
+- RAG reranker contract、optional LLM grounded answer、semantic provider metadata、LLM parser mode、OCR/table/bilingual parser metadata 和 100-case synthetic benchmark。
+- Benchmark metrics 覆盖 RAG recall@k/MRR/groundedness、match human agreement、score stability、human review summary 和 bad-case regression trend。
+- 这仍不是 production-ready；真实 anonymized datasets、真实 semantic provider runs、LLM judge/human review protocol、production vector DB path 和 v3.4 final audit 仍是阻断项。

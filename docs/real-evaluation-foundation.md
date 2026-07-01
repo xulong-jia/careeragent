@@ -17,11 +17,26 @@
 
 The samples use Example companies, Example schools, synthetic candidate names, and no real phone, email, API key, job link, or private document.
 
+v3.2 adds `evals/datasets/benchmark/`, a 100-case synthetic benchmark foundation:
+
+| Module | Cases |
+| --- | ---: |
+| JD Parser | 30 |
+| Resume Parser | 20 |
+| RAG Retrieval | 20 |
+| RAG Answer | 10 |
+| Match | 10 |
+| Project Rewrite | 5 |
+| Agent Workflow | 5 |
+
+`human_review_sample.jsonl` is synthetic reviewer data for calibration and agreement metrics. It is not a real human-review protocol.
+
 ## Commands
 
 ```bash
 backend/.venv/bin/python scripts/run_evals.py --dataset synthetic --output-dir /tmp/careeragent-evals-synthetic
 backend/.venv/bin/python scripts/run_evals.py --dataset service_level --output-dir /tmp/careeragent-evals-service
+backend/.venv/bin/python scripts/run_evals.py --dataset benchmark --output-dir /tmp/careeragent-evals-benchmark
 ```
 
 Each run writes:
@@ -41,6 +56,11 @@ Each run writes:
 - RAG: `recall_at_k_term_hit`, `citation_present`, `expected_source_type_match`, `retrieval_mode_match`, `average_top_score`, `vector_index_used`, `uncertainty_match`, `case_pass`.
 - Agent: `expected_status_match`, `expected_step_coverage`, `missing_slot_match`, `resume_success`, `retry_success`, `cancel_success`, `bad_case_payload_present`, `run_config_present`, `privacy_safe_payload_present`, `case_pass`.
 - Overall: total, passed, failed, pass rate, failed case ids, by-module pass rate.
+- Benchmark RAG retrieval: `recall_at_k`, `mrr`, `precision_at_k`, `citation_coverage`, `source_type_match`, `no_evidence_refusal_accuracy`, `reranker_improvement_rate`.
+- Benchmark RAG answer: `groundedness`, `unsupported_claim_rate`, `citation_required_pass_rate`, `refusal_accuracy`, `answer_schema_pass_rate`.
+- Benchmark Match: `score_in_expected_range`, `ranking_consistency`, `evidence_completeness`, `gap_identification_precision`, `human_agreement`, `stability_delta`.
+- Human review summary: reviewed count, score delta, disagreement rate, human agreement rate, ranking consistency, score distribution, dimension disagreement.
+- Bad-case regression trend: candidate count, reopened count, regression pass rate and privacy-safe bad-case candidates.
 
 ## Bad Case Connection
 
@@ -64,10 +84,11 @@ The current CLI writes fileized outputs only. The output shape maps to existing 
 
 ## Current Limits
 
+- v3.2 benchmark is synthetic large-sample foundation only. It does not replace real anonymized data, provider runs, LLM judge calibration, or human review.
 - JD/Resume parsing now has parser production foundation fields, evidence, confidence, warnings, parser metadata, and optional LLM provider fallback. Default tests still use deterministic local parser foundation.
-- RAG has a local vector production foundation with persisted chunk vectors, but local bag-of-words vectors are not final semantic embeddings or a production-scale vector DB.
-- Match and Project Rewrite now have 2.4 trustworthy foundation fields and service-level metrics, but remain deterministic and uncalibrated against large human agreement benchmarks.
+- RAG has a local vector production foundation with persisted chunk vectors, v3.2 provider metadata, reranker contract and optional LLM grounded answer path, but local/offline vectors are not final semantic embeddings or a production-scale vector DB.
+- Match and Project Rewrite now have 2.4 trustworthy foundation fields, service-level metrics and v3.2 synthetic calibration helpers, but remain uncalibrated against large real human agreement benchmarks.
 - Agent Workflow now has 2.5 production foundation lifecycle, resume/retry/cancel, multiple fixed workflows, and failure Bad Case drafts. It remains a synchronous local runner, not a durable production workflow engine.
 - Service-level eval is a foundation for finding failures, not proof of production quality.
 
-Next phase should be 2.6 Security / Privacy / Deployment Hardening.
+Next phase should be v3.3 Frontend Productization & End-to-End Experience.

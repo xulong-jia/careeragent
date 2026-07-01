@@ -80,6 +80,7 @@ def _to_answer_run_record(answer_run: RagAnswerRun) -> RagAnswerRunRecord:
     evidence_summary = decrypt_json(answer_run.evidence_summary or [])
     citations = decrypt_json(answer_run.citations_json or [])
     source_refs = decrypt_json(answer_run.source_refs_json or [])
+    retrieval_debug = dict(answer_run.retrieval_debug_json or {})
     return RagAnswerRunRecord(
         answer_run_id=answer_run.id,
         question=decrypt_text(answer_run.question),
@@ -88,12 +89,13 @@ def _to_answer_run_record(answer_run: RagAnswerRun) -> RagAnswerRunRecord:
         retrieval_mode=answer_run.retrieval_mode,
         answer=decrypt_text(answer_run.answer),
         answer_type=answer_run.answer_type,
+        answer_mode=str(retrieval_debug.get("answer_mode") or answer_run.answer_type),
         grounded=answer_run.grounded,
         uncertainty=answer_run.uncertainty,
         evidence_summary=list(evidence_summary or []),
         citations=list(citations or []),
         source_refs=list(source_refs or []),
-        retrieval_debug=dict(answer_run.retrieval_debug_json or {}),
+        retrieval_debug=retrieval_debug,
         created_at=answer_run.created_at,
         updated_at=answer_run.updated_at,
     )

@@ -5,9 +5,12 @@ from pydantic import BaseModel
 
 from app.ai.embedding_provider import (
     DeterministicEmbeddingProvider,
+    LocalSemanticEmbeddingProvider,
     LocalVectorEmbeddingProvider,
     OpenAICompatibleEmbeddingProvider,
     build_embedding_provider,
+    embedding_input_hash,
+    embedding_metadata_for_text,
 )
 from app.ai.llm_provider import (
     DeterministicLLMProvider,
@@ -204,6 +207,27 @@ def test_local_vector_embedding_is_stable_and_dimensioned():
     assert any(value for value in first)
 
 
+def test_local_semantic_embedding_marks_semantic_metadata():
+    provider = LocalSemanticEmbeddingProvider(
+        dimension=16,
+        provider_config_id="synthetic-semantic-config",
+    )
+
+    vector = provider.embed_text("FastAPI semantic RAG testing")
+    metadata = embedding_metadata_for_text(
+        "FastAPI semantic RAG testing",
+        provider=provider,
+    )
+
+    assert len(vector) == 16
+    assert provider.name == "local_semantic"
+    assert provider.semantic is True
+    assert metadata["semantic"] is True
+    assert metadata["provider_config_id"] == "synthetic-semantic-config"
+    assert metadata["input_hash"] == embedding_input_hash("FastAPI semantic RAG testing")
+    assert "FastAPI" not in str(metadata)
+
+
 def test_embedding_empty_input_returns_controlled_error():
     provider = DeterministicEmbeddingProvider(dimension=16)
 
@@ -251,3 +275,26 @@ def test_fake_openai_compatible_embedding_response(monkeypatch):
     )
 
     assert provider.embed_text("FastAPI") == [0.1, 0.2]
+
+
+def test_openai_compatible_embedding_retries_transient_failure(monkeypatch):
+    calls = {"count": 0}
+
+    def flaky_urlopen(request, timeout):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise TimeoutError("synthetic timeout")
+        return _FakeResponse({"data": [{"embedding": [0.3, 0.4]}]})
+
+    monkeypatch.setattr("urllib.request.urlopen", flaky_urlopen)
+    provider = OpenAICompatibleEmbeddingProvider(
+        api_base_url="https://provider.example/v1",
+        api_key="sk-testsecret123456789",
+        model="synthetic-embedding",
+        timeout_seconds=3,
+        dimension=2,
+        retry_count=1,
+    )
+
+    assert provider.embed_text("FastAPI") == [0.3, 0.4]
+    assert calls["count"] == 2

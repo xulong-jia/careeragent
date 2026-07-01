@@ -1,8 +1,8 @@
 # CareerAgent Evaluation
 
-This document is the stable entrypoint for the deterministic evaluation regression foundation, version/privacy governance additions, and Phase 2.1/2.2/2.3 service-level evaluation foundation. The detailed design remains in `docs/evaluation-design.md`.
+This document is the stable entrypoint for the deterministic evaluation regression foundation, version/privacy governance additions, Phase 2.1-2.5 service-level evaluation foundation, and v3.2 benchmark foundation. The detailed design remains in `docs/evaluation-design.md`.
 
-Phase 2.3 status: CareerAgent now has both synthetic contract regression and service-level evaluation foundation. RAG service-level cases cover lexical/vector/hybrid/no-evidence behavior; parser service-level cases cover JD/Resume evidence, confidence, warnings, and risk flags. This is still not a production-quality benchmark.
+v3.2 status: CareerAgent now has synthetic contract regression, service-level evaluation foundation, and a 100-case synthetic benchmark foundation. RAG service-level cases cover lexical/vector/hybrid/no-evidence behavior; parser service-level cases cover JD/Resume evidence, confidence, warnings, and risk flags; benchmark cases add RAG recall/MRR/groundedness, Match human agreement, score stability and bad-case trend metrics. This is still not a production-quality benchmark.
 
 ## Scope
 
@@ -10,6 +10,7 @@ Phase 2.3 status: CareerAgent now has both synthetic contract regression and ser
 - Built-in dataset: `synthetic_smoke_v1`.
 - Fileized fixtures: `evals/datasets/smoke` and `evals/expected/smoke`.
 - Service-level fixtures: `evals/datasets/service_level`.
+- Benchmark fixtures: `evals/datasets/benchmark`.
 - Local runner: `scripts/run_evals.py`.
 - Results: ignored `evals/results/<dataset>/summary.md`, `metrics.json`, `failed_cases.json`, `actual_outputs.json`, and `run_config.json`.
 - Regression linkage: Bad Cases can be added to the `regression` eval set and marked `verified` after passing linked deterministic evaluation.
@@ -20,6 +21,7 @@ Phase 2.3 status: CareerAgent now has both synthetic contract regression and ser
 backend/.venv/bin/python scripts/run_evals.py --dataset smoke
 backend/.venv/bin/python scripts/run_evals.py --dataset synthetic
 backend/.venv/bin/python scripts/run_evals.py --dataset service_level
+backend/.venv/bin/python scripts/run_evals.py --dataset benchmark
 backend/.venv/bin/python scripts/run_evals.py --dataset smoke --module rag
 backend/.venv/bin/python scripts/run_evals.py --dataset regression
 ```
@@ -31,6 +33,8 @@ Synthetic evaluation is deterministic contract regression only. It is not a real
 Service-level evaluation uses de-identified JD, resume, match, RAG, and agent workflow cases. The runner calls actual current services or runner paths instead of constructing `actual` in the script. Current service-level failures are quality signals, not something to hide.
 
 Current service-level evaluation still runs foundation modules. A pass does not mean parser, RAG, match, or agent production quality.
+
+Benchmark evaluation is synthetic large-sample foundation only. A pass does not mean real semantic provider quality, real recruiter agreement, LLM judge quality, or production-readiness certification.
 
 ## v1.5C Governance Additions
 
@@ -58,3 +62,11 @@ Current service-level evaluation still runs foundation modules. A pass does not 
 - Resume parser service-level cases increased to 8 and cover section parsing, skill categories, projects, education, risk flags, evidence, confidence, ambiguous sections, and low-confidence text.
 - Parser eval metrics add `evidence_coverage`, `confidence_present`, `warning_expected_match`, `hidden_requirement_hit_rate`, and `risk_flag_hit_rate`.
 - Parser eval uses local deterministic parser foundation by default; optional LLM provider runs are not required for tests and are not production-quality benchmark evidence.
+
+## v3.2 Benchmark Additions
+
+- `benchmark` dataset covers 100 synthetic cases across parser, RAG retrieval, RAG answer, Match, Project Rewrite and Agent Workflow.
+- RAG benchmark metrics include `recall_at_k`, `mrr`, `precision_at_k`, `groundedness`, `unsupported_claim_rate`, refusal accuracy and answer schema pass rate.
+- Match benchmark metrics include score range, ranking consistency, evidence completeness, gap precision, human agreement and stability delta.
+- `human_review_summary.json` summarizes synthetic reviewer labels for calibration and agreement.
+- `bad_case_regression_trend` converts failed cases into privacy-safe Bad Case candidates.

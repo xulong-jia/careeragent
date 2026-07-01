@@ -308,11 +308,11 @@ metadata filter 用途：
 - `retrieval_mode` 标准值为 `lexical` / `vector` / `hybrid`；后端仍接受 legacy `deterministic_*` request alias。
 - `lexical` 使用 keyword overlap，不依赖 embedding。
 - `vector` 使用 query vector + DB-persisted chunk vectors 做 cosine similarity；search 不重新 embed chunk text。
-- `hybrid` 当前使用 `0.4 lexical + 0.6 vector` 的简单加权；这是 foundation，不是 reranker。
+- `hybrid` 当前使用 `0.4 lexical + 0.6 vector` 的简单加权；v3.2 另有 reranker contract，但未校准为 production reranker。
 - `rag_chunks` 保存 `embedding_id`、`embedding_vector`、`embedding_provider`、`embedding_model`、`embedding_dim`、`embedding_version`、`embedding_created_at`。API response 只返回 metadata，不返回 vector 本体。
 - `score_threshold` 可过滤低分来源；无来源时仍返回 uncertainty，不编造答案。
 - `retrieval_debug` 可记录 retrieval mode、embedding provider/model、vector_index_used、scores、selected chunk IDs 和版本 metadata，但不包含 raw_text 或 full chunk text。
-- local bag-of-words vectorizer 不等于最终 semantic embedding；FAISS/pgvector/remote vector DB、reranker 和 larger benchmark 仍需后续单独设计和验收。
+- local/offline vectorizer 不等于最终 semantic embedding；v3.2 的 reranker、LLM grounded answer 和 benchmark 都是 foundation。FAISS/pgvector application path、真实 provider benchmark、人审 groundedness 和 production-scale vector DB 仍需后续单独设计和验收。
 
 ## 9. Source / Citation Contract
 

@@ -56,8 +56,12 @@ class Settings:
     embedding_api_key: str
     embedding_model: str
     embedding_dimension: int
+    embedding_provider_config_id: str
     vector_store: str
     rag_retrieval_mode: str
+    rag_reranker_mode: str
+    rag_reranker_model: str
+    rag_answer_mode: str
     enable_real_llm: bool
     enable_real_embedding: bool
     data_encryption_key: str
@@ -169,8 +173,12 @@ def settings_summary(settings: Settings) -> dict[str, object]:
         "embedding_api_base_url": _mask_config_value(settings.embedding_api_base_url),
         "embedding_api_key": _mask_config_value(settings.embedding_api_key),
         "embedding_model": settings.embedding_model,
+        "embedding_provider_config_id": settings.embedding_provider_config_id,
         "vector_store": settings.vector_store,
         "rag_retrieval_mode": settings.rag_retrieval_mode,
+        "rag_reranker_mode": settings.rag_reranker_mode,
+        "rag_reranker_model": settings.rag_reranker_model,
+        "rag_answer_mode": settings.rag_answer_mode,
         "enable_real_llm": settings.enable_real_llm,
         "enable_real_embedding": settings.enable_real_embedding,
         "data_encryption_key": _mask_config_value(settings.data_encryption_key),
@@ -207,8 +215,15 @@ def get_settings() -> Settings:
         embedding_api_key=os.getenv("EMBEDDING_API_KEY", "").strip(),
         embedding_model=os.getenv("EMBEDDING_MODEL", "local-bow-v1").strip(),
         embedding_dimension=int(os.getenv("EMBEDDING_DIMENSION", "384")),
+        embedding_provider_config_id=os.getenv(
+            "EMBEDDING_PROVIDER_CONFIG_ID",
+            "local-bow-default",
+        ).strip(),
         vector_store=os.getenv("VECTOR_STORE", "local").strip().lower(),
         rag_retrieval_mode=os.getenv("RAG_RETRIEVAL_MODE", "lexical").strip().lower(),
+        rag_reranker_mode=os.getenv("RAG_RERANKER_MODE", "none").strip().lower(),
+        rag_reranker_model=os.getenv("RAG_RERANKER_MODEL", "local-score-v1").strip(),
+        rag_answer_mode=os.getenv("RAG_ANSWER_MODE", "deterministic_summary").strip().lower(),
         enable_real_llm=_bool_env("ENABLE_REAL_LLM", False),
         enable_real_embedding=_bool_env("ENABLE_REAL_EMBEDDING", False),
         data_encryption_key=os.getenv("DATA_ENCRYPTION_KEY", "").strip(),

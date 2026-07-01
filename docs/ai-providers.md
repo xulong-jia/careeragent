@@ -36,10 +36,11 @@ All structured output must pass Pydantic validation through `validate_structured
 ## Embedding Provider
 
 - `LocalVectorEmbeddingProvider` uses stable local bag-of-words vectors and has no network dependency.
+- `LocalSemanticEmbeddingProvider` is a v3.2 offline semantic-provider-shaped foundation. It is useful for contract tests and metadata, not a production semantic model.
 - `DeterministicEmbeddingProvider` remains as a backwards-compatible alias for older local tests/config.
-- `OpenAICompatibleEmbeddingProvider` can call `/embeddings` only when explicitly enabled and fully configured.
+- `OpenAICompatibleEmbeddingProvider` can call `/embeddings` only when explicitly enabled and fully configured. v3.2 adds one retry and provider config metadata.
 
-Phase 2.2 persists chunk vectors in `rag_chunks`. Local vector search is a production foundation, not a final semantic embedding provider.
+Phase 2.2 persists chunk vectors in `rag_chunks`. v3.2 also stores non-secret embedding metadata such as provider config id, vector source, semantic flag and input hash. Local vector search is a production foundation, not a final semantic embedding provider.
 
 Required real-provider env:
 
@@ -50,7 +51,31 @@ EMBEDDING_API_BASE_URL=https://provider.example/v1
 EMBEDDING_API_KEY=
 EMBEDDING_MODEL=
 EMBEDDING_DIMENSION=384
+EMBEDDING_PROVIDER_CONFIG_ID=prod-embedding-provider-v1
 ```
+
+## RAG v3.2 Controls
+
+```bash
+RAG_RERANKER_MODE=none
+RAG_RERANKER_MODEL=local-score-v1
+RAG_ANSWER_MODE=deterministic_summary
+```
+
+Supported answer modes:
+
+- `deterministic_summary`
+- `llm_grounded`
+
+Supported reranker modes:
+
+- `none`
+- `local_score`
+- `provider`
+
+`llm_grounded` is schema-validated and citation-checked, but it is still an
+optional foundation path until real providers, real anonymized datasets and human
+review gates are completed.
 
 ## Safety Rules
 
@@ -58,3 +83,4 @@ EMBEDDING_DIMENSION=384
 - Do not log prompts, full resume/JD raw text, chunk full text, `reflection`, `interview_notes`, or provider keys.
 - Tests must not call external APIs.
 - Real provider mode should be enabled only after running the smoke evals and reviewing cost/rate limits.
+- Real provider outputs must be written to `/tmp` or ignored artifacts until privacy, redaction and review are complete.

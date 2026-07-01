@@ -17,8 +17,16 @@ MAX_EMBEDDING_INPUT_CHARS = 20000
 
 class LocalVectorEmbeddingProvider:
     name = "local_bow"
+    semantic = False
+    vector_source = "local_bow_hash"
 
-    def __init__(self, *, dimension: int = 384, model: str = "local-bow-v1") -> None:
+    def __init__(
+        self,
+        *,
+        dimension: int = 384,
+        model: str = "local-bow-v1",
+        provider_config_id: str = "local-bow-default",
+    ) -> None:
         if dimension <= 0:
             raise AppError(
                 code="embedding_provider_config_error",
@@ -28,6 +36,7 @@ class LocalVectorEmbeddingProvider:
         self.dimension = dimension
         self.model = model
         self.version = "local-bow-v1"
+        self.provider_config_id = provider_config_id
 
     def embed_text(self, text: str) -> list[float]:
         normalized = _normalize_input(text)
@@ -42,8 +51,42 @@ class DeterministicEmbeddingProvider(LocalVectorEmbeddingProvider):
     name = "deterministic"
 
 
+class LocalSemanticEmbeddingProvider(LocalVectorEmbeddingProvider):
+    name = "local_semantic"
+    semantic = True
+    vector_source = "local_semantic_hash"
+
+    def __init__(
+        self,
+        *,
+        dimension: int = 384,
+        model: str = "local-semantic-v1",
+        provider_config_id: str = "local-semantic-default",
+    ) -> None:
+        super().__init__(
+            dimension=dimension,
+            model=model,
+            provider_config_id=provider_config_id,
+        )
+        self.version = "local-semantic-v1"
+
+    def embed_text(self, text: str) -> list[float]:
+        normalized = _normalize_input(text)
+        vector = [0.0] * self.dimension
+        tokens = _tokenize(normalized)
+        features = set(tokens)
+        for token in tokens:
+            features.update(_semantic_features(token))
+        for feature in features:
+            index = _feature_index(feature, self.dimension)
+            vector[index] += 1.0
+        return _normalize_vector(vector)
+
+
 class OpenAICompatibleEmbeddingProvider:
     name = "openai_compatible"
+    semantic = True
+    vector_source = "provider_embedding"
 
     def __init__(
         self,
@@ -53,6 +96,8 @@ class OpenAICompatibleEmbeddingProvider:
         model: str,
         timeout_seconds: float,
         dimension: int,
+        provider_config_id: str = "openai-compatible",
+        retry_count: int = 1,
     ) -> None:
         self.api_base_url = api_base_url.rstrip("/")
         self.api_key = api_key
@@ -60,6 +105,8 @@ class OpenAICompatibleEmbeddingProvider:
         self.timeout_seconds = timeout_seconds
         self.dimension = dimension
         self.version = model
+        self.provider_config_id = provider_config_id
+        self.retry_count = retry_count
 
     def embed_text(self, text: str) -> list[float]:
         normalized = _normalize_input(text)
@@ -73,16 +120,31 @@ class OpenAICompatibleEmbeddingProvider:
             },
             method="POST",
         )
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            embedding = payload["data"][0]["embedding"]
-        except (TimeoutError, urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+        last_exc: Exception | None = None
+        for _attempt in range(self.retry_count + 1):
+            try:
+                with urllib.request.urlopen(
+                    request,
+                    timeout=self.timeout_seconds,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                embedding = payload["data"][0]["embedding"]
+                break
+            except (
+                TimeoutError,
+                urllib.error.URLError,
+                json.JSONDecodeError,
+                KeyError,
+                IndexError,
+                TypeError,
+            ) as exc:
+                last_exc = exc
+        else:
             raise AppError(
                 code="embedding_provider_request_failed",
                 message="Embedding provider request failed.",
                 status_code=502,
-            ) from exc
+            ) from last_exc
         if not isinstance(embedding, list) or not all(
             isinstance(value, (int, float)) for value in embedding
         ):
@@ -122,6 +184,13 @@ def _tokenize(text: str) -> list[str]:
     return tokens or [hashlib.sha256(text.encode("utf-8")).hexdigest()]
 
 
+def _semantic_features(token: str) -> list[str]:
+    features = [token]
+    if len(token) >= 4:
+        features.extend(token[index : index + 4] for index in range(len(token) - 3))
+    return features
+
+
 def _feature_index(token: str, dimension: int) -> int:
     digest = hashlib.sha256(token.encode("utf-8")).digest()
     return int.from_bytes(digest[:4], "big") % dimension
@@ -139,8 +208,33 @@ def embedding_id_for_text(text: str, *, model: str) -> str:
     return f"{model}:{digest}"
 
 
+def embedding_input_hash(text: str) -> str:
+    return hashlib.sha256(_normalize_input(text).encode("utf-8")).hexdigest()
+
+
+def embedding_metadata_for_text(text: str, *, provider: Any) -> dict[str, Any]:
+    return {
+        "provider": provider.name,
+        "model": provider.model,
+        "dim": provider.dimension,
+        "version": getattr(provider, "version", provider.model),
+        "input_hash": embedding_input_hash(text),
+        "provider_config_id": getattr(provider, "provider_config_id", provider.name),
+        "vector_source": getattr(provider, "vector_source", "unknown"),
+        "semantic": bool(getattr(provider, "semantic", False)),
+    }
+
+
 def build_embedding_provider(settings: Settings | None = None):
     settings = settings or get_settings()
+    if settings.embedding_provider in {"local_semantic", "fake_semantic"}:
+        return LocalSemanticEmbeddingProvider(
+            dimension=settings.embedding_dimension,
+            model=settings.embedding_model
+            if settings.embedding_model != "local-bow-v1"
+            else "local-semantic-v1",
+            provider_config_id=settings.embedding_provider_config_id,
+        )
     if not settings.enable_real_embedding or settings.embedding_provider in {
         "deterministic",
         "local",
@@ -149,6 +243,7 @@ def build_embedding_provider(settings: Settings | None = None):
         return LocalVectorEmbeddingProvider(
             dimension=settings.embedding_dimension,
             model=settings.embedding_model,
+            provider_config_id=settings.embedding_provider_config_id,
         )
     if settings.embedding_provider not in {"openai_compatible", "generic_http"}:
         raise AppError(
@@ -172,4 +267,5 @@ def build_embedding_provider(settings: Settings | None = None):
         model=settings.embedding_model,
         timeout_seconds=settings.llm_timeout_seconds,
         dimension=settings.embedding_dimension,
+        provider_config_id=settings.embedding_provider_config_id,
     )

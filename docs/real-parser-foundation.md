@@ -9,6 +9,8 @@
 - Parser 输出通过 Pydantic schema validation 后进入 API / DB JSON。
 - 默认路径仍是 local deterministic parser foundation，测试不依赖 API key、外部网络或真实 LLM。
 - Optional LLM path 复用 `backend/app/ai/llm_provider.py`，显式开启真实 provider 后才会调用 OpenAI-compatible endpoint；失败或缺配置会在 metadata/warnings 中记录 fallback。
+- v3.2 `POST /api/resumes/{resume_id}/parse` 支持 `parser_mode=deterministic|llm_parser`。`deterministic` 不触发 provider；`llm_parser` 走 schema-validated optional provider path。
+- v3.2 Resume parser metadata 记录 `ocr_supported=false`、`ocr_provider=null`、table/bilingual foundation flags 和 layout signals；OCR provider 未配置时显式返回 `resume_ocr_not_configured`。
 - `job_profiles` 新增 parser metadata columns；`structured_resume` 继续使用 JSON 兼容扩展。
 
 ## JD Parser
@@ -52,6 +54,14 @@ Resume Parser 当前支持：
 
 技能抽取优先使用 Skills section。没有明确 Skills section 时才从全文 fallback，并写入 `skills_inferred_without_skill_section` warning，降低过度抽取风险。Parser 会生成 foundation-level risk flags：`unsupported_metric`、`fabricated_skill`、`timeline_conflict`、`overclaim`、`missing_evidence`、`parse_low_confidence`、`ambiguous_section`。
 
+v3.2 adds layout warnings:
+
+- `bilingual_resume_layout_detected`
+- `table_like_resume_layout_detected`
+- `noisy_resume_layout_detected`
+
+These are routing/audit signals only. They do not mean scanned PDFs, images, complex tables or bilingual resumes are production-grade parsed.
+
 上传简历后，parser risk flags 会写入 initial resume version；人工确认版本仍通过现有 risk-check 生成风险报告后保存。
 
 ## Provider Boundary
@@ -75,6 +85,16 @@ LLM_MODEL=<model>
 
 LLM provider 有 timeout、one retry、JSON schema validation 和 controlled fallback。测试使用 fake provider / deterministic fallback，不访问外部网络，不提交真实 key。
 
+Resume parse request:
+
+```json
+{
+  "parser_mode": "llm_parser"
+}
+```
+
+Real provider output must match `StructuredResume`; invalid JSON/schema falls back with metadata instead of silently trusting provider text.
+
 ## Evaluation
 
 `service_level` parser cases 已扩展：
@@ -93,11 +113,11 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset servi
 
 ## Remaining Gaps
 
-- Not OCR: scanned PDF / image resume parsing is still unsupported.
-- Not large benchmark: current cases are de-identified foundation fixtures, not broad production quality measurement.
+- Not OCR: scanned PDF / image resume parsing is still unsupported; v3.2 only makes unsupported OCR explicit.
+- Not real large benchmark: v3.2 adds synthetic benchmark foundation, not broad production quality measurement on anonymized real resumes.
 - Not default production LLM parser: real provider path is opt-in and must be calibrated separately.
 - Complex bilingual PDFs, tables, unusual layouts, and noisy resumes still need larger evaluation.
 - v3.0 encrypts parser source `raw_text` at the repository write path, and v3.1 adds database/backup runbooks. KMS, rotation backfill, automated backup purge and legal audit remain production blockers.
 - Match scoring and Project Rewrite have 2.4 trustworthy foundation, and Agent Workflow has 2.5 production foundation, but all still require larger validation and production hardening.
 
-Next phase: v3.2 Production AI Quality Upgrade.
+Next phase: v3.3 Frontend Productization & End-to-End Experience.

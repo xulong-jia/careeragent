@@ -99,6 +99,26 @@ def test_service_level_loader_reads_dataset_cases():
     assert len(cases) == 49
 
 
+def test_benchmark_loader_reads_large_sample_dataset():
+    cases = run_evals._load_benchmark_cases()
+    by_module = {}
+    for module, _case in cases:
+        by_module[module] = by_module.get(module, 0) + 1
+
+    assert by_module == {
+        "agent_workflow": 5,
+        "jd_parser": 30,
+        "match": 10,
+        "project_rewrite": 5,
+        "rag_answer": 10,
+        "rag_retrieval": 20,
+        "resume_parser": 20,
+    }
+    assert len(cases) == 100
+    assert len(run_evals._load_benchmark_cases("parser")) == 50
+    assert len(run_evals._load_benchmark_cases("rag")) == 30
+
+
 def test_eval_metrics_aggregate_module_metrics():
     metrics = run_evals._build_metrics(
         [
@@ -193,6 +213,35 @@ def test_synthetic_alias_report_is_distinct_from_service_level(tmp_path):
     assert run_config["dataset_kind"] == "synthetic_contract"
     assert run_config["service_level"] is False
     assert "dataset_kind: synthetic_contract" in summary
+
+
+def test_benchmark_runner_writes_ai_quality_metrics(tmp_path):
+    output_dir = tmp_path / "benchmark-results"
+
+    result_code = run_evals.run("benchmark", None, output_dir)
+
+    assert result_code == 0
+    metrics = json.loads((output_dir / "metrics.json").read_text())
+    actual_outputs = json.loads((output_dir / "actual_outputs.json").read_text())
+    human_review = json.loads((output_dir / "human_review_summary.json").read_text())
+    run_config = json.loads((output_dir / "run_config.json").read_text())
+    summary = (output_dir / "summary.md").read_text()
+
+    assert metrics["total_count"] == 100
+    assert metrics["failed_count"] == 0
+    assert metrics["by_module"]["rag_retrieval"]["metrics"]["recall_at_k"] >= 0.8
+    assert metrics["by_module"]["rag_retrieval"]["metrics"]["mrr"] >= 0.5
+    assert metrics["by_module"]["rag_answer"]["metrics"]["groundedness"] >= 0.8
+    assert metrics["by_module"]["match"]["metrics"]["human_agreement"] == 1.0
+    assert metrics["human_review"]["reviewed_count"] == 6
+    assert human_review["human_agreement_rate"] >= 0.8
+    assert metrics["bad_case_regression_trend"]["candidate_count"] == 0
+    assert run_config["dataset_kind"] == "benchmark_foundation"
+    assert run_config["large_scale_foundation"] is True
+    assert run_config["uses_real_private_data"] is False
+    assert "dataset_kind: benchmark_foundation" in summary
+    _assert_private_safe(metrics)
+    _assert_private_safe(actual_outputs)
 
 
 def test_service_level_rag_eval_covers_vector_metrics(tmp_path):

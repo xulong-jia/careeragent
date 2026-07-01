@@ -6,13 +6,19 @@ from sqlalchemy.orm import Session
 from app.ai.embedding_provider import (
     build_embedding_provider,
     embedding_id_for_text,
+    embedding_metadata_for_text,
 )
 from app.core.crypto import decrypt_text
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.versioning import MODEL_VERSION, RETRIEVAL_VERSION, SCHEMA_VERSION
-from app.rag.answering import build_deterministic_answer
+from app.rag.answering import (
+    LLM_GROUNDED_ANSWER_TYPE,
+    build_deterministic_answer,
+    build_llm_grounded_answer,
+)
 from app.rag.chunking import chunk_document_text
+from app.rag.reranker import normalize_reranker_mode, rerank_sources
 from app.rag.retriever import normalize_retrieval_mode, rank_chunks_by_mode, tokenize_text
 from app.repositories import rag_repository
 from app.schemas.rag import (
@@ -52,6 +58,10 @@ ALLOWED_RETRIEVAL_MODES = {
     "lexical",
     "vector",
     "hybrid",
+}
+ALLOWED_ANSWER_MODES = {
+    "deterministic_summary",
+    LLM_GROUNDED_ANSWER_TYPE,
 }
 STORED_TEXT_PREVIEW_CHARS = 240
 SENSITIVE_KEY_PARTS = {
@@ -98,6 +108,18 @@ def _validate_answer_run_filter(
             status_code=400,
             details={"field": "retrieval_mode"},
         )
+
+
+def _normalize_answer_mode(mode: str | None) -> str:
+    normalized = (mode or "deterministic_summary").strip().lower()
+    if normalized not in ALLOWED_ANSWER_MODES:
+        raise AppError(
+            code="rag_answer_validation_error",
+            message="Unsupported RAG answer_mode.",
+            status_code=400,
+            details={"field": "answer_mode"},
+        )
+    return normalized
 
 
 def _truncate_stored_text(value: str) -> str:
@@ -197,6 +219,14 @@ def index_document(
         embedding_created_at = datetime.now(timezone.utc)
         for chunk in chunks:
             embedding_vector = embedding_provider.embed_text(str(chunk["text"]))
+            chunk_metadata = dict(chunk.get("metadata") or {})
+            embedding_metadata = embedding_metadata_for_text(
+                str(chunk["text"]),
+                provider=embedding_provider,
+            )
+            embedding_metadata["created_at"] = embedding_created_at.isoformat()
+            chunk_metadata["embedding"] = embedding_metadata
+            chunk["metadata"] = chunk_metadata
             chunk["embedding_id"] = embedding_id_for_text(
                 str(chunk["text"]),
                 model=embedding_provider.model,
@@ -306,13 +336,20 @@ def search_documents(db: Session, payload: RagSearchRequest) -> RagSearchResult:
     ranked_sources = rank_chunks_by_mode(
         query,
         candidates,
-        top_k=top_k,
+        top_k=MAX_SEARCH_TOP_K,
         filters=filters,
         retrieval_mode=retrieval_mode,
         score_threshold=payload.score_threshold,
         embedding_provider=embedding_provider,
     )
-    sources = [RagSearchSource(**source) for source in ranked_sources]
+    reranker_mode = normalize_reranker_mode(settings.rag_reranker_mode)
+    reranked_sources = rerank_sources(
+        query,
+        ranked_sources,
+        reranker_mode=reranker_mode,
+        reranker_model=settings.rag_reranker_model,
+    )
+    sources = [RagSearchSource(**source) for source in reranked_sources[:top_k]]
     retrieval_debug = RagRetrievalDebug(
         retrieval_mode=retrieval_mode,
         retrieval_version=RETRIEVAL_VERSION,
@@ -321,6 +358,9 @@ def search_documents(db: Session, payload: RagSearchRequest) -> RagSearchResult:
         embedding_provider=embedding_provider.name if embedding_provider else None,
         embedding_model=embedding_provider.model if embedding_provider else None,
         vector_index_used=any(source.vector_index_used for source in sources),
+        reranker_mode=reranker_mode,
+        reranker_model=settings.rag_reranker_model,
+        reranker_applied=reranker_mode != "none",
         query_tokens=tokenize_text(query),
         candidate_count=len(candidates),
         selected_chunk_ids=[source.chunk_id for source in sources],
@@ -359,12 +399,27 @@ def answer_question(db: Session, payload: RagAnswerRequest) -> RagAnswerResult:
             score_threshold=payload.score_threshold,
         ),
     )
-    answer_payload = build_deterministic_answer(
-        question,
-        search_result.sources,
-        retrieval_debug=search_result.retrieval_debug,
-    )
+    settings = get_settings()
+    answer_mode = _normalize_answer_mode(payload.answer_mode or settings.rag_answer_mode)
+    if search_result.retrieval_debug:
+        search_result.retrieval_debug.answer_mode = answer_mode
+    if answer_mode == LLM_GROUNDED_ANSWER_TYPE:
+        answer_payload = build_llm_grounded_answer(
+            question,
+            search_result.sources,
+            retrieval_debug=search_result.retrieval_debug,
+        )
+    else:
+        answer_payload = build_deterministic_answer(
+            question,
+            search_result.sources,
+            retrieval_debug=search_result.retrieval_debug,
+        )
+        answer_payload["answer_mode"] = answer_mode
     result = RagAnswerResult(**answer_payload)
+    result.answer_mode = answer_mode
+    result.retrieval_debug.answer_mode = answer_mode
+    result.retrieval_debug.run_config = dict(result.run_config or {})
     if not payload.persist:
         return result
 
