@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from alembic import command
 from alembic.config import Config
 import pytest
@@ -16,6 +18,17 @@ def test_orm_metadata_contains_rag_tables():
     assert RAG_TABLES.issubset(set(Base.metadata.tables))
 
 
+def test_gitignore_excludes_rag_local_artifacts():
+    gitignore = Path(__file__).resolve().parents[2] / ".gitignore"
+    ignored_patterns = {
+        line.strip() for line in gitignore.read_text(encoding="utf-8").splitlines()
+    }
+
+    assert "local_data/" in ignored_patterns
+    assert "vector_index/" in ignored_patterns
+    assert "**/vector_index/" in ignored_patterns
+
+
 def test_alembic_migration_creates_rag_tables(tmp_path, monkeypatch):
     database_url = f"sqlite:///{tmp_path / 'careeragent_rag_test.db'}"
     monkeypatch.setenv("DATABASE_URL", database_url)
@@ -31,7 +44,17 @@ def test_alembic_migration_creates_rag_tables(tmp_path, monkeypatch):
     assert {"source_type", "index_status"}.issubset(
         {column["name"] for column in inspector.get_columns("rag_documents")}
     )
-    assert {"document_id", "chunk_index", "embedding_id"}.issubset(
+    assert {
+        "document_id",
+        "chunk_index",
+        "embedding_id",
+        "embedding_vector",
+        "embedding_provider",
+        "embedding_model",
+        "embedding_dim",
+        "embedding_version",
+        "embedding_created_at",
+    }.issubset(
         {column["name"] for column in inspector.get_columns("rag_chunks")}
     )
     assert {
@@ -83,6 +106,12 @@ def test_rag_document_and_chunk_insert_with_json_metadata(db_session):
         text="Synthetic chunk about pytest and Alembic.",
         token_count=6,
         metadata_json={"section_hint": "Testing"},
+        embedding_id="local-bow-v1:abc123",
+        embedding_vector=[0.5, 0.5],
+        embedding_provider="local_bow",
+        embedding_model="local-bow-v1",
+        embedding_dim=2,
+        embedding_version="local-bow-v1",
     )
     document.chunks.append(chunk)
 
@@ -97,6 +126,9 @@ def test_rag_document_and_chunk_insert_with_json_metadata(db_session):
     assert persisted.metadata_json["tags"] == ["backend", "synthetic"]
     assert persisted.chunks[0].metadata_json["section_hint"] == "Testing"
     assert persisted.chunks[0].document_id == "rag_doc_0001"
+    assert persisted.chunks[0].embedding_vector == [0.5, 0.5]
+    assert persisted.chunks[0].embedding_provider == "local_bow"
+    assert persisted.chunks[0].embedding_model == "local-bow-v1"
 
 
 def test_rag_answer_run_insert_with_grounded_contract(db_session):
@@ -105,7 +137,7 @@ def test_rag_answer_run_insert_with_grounded_contract(db_session):
         question="How should I prepare for FastAPI interviews?",
         filters_json={"source_type": "manual"},
         top_k=3,
-        retrieval_mode="deterministic_lexical",
+        retrieval_mode="lexical",
         answer="Based on retrieved evidence, use source-backed examples.",
         answer_type="deterministic_summary",
         grounded=True,
@@ -137,7 +169,7 @@ def test_rag_answer_run_insert_with_grounded_contract(db_session):
             }
         ],
         retrieval_debug_json={
-            "retrieval_mode": "deterministic_lexical",
+            "retrieval_mode": "lexical",
             "query_tokens": ["fastapi"],
             "candidate_count": 1,
             "selected_chunk_ids": ["rag_doc_0001_chunk_0001"],

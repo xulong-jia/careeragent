@@ -1,9 +1,9 @@
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.ai.embedding_provider import (
-    DeterministicEmbeddingProvider,
     build_embedding_provider,
     embedding_id_for_text,
 )
@@ -48,9 +48,9 @@ ALLOWED_ANSWER_UNCERTAINTIES = {
     "insufficient_evidence",
 }
 ALLOWED_RETRIEVAL_MODES = {
-    "deterministic_lexical",
-    "deterministic_vector",
-    "deterministic_hybrid",
+    "lexical",
+    "vector",
+    "hybrid",
 }
 STORED_TEXT_PREVIEW_CHARS = 240
 SENSITIVE_KEY_PARTS = {
@@ -193,11 +193,23 @@ def index_document(
             overlap_chars=payload.overlap_chars,
         )
         embedding_provider = build_embedding_provider(get_settings())
+        embedding_created_at = datetime.now(timezone.utc)
         for chunk in chunks:
+            embedding_vector = embedding_provider.embed_text(str(chunk["text"]))
             chunk["embedding_id"] = embedding_id_for_text(
                 str(chunk["text"]),
                 model=embedding_provider.model,
             )
+            chunk["embedding_vector"] = embedding_vector
+            chunk["embedding_provider"] = embedding_provider.name
+            chunk["embedding_model"] = embedding_provider.model
+            chunk["embedding_dim"] = len(embedding_vector)
+            chunk["embedding_version"] = getattr(
+                embedding_provider,
+                "version",
+                embedding_provider.model,
+            )
+            chunk["embedding_created_at"] = embedding_created_at
         if not chunks:
             raise AppError(
                 code="rag_chunk_validation_error",
@@ -280,19 +292,10 @@ def search_documents(db: Session, payload: RagSearchRequest) -> RagSearchResult:
             status_code=400,
             details={"field": "retrieval_mode"},
         )
-    if retrieval_mode in {"deterministic_vector", "deterministic_hybrid"}:
+    if retrieval_mode in {"vector", "hybrid"}:
         embedding_provider = build_embedding_provider(settings)
-        if not isinstance(embedding_provider, DeterministicEmbeddingProvider):
-            # ponytail: vector retrieval stays local until real embedding storage is added.
-            embedding_provider = DeterministicEmbeddingProvider(
-                dimension=settings.embedding_dimension,
-                model=settings.embedding_model,
-            )
     else:
-        embedding_provider = DeterministicEmbeddingProvider(
-            dimension=settings.embedding_dimension,
-            model=settings.embedding_model,
-        )
+        embedding_provider = None
 
     candidates = rag_repository.list_indexed_chunks_for_search(
         db,
@@ -314,9 +317,9 @@ def search_documents(db: Session, payload: RagSearchRequest) -> RagSearchResult:
         retrieval_version=RETRIEVAL_VERSION,
         schema_version=SCHEMA_VERSION,
         model_version=MODEL_VERSION,
-        embedding_model=embedding_provider.model
-        if retrieval_mode in {"deterministic_vector", "deterministic_hybrid"}
-        else None,
+        embedding_provider=embedding_provider.name if embedding_provider else None,
+        embedding_model=embedding_provider.model if embedding_provider else None,
+        vector_index_used=any(source.vector_index_used for source in sources),
         query_tokens=tokenize_text(query),
         candidate_count=len(candidates),
         selected_chunk_ids=[source.chunk_id for source in sources],

@@ -14,7 +14,7 @@ Default Compose uses:
 
 - SQLite at `backend/local_data/careeragent.db`
 - deterministic LLM provider
-- deterministic embedding provider
+- local embedding provider
 - local vector store setting
 - lexical RAG retrieval mode
 - P1 token auth with a required `AUTH_JWT_SECRET`
@@ -87,4 +87,4 @@ The smoke eval is synthetic contract regression only. Phase 2.1 adds `service_le
 
 Current P1 has token auth, workspace scope, privacy export/delete/audit baseline, and PostgreSQL driver readiness. It still does not include production SSO, MFA, full RBAC, cloud deployment scripts, Kubernetes, monitoring, automatic backup, retention policy, backup erasure proof, recruitment scraping, or auto-apply.
 
-Current deployment status is `production hardening + real evaluation foundation`, not `production-ready`. The next phase is 2.2 Real RAG Production Path.
+Current deployment status is `production hardening + real evaluation + real RAG production foundation`, not `production-ready`. The next phase is 2.3 Real JD Parser + Resume Parser.

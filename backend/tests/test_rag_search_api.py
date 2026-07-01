@@ -1,4 +1,5 @@
 from conftest import get_data, get_error, make_client
+from app.ai.embedding_provider import LocalVectorEmbeddingProvider
 
 
 def _create_and_index_document(
@@ -215,7 +216,7 @@ def test_search_rejects_empty_query_and_caps_top_k():
     assert get_data(capped_response)["top_k"] == 20
 
 
-def test_search_supports_deterministic_vector_mode_without_full_text():
+def test_search_supports_vector_mode_without_full_text():
     client = make_client()
     document = _create_and_index_document(
         client,
@@ -236,13 +237,69 @@ def test_search_supports_deterministic_vector_mode_without_full_text():
 
     assert response.status_code == 200
     result = get_data(response)
-    assert result["retrieval_debug"]["retrieval_mode"] == "deterministic_vector"
-    assert result["retrieval_debug"]["embedding_model"] == "deterministic-hash-v1"
+    assert result["retrieval_debug"]["retrieval_mode"] == "vector"
+    assert result["retrieval_debug"]["embedding_provider"] == "local_bow"
+    assert result["retrieval_debug"]["embedding_model"] == "local-bow-v1"
+    assert result["retrieval_debug"]["vector_index_used"] is True
     assert result["sources"][0]["doc_id"] == document["doc_id"]
-    assert result["sources"][0]["retrieval_mode"] == "deterministic_vector"
-    assert result["sources"][0]["embedding_model"] == "deterministic-hash-v1"
+    assert result["sources"][0]["retrieval_mode"] == "vector"
+    assert result["sources"][0]["embedding_provider"] == "local_bow"
+    assert result["sources"][0]["embedding_model"] == "local-bow-v1"
+    assert result["sources"][0]["vector_index_used"] is True
     assert "text" not in result["sources"][0]
     assert "raw_text" not in str(result)
+
+
+def test_vector_search_uses_persisted_chunk_vector(monkeypatch):
+    client = make_client()
+    document = _create_and_index_document(
+        client,
+        title="Persisted Vector Notes",
+        raw_text="FastAPI persisted vector retrieval keeps chunk embeddings in storage.",
+        metadata={"tags": ["backend"], "topic": "retrieval"},
+    )
+    calls = []
+    original_embed = LocalVectorEmbeddingProvider.embed_text
+
+    def spy_embed(self, text):
+        calls.append(text)
+        return original_embed(self, text)
+
+    monkeypatch.setattr(LocalVectorEmbeddingProvider, "embed_text", spy_embed)
+
+    response = client.post(
+        "/api/rag/search",
+        json={"query": "FastAPI persisted vector", "retrieval_mode": "vector"},
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert result["sources"][0]["doc_id"] == document["doc_id"]
+    assert calls == ["FastAPI persisted vector"]
+
+
+def test_search_supports_hybrid_mode_and_legacy_alias():
+    client = make_client()
+    document = _create_and_index_document(
+        client,
+        title="Hybrid Backend Notes",
+        raw_text="Hybrid retrieval combines FastAPI lexical evidence with persisted vectors.",
+        metadata={"tags": ["backend"], "topic": "retrieval"},
+    )
+
+    response = client.post(
+        "/api/rag/search",
+        json={
+            "query": "FastAPI persisted vectors",
+            "retrieval_mode": "deterministic_hybrid",
+        },
+    )
+
+    assert response.status_code == 200
+    result = get_data(response)
+    assert result["retrieval_debug"]["retrieval_mode"] == "hybrid"
+    assert result["retrieval_debug"]["vector_index_used"] is True
+    assert result["sources"][0]["doc_id"] == document["doc_id"]
 
 
 def test_search_rejects_unsupported_retrieval_mode():

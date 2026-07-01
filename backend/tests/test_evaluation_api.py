@@ -150,10 +150,10 @@ def test_run_synthetic_smoke_evaluation_creates_run_cases_and_results():
         "bad_case",
     }
     assert run["run_config"]["prompt_version"] == "deterministic-v1"
-    assert run["run_config"]["schema_version"] == "v1.5"
-    assert run["run_config"]["retrieval_version"] == "lexical-v1"
+    assert run["run_config"]["schema_version"] == "v2.2"
+    assert run["run_config"]["retrieval_version"] == "local-vector-v1"
     assert run["run_config"]["model_version"] == "none"
-    assert run["run_config"]["evaluation_version"] == "v1.5C"
+    assert run["run_config"]["evaluation_version"] == "v2.2"
     assert run["run_config"]["code_version"]
     _assert_private_safe(summary)
 

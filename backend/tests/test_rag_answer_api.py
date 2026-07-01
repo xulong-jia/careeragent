@@ -70,6 +70,7 @@ def test_answer_returns_grounded_result_with_citations():
     assert result["grounded"] is True
     assert result["uncertainty"] == "grounded"
     assert result["answer_type"] == "deterministic_summary"
+    assert result["retrieval_mode"] == "lexical"
     assert "Based on retrieved evidence" in result["answer"]
     assert len(result["sources"]) == 1
     source = result["sources"][0]
@@ -99,8 +100,9 @@ def test_answer_returns_grounded_result_with_citations():
     assert source_ref["field"] == "snippet"
     assert source_ref["preview"] == source["snippet"]
     assert result["evidence_summary"]
+    assert result["evidence_used"] == result["evidence_summary"]
     debug = result["retrieval_debug"]
-    assert debug["retrieval_mode"] == "deterministic_lexical"
+    assert debug["retrieval_mode"] == "lexical"
     assert "fastapi" in debug["query_tokens"]
     assert debug["candidate_count"] >= 1
     assert debug["selected_chunk_ids"] == [source["chunk_id"]]
@@ -159,6 +161,8 @@ def test_answer_returns_no_source_behavior():
     assert result["sources"] == []
     assert result["uncertainty"] == "no_relevant_source"
     assert result["grounded"] is False
+    assert result["retrieval_mode"] == "lexical"
+    assert result["evidence_used"] == []
     assert result["citations"] == []
     assert result["source_refs"] == []
     assert result["evidence_summary"] == []
@@ -228,7 +232,9 @@ def test_answer_persists_vector_retrieval_mode_and_filter_alias():
 
     assert answer_response.status_code == 200
     result = get_data(answer_response)
-    assert result["retrieval_debug"]["retrieval_mode"] == "deterministic_vector"
+    assert result["retrieval_mode"] == "vector"
+    assert result["retrieval_debug"]["retrieval_mode"] == "vector"
+    assert result["retrieval_debug"]["vector_index_used"] is True
     assert result["answer_run_id"]
 
     list_response = client.get("/api/rag/answers?retrieval_mode=vector")

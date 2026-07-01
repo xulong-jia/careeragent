@@ -58,6 +58,12 @@ class RagChunk(Base):
     token_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     embedding_id: Mapped[str | None] = mapped_column(String(128))
+    embedding_vector: Mapped[list | None] = mapped_column(JSON)
+    embedding_provider: Mapped[str | None] = mapped_column(String(80))
+    embedding_model: Mapped[str | None] = mapped_column(String(160))
+    embedding_dim: Mapped[int | None] = mapped_column(Integer)
+    embedding_version: Mapped[str | None] = mapped_column(String(80))
+    embedding_created_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
@@ -83,7 +89,7 @@ class RagAnswerRun(Base):
     top_k: Mapped[int] = mapped_column(Integer, nullable=False)
     retrieval_mode: Mapped[str] = mapped_column(
         String(40),
-        default="deterministic_lexical",
+        default="lexical",
         nullable=False,
         index=True,
     )

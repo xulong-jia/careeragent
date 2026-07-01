@@ -5,10 +5,10 @@ import subprocess
 
 
 PROMPT_VERSION = "deterministic-v1"
-SCHEMA_VERSION = "v1.5"
-RETRIEVAL_VERSION = "lexical-v1"
+SCHEMA_VERSION = "v2.2"
+RETRIEVAL_VERSION = "local-vector-v1"
 MODEL_VERSION = "none"
-EVALUATION_VERSION = "v1.5C"
+EVALUATION_VERSION = "v2.2"
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 

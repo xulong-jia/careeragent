@@ -1,8 +1,8 @@
 # CareerAgent Evaluation
 
-This document is the stable entrypoint for the v1.5B deterministic evaluation regression foundation and the v1.5C version/privacy governance additions. The detailed design remains in `docs/evaluation-design.md`.
+This document is the stable entrypoint for the deterministic evaluation regression foundation, version/privacy governance additions, and Phase 2.1/2.2 service-level evaluation foundation. The detailed design remains in `docs/evaluation-design.md`.
 
-Phase 2.1 status: CareerAgent now has both synthetic contract regression and service-level evaluation foundation. This is still not a production-quality benchmark.
+Phase 2.2 status: CareerAgent now has both synthetic contract regression and service-level evaluation foundation. RAG service-level cases cover lexical/vector/hybrid/no-evidence behavior. This is still not a production-quality benchmark.
 
 ## Scope
 
@@ -45,3 +45,9 @@ Current service-level evaluation still runs deterministic/mock modules. A pass d
 - Metrics include JD skill/responsibility/role checks, Resume section/skill/project/education/risk checks, Match evidence/strength/gap/score checks, RAG recall/citation/source-type checks, and Agent status/step/missing-slot checks.
 - `failed_cases.json` includes fields needed for manual Bad Case creation: `case_id`, `module`, `case_type`, `failure_type`, `input_summary`, `expected_summary`, `actual_summary`, `failure_reason`, and `suggested_bad_case_type`.
 - The CLI currently writes output files only. The JSON shape maps to existing Evaluation Run/Case/Result schema, but automatic DB write is left as a follow-up to avoid a migration-heavy detour in 2.1.
+
+## Phase 2.2 RAG Additions
+
+- RAG service-level cases include `retrieval_mode` and cover `lexical`, `vector`, `hybrid`, and no-evidence refusal.
+- RAG metrics add `retrieval_mode_match`, `average_top_score`, `vector_index_used`, and `uncertainty_match`.
+- RAG vector/hybrid eval checks the local persisted-vector path; it is not a final semantic embedding benchmark.

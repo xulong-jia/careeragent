@@ -65,6 +65,11 @@ class RagChunkRecord(BaseModel):
     token_count: int
     metadata: dict[str, object] = Field(default_factory=dict)
     embedding_id: str | None = None
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
+    embedding_dim: int | None = None
+    embedding_version: str | None = None
+    embedding_created_at: datetime | None = None
     created_at: datetime
 
 
@@ -85,7 +90,9 @@ class RagSearchSource(BaseModel):
     score: float
     metadata: dict[str, object] = Field(default_factory=dict)
     retrieval_mode: str | None = None
+    embedding_provider: str | None = None
     embedding_model: str | None = None
+    vector_index_used: bool | None = None
 
 
 class RagCitation(BaseModel):
@@ -116,7 +123,9 @@ class RagRetrievalDebug(BaseModel):
     retrieval_version: str | None = None
     schema_version: str | None = None
     model_version: str | None = None
+    embedding_provider: str | None = None
     embedding_model: str | None = None
+    vector_index_used: bool = False
     query_tokens: list[str] = Field(default_factory=list)
     candidate_count: int
     selected_chunk_ids: list[str] = Field(default_factory=list)
@@ -143,6 +152,8 @@ class RagAnswerResult(BaseModel):
     uncertainty: str | None = None
     grounded: bool
     answer_type: str = "deterministic_summary"
+    retrieval_mode: str | None = None
+    evidence_used: list[str] = Field(default_factory=list)
     evidence_summary: list[str] = Field(default_factory=list)
     citations: list[RagCitation] = Field(default_factory=list)
     source_refs: list[RagSourceRef] = Field(default_factory=list)

@@ -34,7 +34,7 @@ def test_health_returns_success_envelope(monkeypatch):
     assert payload["data"]["status"] == "ok"
     assert payload["data"]["service"] == "CareerAgent API"
     assert payload["data"]["llm_provider"] == "deterministic"
-    assert payload["data"]["embedding_provider"] == "deterministic"
+    assert payload["data"]["embedding_provider"] == "local"
     assert payload["data"]["vector_store"] == "local"
     assert payload["data"]["rag_retrieval_mode"] == "lexical"
     assert payload["data"]["real_llm_enabled"] is False

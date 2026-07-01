@@ -653,35 +653,65 @@ def _evaluate_service_rag_retrieval(
         )
         rag_service.index_document(db, created.doc_id, RagDocumentIndexRequest())
         created_docs.append(created)
+    retrieval_mode = str(
+        case.get("retrieval_mode")
+        or expected.get("retrieval_mode")
+        or "lexical"
+    )
     answer = rag_service.answer_question(
         db,
         RagAnswerRequest(
             question=str(case.get("query") or ""),
             top_k=int(case.get("top_k") or 3),
+            filters=case.get("filters"),
+            retrieval_mode=retrieval_mode,
+            score_threshold=case.get("score_threshold"),
             persist=False,
         ),
     )
     source_text = _flatten_text([source.snippet for source in answer.sources])
     source_types = [source.source_type for source in answer.sources]
-    citation_present = bool(answer.citations)
+    scores = [source.score for source in answer.sources]
+    expected_source_type = expected.get("expected_source_type")
+    should_have_citation = bool(expected.get("should_have_citation", True))
+    expected_uncertainty = expected.get(
+        "expected_uncertainty",
+        "grounded" if should_have_citation else "no_relevant_source",
+    )
+    expected_vector_index_used = expected.get("vector_index_used")
     metrics = {
         "recall_at_k_term_hit": _hit_rate(
             expected.get("relevant_terms_should_appear", []),
             source_text,
         ),
-        "citation_present": citation_present
-        == bool(expected.get("should_have_citation", False)),
-        "expected_source_type_match": str(expected.get("expected_source_type") or "")
-        in source_types,
+        "citation_present": bool(answer.citations),
+        "expected_source_type_match": (
+            str(expected_source_type) in source_types if expected_source_type else True
+        ),
+        "retrieval_mode_match": answer.retrieval_debug.retrieval_mode
+        == retrieval_mode,
+        "average_top_score": round(sum(scores) / len(scores), 4) if scores else 0.0,
+        "vector_index_used": bool(answer.retrieval_debug.vector_index_used),
+        "uncertainty_match": answer.uncertainty == expected_uncertainty,
     }
+    vector_index_ok = (
+        True
+        if expected_vector_index_used is None
+        else metrics["vector_index_used"] == bool(expected_vector_index_used)
+    )
     passed = (
         metrics["recall_at_k_term_hit"]
         >= float(expected.get("minimum_recall_at_k", 0))
-        and metrics["citation_present"]
+        and metrics["citation_present"] == should_have_citation
         and metrics["expected_source_type_match"]
+        and metrics["retrieval_mode_match"]
+        and vector_index_ok
+        and metrics["uncertainty_match"]
     )
     actual = {
         "query": answer.question,
+        "retrieval_mode": answer.retrieval_mode,
+        "evidence_used": answer.evidence_used,
         "grounded": answer.grounded,
         "uncertainty": answer.uncertainty,
         "sources": [source.model_dump() for source in answer.sources],

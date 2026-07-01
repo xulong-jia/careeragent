@@ -584,6 +584,11 @@ export type RagChunkRecord = {
   token_count: number;
   metadata: Record<string, unknown>;
   embedding_id: string | null;
+  embedding_provider?: string | null;
+  embedding_model?: string | null;
+  embedding_dim?: number | null;
+  embedding_version?: string | null;
+  embedding_created_at?: string | null;
   created_at: string;
 };
 
@@ -635,7 +640,9 @@ export type RagSearchSource = {
   score: number;
   metadata: Record<string, unknown>;
   retrieval_mode?: string | null;
+  embedding_provider?: string | null;
   embedding_model?: string | null;
+  vector_index_used?: boolean | null;
 };
 
 export type RagCitation = {
@@ -666,7 +673,9 @@ export type RagRetrievalDebug = {
   retrieval_version?: string | null;
   schema_version?: string | null;
   model_version?: string | null;
+  embedding_provider?: string | null;
   embedding_model?: string | null;
+  vector_index_used: boolean;
   query_tokens: string[];
   candidate_count: number;
   selected_chunk_ids: string[];
@@ -702,6 +711,8 @@ export type RagAnswerResult = {
   uncertainty: string | null;
   grounded: boolean;
   answer_type: string;
+  retrieval_mode?: string | null;
+  evidence_used?: string[];
   evidence_summary: string[];
   citations: RagCitation[];
   source_refs: RagSourceRef[];

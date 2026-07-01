@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.ai.embedding_provider import (
     DeterministicEmbeddingProvider,
+    LocalVectorEmbeddingProvider,
     OpenAICompatibleEmbeddingProvider,
     build_embedding_provider,
 )
@@ -150,6 +151,19 @@ def test_deterministic_embedding_is_stable_and_dimensioned():
     assert any(value for value in first)
 
 
+def test_local_vector_embedding_is_stable_and_dimensioned():
+    provider = LocalVectorEmbeddingProvider(dimension=16)
+
+    first = provider.embed_text("FastAPI RAG testing")
+    second = provider.embed_text("FastAPI RAG testing")
+
+    assert first == second
+    assert len(first) == 16
+    assert provider.name == "local_bow"
+    assert provider.model == "local-bow-v1"
+    assert any(value for value in first)
+
+
 def test_embedding_empty_input_returns_controlled_error():
     provider = DeterministicEmbeddingProvider(dimension=16)
 
@@ -165,7 +179,7 @@ def test_real_embedding_disabled_without_key_uses_deterministic(monkeypatch):
     monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
     get_settings.cache_clear()
 
-    assert isinstance(build_embedding_provider(), DeterministicEmbeddingProvider)
+    assert isinstance(build_embedding_provider(), LocalVectorEmbeddingProvider)
 
 
 def test_real_embedding_missing_key_returns_controlled_error(monkeypatch):

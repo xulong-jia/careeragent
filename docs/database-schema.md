@@ -358,8 +358,14 @@ JSON 字段说明：
 - `token_count`
 - `metadata`
 - `embedding_id`
+- `embedding_vector`
+- `embedding_provider`
+- `embedding_model`
+- `embedding_dim`
+- `embedding_version`
+- `embedding_created_at`
 
-v1.6 后 `embedding_id` 保存 deterministic embedding id，用于 local vector/hybrid retrieval readiness；当前不保存真实外部 embedding vector，也不要求 FAISS、pgvector 或 remote vector store。
+阶段 2.2 后，chunk embedding vector 和 metadata 持久化在 DB。当前默认 provider 是 `local_bow` / `local-bow-v1`，不是最终 semantic embedding。API response 不返回 `embedding_vector` 本体；FAISS、pgvector 或 remote vector store 仍未作为 production default。
 
 隔离说明：`rag_chunks` 不直接保存 owner 字段，按 `document_id -> rag_documents.id` 继承 document 的 user/workspace scope；search/list 会先过滤当前 owner 的 documents，再读取 chunks。
 

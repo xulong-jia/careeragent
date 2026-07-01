@@ -163,7 +163,7 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 7. 回到 Dashboard，查看 RAG Documents、Indexed Documents、RAG Chunks、Grounded Answers、Ungrounded Answers、Latest RAG Answer 和 Latest RAG Uncertainty。
 8. 复制 grounded Answer Run ID，作为 Interview Center 或 Study Plan 的可选 RAG refs 输入。
 
-当前 Knowledge Base 默认使用 deterministic lexical retrieval；v1.6 可通过 API/env 测试 local deterministic vector/hybrid retrieval，但默认不接真实 LLM、外部 embedding 或 vector DB。v1.2 final handoff 确认可完整演示 create/index document -> search -> grounded answer -> answer history -> Dashboard RAG stats -> Interview / Study Plan optional RAG Answer Run IDs。页面只展示 preview、snippet、source_refs preview、safe retrieval debug 和 stats 聚合，不展示 document full raw_text、chunk full text、Resume/JD full raw_text 或完整 interview answer_text，也不自动写入 Interview、Study Plan、Resume、Project 或 Application。
+当前 Knowledge Base 默认使用 lexical retrieval；阶段 2.2 可通过 API/env 测试 DB-persisted local vector/hybrid retrieval，但默认不接真实 LLM、外部 embedding 或 production vector DB。v1.2 final handoff 确认可完整演示 create/index document -> search -> grounded answer -> answer history -> Dashboard RAG stats -> Interview / Study Plan optional RAG Answer Run IDs。页面只展示 preview、snippet、source_refs preview、safe retrieval debug 和 stats 聚合，不展示 document full raw_text、chunk full text、embedding vector、Resume/JD full raw_text 或完整 interview answer_text，也不自动写入 Interview、Study Plan、Resume、Project 或 Application。
 
 ### Agent Runs
 

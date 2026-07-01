@@ -4,18 +4,18 @@
 
 阶段三目标是建立可检索、可追踪来源的 CareerAgent 知识库，为后续面试准备、学习计划和 Agent Workflow 提供 evidence source。本阶段先确保数据结构、chunk、metadata、retrieval 和 citation contract 稳定，不直接接入真实 LLM、embedding 或 vector store。
 
-当前实现口径：v1.2 已完成 deterministic grounded answer contract、answer run persistence、KnowledgeBasePage answer history、Dashboard RAG stats 和 downstream optional refs；v1.6 在默认不接真实 provider 的前提下，新增 deterministic embedding id、local vector/hybrid retrieval mode、`score_threshold` 和 provider metadata。默认 retrieval mode 仍是 lexical。
+当前实现口径：v1.2 已完成 deterministic grounded answer contract、answer run persistence、KnowledgeBasePage answer history、Dashboard RAG stats 和 downstream optional refs；v1.6 建立 provider boundary；阶段 2.2 新增 local bag-of-words embedding provider、DB-persisted chunk vectors、lexical/vector/hybrid retrieval mode、`score_threshold` 和 provider metadata。默认 retrieval mode 仍是 lexical。
 
 - 建立可检索知识库。
 - 支持 RAG document 管理。
 - 支持 chunking。
 - 支持 metadata。
 - 支持 deterministic lexical retrieval。
-- 支持 v1.6 local deterministic vector/hybrid retrieval readiness。
+- 支持阶段 2.2 local vector/hybrid retrieval foundation。
 - 支持 source/citation 追踪。
 - 支持 RAG answer 的 deterministic answer with citations。
 - 为后续面试准备、学习计划、Agent Workflow 提供 evidence source。
-- 默认不接真实 LLM / 外部 embedding / vector store；真实 provider 仅作为 opt-in readiness skeleton。
+- 默认不接真实 LLM；local embedding provider 无网络依赖。外部 embedding provider 仅显式 opt-in。
 
 ## 2. 非目标
 
@@ -23,8 +23,8 @@
 
 - 不接真实 LLM。
 - 不接 OpenAI / DeepSeek / Qwen。
-- 默认不接外部 embedding。
-- 不强制接 FAISS / pgvector；v1.6 vector/hybrid 是 local deterministic baseline。
+- 默认不接外部 embedding API。
+- 不强制接 FAISS / pgvector；阶段 2.2 vector/hybrid 是 local persisted-vector foundation。
 - 不做 Agent Workflow。
 - 不做投递管理。
 - 不做 Bad Case 页面。
@@ -72,7 +72,13 @@
 | text | text | chunk 正文 |
 | token_count | integer | 粗略 token / word count |
 | metadata | json | chunk 级 metadata |
-| embedding_id | string nullable | 未来接 vector store 时使用 |
+| embedding_id | string nullable | 当前 chunk embedding 的非 secret id |
+| embedding_vector | json nullable | DB-persisted local vector；API response 不返回本体 |
+| embedding_provider | string nullable | 例如 `local_bow` 或外部 provider 名 |
+| embedding_model | string nullable | 例如 `local-bow-v1` |
+| embedding_dim | integer nullable | vector dimension |
+| embedding_version | string nullable | embedding/vectorizer version |
+| embedding_created_at | datetime nullable | reindex 时更新 |
 | created_at | datetime | 创建时间 |
 
 隐私字段：
@@ -140,7 +146,7 @@ metadata filter 用途：
 }
 ```
 
-阶段三初期全部 deterministic，不调用 LLM。
+阶段三初期全部 deterministic，不调用 LLM。阶段 2.2 后，RAG retrieval 可使用 persisted local vectors；answer generation 仍是 deterministic grounded summary。
 
 ### POST /api/rag/documents
 
@@ -278,11 +284,11 @@ metadata filter 用途：
 - Markdown 按标题和段落切。
 - Plain text 按空行段落切，再按长度拆分。
 - JD 文本可按 requirements / responsibilities / preferred skills 等关键词做 section hint。
-- 每个 chunk 保存 `section`、`chunk_index`、`token_count`、`metadata`、`text`。
+- 每个 chunk 保存 `section`、`chunk_index`、`token_count`、`metadata`、`text`、`embedding_vector` 和 embedding metadata。
 - 初始 chunk 长度建议 800-1500 chars。
 - overlap 初始设 0 或最多 100 chars。
 - 不做 PDF/DOCX parser。
-- 不做真实 embedding。
+- 当前做 local bag-of-words vector embedding；不调用外部 semantic embedding API。
 
 ## 8. Retrieval 策略
 
@@ -297,13 +303,16 @@ metadata filter 用途：
 - RAG answer 暂时 deterministic summary，不调用 LLM。
 - answer 必须引用 `doc_id` / `chunk_id` / source snippet。
 
-v1.6 retrieval readiness：
+阶段 2.2 retrieval foundation：
 
-- `retrieval_mode` 支持 `lexical` / `vector` / `hybrid` alias，并归一化为 `deterministic_lexical` / `deterministic_vector` / `deterministic_hybrid`。
-- vector/hybrid 当前使用本地 deterministic hashing embedding 和 existing DB chunks；`rag_chunks.embedding_id` 保存非 secret 的 deterministic id，不保存外部 provider payload。
+- `retrieval_mode` 标准值为 `lexical` / `vector` / `hybrid`；后端仍接受 legacy `deterministic_*` request alias。
+- `lexical` 使用 keyword overlap，不依赖 embedding。
+- `vector` 使用 query vector + DB-persisted chunk vectors 做 cosine similarity；search 不重新 embed chunk text。
+- `hybrid` 当前使用 `0.4 lexical + 0.6 vector` 的简单加权；这是 foundation，不是 reranker。
+- `rag_chunks` 保存 `embedding_id`、`embedding_vector`、`embedding_provider`、`embedding_model`、`embedding_dim`、`embedding_version`、`embedding_created_at`。API response 只返回 metadata，不返回 vector 本体。
 - `score_threshold` 可过滤低分来源；无来源时仍返回 uncertainty，不编造答案。
-- `retrieval_debug` 可记录 retrieval mode、embedding model、scores、selected chunk IDs 和版本 metadata，但不包含 raw_text 或 full chunk text。
-- 真实 embedding provider skeleton 不等于生产 vector store；FAISS/pgvector/remote vector DB 仍需后续单独设计和验收。
+- `retrieval_debug` 可记录 retrieval mode、embedding provider/model、vector_index_used、scores、selected chunk IDs 和版本 metadata，但不包含 raw_text 或 full chunk text。
+- local bag-of-words vectorizer 不等于最终 semantic embedding；FAISS/pgvector/remote vector DB、reranker 和 larger benchmark 仍需后续单独设计和验收。
 
 ## 9. Source / Citation Contract
 

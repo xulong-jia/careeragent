@@ -126,7 +126,7 @@ sqlite:///./local_data/careeragent.db
 - Resume：PDF / DOCX / Markdown / txt 文本提取 + deterministic parser / risk-check，不调用真实 LLM。
 - JD：deterministic skill extraction / role category inference。
 - Match：deterministic scoring。
-- RAG：deterministic chunking + lexical/vector/hybrid local retrieval + deterministic grounded answer。v1.2 RAG Completion deterministic MVP 已完成，覆盖 contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs；v1.6 增加 deterministic embedding id、local vector/hybrid retrieval mode、score threshold 和 provider metadata。默认 retrieval mode 仍为 lexical，不接真实 LLM、外部 embedding 或 vector DB。
+- RAG：chunking + lexical/vector/hybrid local retrieval + DB-persisted chunk vectors + deterministic grounded answer。v1.2 RAG Completion deterministic MVP 已完成，覆盖 contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs；阶段 2.2 增加 local bag-of-words embedding、embedding metadata persistence、score threshold 和 provider metadata。默认 retrieval mode 仍为 lexical，不接真实 LLM、外部 semantic embedding 或 production vector DB。
 - Agent：v1.3 deterministic workflow baseline，固定 `job_application_preparation` state machine 串联 Resume Version、JD、Match、可选 RAG search、RAG context summary、Project Rewrite、Interview Questions、Study Plan 和 Application linkage；不是自由工具调用 Agent，不自动投递。
 - Evaluation：v1.5B deterministic smoke/regression foundation，包含 7 模块 smoke set、Bad Case regression linkage 和文件化 eval runner，不是 LLM judge；v1.5C 在 API run_config 和 fileized metrics 中加入 prompt/schema/retrieval/model/code/evaluation version metadata；阶段 2.1 新增 `service_level` 脱敏样例集，runner 真实调用当前 service/retriever/parser/agent 路径并输出 metrics、failed cases、actual outputs 和 run config。
 - Privacy / Data Governance：v1.5C 新增 `app.core.privacy` redaction helpers、`app.core.versioning` constants、Resume/JD/Application/RAG delete/archive endpoints、默认列表隐藏 deleted/archived 数据，以及前端确认式删除/归档入口。P1 增加当前 user/workspace scope 的 privacy export、delete-all 和 audit-log baseline。Resume/JD/RAG 默认响应只展示短 preview；Agent step/final summary、Bad Case、Evaluation 和 Application 只保存 refs、summary、counts 或 version metadata，不保存大段原文。
@@ -272,10 +272,10 @@ v1.5C 在不新增真实 LLM、embedding/vector DB、自动投递或生产级权
 v1.6 在不改变默认 deterministic 行为的前提下，补齐生产化 AI 接入和部署准备的边界：
 
 1. `backend/app/ai/llm_provider.py` 定义 deterministic provider 和 OpenAI-compatible HTTP provider skeleton；外部 provider 只有显式启用并配置 key/model/base URL 时才可用。
-2. `backend/app/ai/embedding_provider.py` 提供 deterministic hashing embedding fallback、embedding id 生成和 OpenAI-compatible embedding skeleton；默认不调用外部 embedding API。
+2. `backend/app/ai/embedding_provider.py` 提供 local bag-of-words embedding、embedding id 生成和 OpenAI-compatible embedding skeleton；默认不调用外部 embedding API。
 3. `backend/app/ai/validators.py` 使用 Pydantic schema 校验结构化 AI 输出，避免无约束自然语言直接进入业务对象。
 4. `/health` 暴露 `ai_provider_mode`、`llm_provider`、`embedding_provider`、`vector_store`、`rag_retrieval_mode` 和 real provider enable flags，但不返回 API key 或 secret。
-5. RAG search / answer 支持 `retrieval_mode=lexical|vector|hybrid` alias 和 `score_threshold`；当前 vector/hybrid 使用本地 deterministic embeddings 与 DB chunks，不依赖 FAISS、pgvector 或外部 vector store。
+5. RAG search / answer 支持 `retrieval_mode=lexical|vector|hybrid` alias 和 `score_threshold`；当前 vector/hybrid 使用 DB-persisted local vectors，不依赖 FAISS、pgvector 或外部 vector store。
 6. `docker-compose.yml` 和 `.env.example` 提供 provider/vector 配置 placeholder；默认 compose 仍可 keyless deterministic 启动。
 7. 新增 `docs/ai-providers.md`、`docs/deployment.md` 和 `docs/release-notes-v1.6.md`，明确 provider opt-in、部署检查、安全边界和未完成项。
 
@@ -314,7 +314,7 @@ Dashboard 当前展示：
 | --- | --- |
 | 阶段一 | Resume / JD / Match 最小闭环已完成 |
 | 阶段二 | SQLite + SQLAlchemy + Alembic 持久化与 Resume Version 已完成 |
-| 阶段三 | RAG lexical prototype 已完成；v1.2 RAG Completion deterministic MVP 已完成；v1.6 补充 local deterministic vector/hybrid retrieval readiness |
+| 阶段三 / 2.2 | RAG lexical prototype 已完成；v1.2 RAG Completion deterministic MVP 已完成；2.2 补充 local vector embedding persistence 和 lexical/vector/hybrid retrieval foundation |
 | 阶段四 | Agent deterministic workflow prototype 已完成 |
 | 阶段五 | Application Tracking + Dashboard MVP 已完成 |
 | 阶段六 | Deterministic Evaluation MVP + Bad Case 关联已完成 |
@@ -331,7 +331,7 @@ Dashboard 当前展示：
 | v1.4 Product Operations / Application Management Hardening | Application tracking 已补强 JD/Resume 强绑定、status history、reflection、Application Board、enhanced stats 和 Dashboard operations overview；不自动投递、不接招聘网站、不接真实 LLM |
 | v1.5B Bad Case + Evaluation Regression Foundation | Bad Case lifecycle / regression linkage、7 模块 deterministic evaluation、fileized smoke fixtures、run_evals script、QualityReviewPage / EvaluationPage 增强已完成；不接真实 LLM judge 或多模型评测 |
 | v1.5C Privacy / Security / Data Governance | Redaction utilities、delete/archive APIs、short safe previews、version metadata tracking、frontend governance controls 和 privacy regression tests 已完成；不声明生产级合规删除或多用户安全 |
-| v1.6 Production AI & Deployment Readiness | Provider abstraction、deterministic fallback、OpenAI-compatible skeleton、structured output validation、deterministic embedding、local vector/hybrid retrieval、health/config visibility、Docker/env placeholders 和部署文档已完成；默认不调用真实 provider |
+| v1.6 + 2.2 Production AI / RAG Foundation | Provider abstraction、deterministic LLM fallback、OpenAI-compatible skeleton、structured output validation、local vector embedding persistence、lexical/vector/hybrid retrieval、health/config visibility、Docker/env placeholders 和部署文档已完成；默认不调用真实外部 provider |
 | P1 Production Foundation | Token auth、workspace membership、route protection、owned data isolation、privacy export/delete/audit baseline、frontend auth gate 和 PostgreSQL driver readiness 已完成；不声明完整 production-ready |
 | 阶段七 | 当前补齐 Docker、README、docs、demo script、安全清单和 provider/deployment readiness |
 

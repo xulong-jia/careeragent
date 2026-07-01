@@ -64,6 +64,11 @@ def _to_chunk_record(chunk: RagChunk) -> RagChunkRecord:
         token_count=chunk.token_count,
         metadata=dict(chunk.metadata_json or {}),
         embedding_id=chunk.embedding_id,
+        embedding_provider=chunk.embedding_provider,
+        embedding_model=chunk.embedding_model,
+        embedding_dim=chunk.embedding_dim,
+        embedding_version=chunk.embedding_version,
+        embedding_created_at=chunk.embedding_created_at,
         created_at=chunk.created_at,
     )
 
@@ -192,6 +197,22 @@ def replace_chunks_for_document(
                 token_count=int(chunk["token_count"]),
                 metadata_json=dict(chunk.get("metadata") or {}),
                 embedding_id=str(chunk["embedding_id"]) if chunk.get("embedding_id") else None,
+                embedding_vector=chunk.get("embedding_vector")
+                if isinstance(chunk.get("embedding_vector"), list)
+                else None,
+                embedding_provider=str(chunk["embedding_provider"])
+                if chunk.get("embedding_provider")
+                else None,
+                embedding_model=str(chunk["embedding_model"])
+                if chunk.get("embedding_model")
+                else None,
+                embedding_dim=int(chunk["embedding_dim"]) if chunk.get("embedding_dim") else None,
+                embedding_version=str(chunk["embedding_version"])
+                if chunk.get("embedding_version")
+                else None,
+                embedding_created_at=chunk.get("embedding_created_at")
+                if chunk.get("embedding_created_at")
+                else None,
             )
             chunk_models.append(chunk_model)
             db.add(chunk_model)
@@ -259,6 +280,11 @@ def list_indexed_chunks_for_search(
             "section": chunk.section,
             "text": chunk.text,
             "metadata": dict(document.metadata_json or {}) | dict(chunk.metadata_json or {}),
+            "embedding_vector": list(chunk.embedding_vector or []),
+            "embedding_provider": chunk.embedding_provider,
+            "embedding_model": chunk.embedding_model,
+            "embedding_dim": chunk.embedding_dim,
+            "embedding_version": chunk.embedding_version,
         }
         for chunk, document in rows
     ]
@@ -347,7 +373,10 @@ def list_answer_runs(
     if uncertainty:
         statement = statement.where(RagAnswerRun.uncertainty == uncertainty)
     if retrieval_mode:
-        statement = statement.where(RagAnswerRun.retrieval_mode == retrieval_mode)
+        legacy_mode = f"deterministic_{retrieval_mode}"
+        statement = statement.where(
+            RagAnswerRun.retrieval_mode.in_([retrieval_mode, legacy_mode])
+        )
     answer_runs = db.scalars(
         statement.order_by(RagAnswerRun.created_at.desc(), RagAnswerRun.id.desc())
     ).all()

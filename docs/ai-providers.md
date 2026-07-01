@@ -6,7 +6,7 @@ v1.6 adds a provider boundary, not a mandatory production LLM rollout.
 
 - `AI_PROVIDER_MODE=deterministic`
 - `LLM_PROVIDER=deterministic`
-- `EMBEDDING_PROVIDER=deterministic`
+- `EMBEDDING_PROVIDER=local`
 - `ENABLE_REAL_LLM=false`
 - `ENABLE_REAL_EMBEDDING=false`
 
@@ -35,8 +35,11 @@ All structured output must pass Pydantic validation through `validate_structured
 
 ## Embedding Provider
 
-- `DeterministicEmbeddingProvider` uses stable local hashing and has no network dependency.
+- `LocalVectorEmbeddingProvider` uses stable local bag-of-words vectors and has no network dependency.
+- `DeterministicEmbeddingProvider` remains as a backwards-compatible alias for older local tests/config.
 - `OpenAICompatibleEmbeddingProvider` can call `/embeddings` only when explicitly enabled and fully configured.
+
+Phase 2.2 persists chunk vectors in `rag_chunks`. Local vector search is a production foundation, not a final semantic embedding provider.
 
 Required real-provider env:
 

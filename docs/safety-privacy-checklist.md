@@ -47,7 +47,7 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] `ENABLE_REAL_LLM=false` 和 `ENABLE_REAL_EMBEDDING=false` 时，backend tests、frontend build 和 Docker Compose config 不需要真实 AI provider key；Docker Compose 仍必须有本地 dev-only `AUTH_JWT_SECRET`。
 - [ ] `ENABLE_REAL_LLM=true` 或 `ENABLE_REAL_EMBEDDING=true` 时，缺少 base URL / key / model 应返回受控配置错误，不静默降级为假成功。
 - [ ] LLM structured output 必须经过 Pydantic schema validation。
-- [ ] RAG vector/hybrid retrieval 默认使用 local deterministic embeddings，不提交 FAISS/pgvector/remote vector DB artifacts。
+- [ ] RAG vector/hybrid retrieval 默认使用 DB-persisted local vectors，不提交 FAISS/pgvector/remote vector DB artifacts。
 - [ ] `retrieval_debug` 只包含 IDs、scores、counts、mode/model/version metadata，不包含 full raw_text、chunk text 或 secret。
 
 ## Resume / JD / RAG

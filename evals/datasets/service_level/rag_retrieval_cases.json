@@ -13,13 +13,17 @@
           "metadata": {"topic": "backend", "case": "rag_service_001"}
         }
       ],
+      "retrieval_mode": "lexical",
       "query": "What should FastAPI interview preparation cover?",
       "top_k": 3,
       "expected": {
+        "retrieval_mode": "lexical",
         "relevant_terms_should_appear": ["FastAPI", "SQL", "Docker"],
         "minimum_recall_at_k": 1.0,
         "expected_source_type": "manual",
-        "should_have_citation": true
+        "should_have_citation": true,
+        "expected_uncertainty": "grounded",
+        "vector_index_used": false
       }
     },
     {
@@ -33,13 +37,17 @@
           "metadata": {"topic": "rag", "case": "rag_service_002"}
         }
       ],
+      "retrieval_mode": "vector",
       "query": "How should grounded RAG answers handle evidence?",
       "top_k": 3,
       "expected": {
+        "retrieval_mode": "vector",
         "relevant_terms_should_appear": ["cite", "uncertainty", "unsupported"],
         "minimum_recall_at_k": 1.0,
         "expected_source_type": "learning",
-        "should_have_citation": true
+        "should_have_citation": true,
+        "expected_uncertainty": "grounded",
+        "vector_index_used": true
       }
     },
     {
@@ -53,13 +61,17 @@
           "metadata": {"topic": "rewrite", "case": "rag_service_003"}
         }
       ],
+      "retrieval_mode": "hybrid",
       "query": "What should project rewrite suggestions avoid?",
       "top_k": 3,
       "expected": {
+        "retrieval_mode": "hybrid",
         "relevant_terms_should_appear": ["evidence", "forbidden", "fabricating"],
         "minimum_recall_at_k": 1.0,
         "expected_source_type": "project",
-        "should_have_citation": true
+        "should_have_citation": true,
+        "expected_uncertainty": "grounded",
+        "vector_index_used": true
       }
     },
     {
@@ -73,13 +85,17 @@
           "metadata": {"topic": "application", "case": "rag_service_004"}
         }
       ],
+      "retrieval_mode": "lexical",
       "query": "What fields should application tracking keep?",
       "top_k": 3,
       "expected": {
+        "retrieval_mode": "lexical",
         "relevant_terms_should_appear": ["status", "reflection", "priority"],
         "minimum_recall_at_k": 1.0,
         "expected_source_type": "manual",
-        "should_have_citation": true
+        "should_have_citation": true,
+        "expected_uncertainty": "grounded",
+        "vector_index_used": false
       }
     },
     {
@@ -93,13 +109,41 @@
           "metadata": {"topic": "study_plan", "case": "rag_service_005"}
         }
       ],
+      "retrieval_mode": "hybrid",
       "query": "How should a study gap plan handle missing skills?",
       "top_k": 3,
       "expected": {
+        "retrieval_mode": "hybrid",
         "relevant_terms_should_appear": ["tasks", "resources", "deliverables"],
         "minimum_recall_at_k": 1.0,
         "expected_source_type": "learning",
-        "should_have_citation": true
+        "should_have_citation": true,
+        "expected_uncertainty": "grounded",
+        "vector_index_used": true
+      }
+    },
+    {
+      "case_id": "rag_service_006_no_evidence",
+      "module": "rag_retrieval",
+      "documents": [
+        {
+          "title": "Frontend Layout Notes",
+          "source_type": "manual",
+          "raw_text": "The frontend layout note covers CSS spacing, table density, and dashboard filter controls.",
+          "metadata": {"topic": "frontend_layout", "case": "rag_service_006_no_evidence"}
+        }
+      ],
+      "retrieval_mode": "vector",
+      "query": "What evidence proves Kubernetes incident response ownership?",
+      "top_k": 3,
+      "score_threshold": 0.8,
+      "expected": {
+        "retrieval_mode": "vector",
+        "relevant_terms_should_appear": [],
+        "minimum_recall_at_k": 1.0,
+        "should_have_citation": false,
+        "expected_uncertainty": "no_relevant_source",
+        "vector_index_used": false
       }
     }
   ]

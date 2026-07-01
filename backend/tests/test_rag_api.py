@@ -107,6 +107,13 @@ def test_index_document_creates_and_replaces_chunks():
     assert first_count == index_result["chunk_count"]
     assert all(item["doc_id"] == document["doc_id"] for item in chunks["items"])
     assert all("text" not in item for item in chunks["items"])
+    assert all(item["embedding_id"] for item in chunks["items"])
+    assert all(item["embedding_provider"] == "local_bow" for item in chunks["items"])
+    assert all(item["embedding_model"] == "local-bow-v1" for item in chunks["items"])
+    assert all(item["embedding_dim"] == 384 for item in chunks["items"])
+    assert all(item["embedding_version"] == "local-bow-v1" for item in chunks["items"])
+    assert all(item["embedding_created_at"] for item in chunks["items"])
+    assert all("embedding_vector" not in item for item in chunks["items"])
 
     reindex_response = client.post(
         f"/api/rag/documents/{document['doc_id']}/index",

@@ -4,9 +4,6 @@ import re
 from collections import Counter
 from typing import Any
 
-from app.ai.embedding_provider import DeterministicEmbeddingProvider
-
-
 STOPWORDS = {
     "a",
     "an",
@@ -154,12 +151,12 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
 def normalize_retrieval_mode(mode: str | None) -> str:
     normalized = (mode or "lexical").strip().lower()
     aliases = {
-        "lexical": "deterministic_lexical",
-        "deterministic_lexical": "deterministic_lexical",
-        "vector": "deterministic_vector",
-        "deterministic_vector": "deterministic_vector",
-        "hybrid": "deterministic_hybrid",
-        "deterministic_hybrid": "deterministic_hybrid",
+        "lexical": "lexical",
+        "deterministic_lexical": "lexical",
+        "vector": "vector",
+        "deterministic_vector": "vector",
+        "hybrid": "hybrid",
+        "deterministic_hybrid": "hybrid",
     }
     return aliases.get(normalized, normalized)
 
@@ -170,15 +167,15 @@ def rank_chunks_by_mode(
     *,
     top_k: int,
     filters: dict[str, Any] | None = None,
-    retrieval_mode: str = "deterministic_lexical",
+    retrieval_mode: str = "lexical",
     score_threshold: float | None = None,
-    embedding_provider: DeterministicEmbeddingProvider | None = None,
+    embedding_provider: Any | None = None,
 ) -> list[dict[str, Any]]:
     mode = normalize_retrieval_mode(retrieval_mode)
     query_tokens = tokenize_text(query)
-    provider = embedding_provider or DeterministicEmbeddingProvider()
+    provider = embedding_provider
     query_embedding = (
-        provider.embed_text(query) if mode in {"deterministic_vector", "deterministic_hybrid"} else []
+        provider.embed_text(query) if provider and mode in {"vector", "hybrid"} else []
     )
     threshold = 0.0 if score_threshold is None else score_threshold
     ranked: list[dict[str, Any]] = []
@@ -191,15 +188,24 @@ def rank_chunks_by_mode(
         chunk_text = str(candidate.get("text") or "")
         lexical_score = score_chunk(query_tokens, chunk_text)
         vector_score = 0.0
-        if mode in {"deterministic_vector", "deterministic_hybrid"}:
-            vector_score = cosine_similarity(query_embedding, provider.embed_text(chunk_text))
+        persisted_vector = candidate.get("embedding_vector")
+        vector_index_used = (
+            mode in {"vector", "hybrid"}
+            and isinstance(persisted_vector, list)
+            and bool(persisted_vector)
+        )
+        if vector_index_used:
+            vector_score = cosine_similarity(
+                query_embedding,
+                [float(value) for value in persisted_vector],
+            )
 
-        if mode == "deterministic_lexical":
+        if mode == "lexical":
             score = lexical_score
-        elif mode == "deterministic_vector":
+        elif mode == "vector":
             score = vector_score
         else:
-            score = round(lexical_score + vector_score, 6)
+            score = round((0.4 * lexical_score) + (0.6 * vector_score), 6)
 
         if score <= threshold:
             continue
@@ -215,9 +221,13 @@ def rank_chunks_by_mode(
                 "score": score,
                 "metadata": metadata,
                 "retrieval_mode": mode,
-                "embedding_model": provider.model
-                if mode in {"deterministic_vector", "deterministic_hybrid"}
+                "embedding_provider": candidate.get("embedding_provider")
+                if mode in {"vector", "hybrid"}
                 else None,
+                "embedding_model": candidate.get("embedding_model")
+                if mode in {"vector", "hybrid"}
+                else None,
+                "vector_index_used": vector_index_used,
             }
         )
 

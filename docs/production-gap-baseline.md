@@ -1,12 +1,12 @@
 # CareerAgent Production Gap Baseline
 
-阶段 2.1 后，当前仓库是 production hardening + real evaluation foundation。本文档不声明 production-ready。
+阶段 2.2 后，当前仓库是 production hardening + real evaluation + real RAG production foundation。本文档不声明 production-ready。
 
 ## 1. 当前总体判断
 
-当前版本可以作为 production hardening + real evaluation foundation，因为主业务对象已经有持久化、Auth/Workspace 基础隔离、隐私 preview 收敛、Docker 本地骨架、Alembic migration、后端测试、前端 build、synthetic smoke regression 和 service-level evaluation runner。
+当前版本可以作为 production hardening + real evaluation + real RAG production foundation，因为主业务对象已经有持久化、Auth/Workspace 基础隔离、隐私 preview 收敛、Docker 本地骨架、Alembic migration、后端测试、前端 build、synthetic smoke regression、service-level evaluation runner，以及 RAG local vector embedding persistence。
 
-当前版本不是 production-ready，原因是核心 AI 能力仍大量依赖 deterministic、mock、synthetic 或本地 prototype 路径：RAG 没有真实 embedding/vector store 持久化，JD/Resume parser 没有真实 LLM 生产路径，Match/Rewrite 仍是规则和 overlap，Agent 是同步固定 workflow，Evaluation 仍只是 foundation benchmark，raw_text 仍明文保存，生产 DB、observability、retention、backup、RBAC 和部署策略不足。
+当前版本不是 production-ready，原因是核心 AI 能力仍大量依赖 deterministic、mock、synthetic 或本地 foundation 路径：RAG 已有 local vector path 和 DB-persisted chunk vectors，但没有最终 semantic embedding、reranker 或 production-scale vector DB；JD/Resume parser 没有真实 LLM 生产路径，Match/Rewrite 仍是规则和 overlap，Agent 是同步固定 workflow，Evaluation 仍只是 foundation benchmark，raw_text 仍明文保存，生产 DB、observability、retention、backup、RBAC 和部署策略不足。
 
 完成标准口径：mock、stub、deterministic、synthetic、prototype、本地可演示、骨架完整都不能标为 DONE，只能标为 PARTIAL、FOUNDATION、MOCK_ONLY、DETERMINISTIC_ONLY、SYNTHETIC_ONLY 或 RISKY。
 
@@ -23,7 +23,7 @@
 | Study Plan | DETERMINISTIC_ONLY | deterministic phases/tasks/resources、task status | 无真实 gap diagnosis、学习资源质量和进度验证 | 2.4, 2.5 | 计划看似完整但不针对真实缺口 |
 | Application | PARTIAL | 手动 application tracking、status history、reflection | 不接招聘系统，不处理真实投递合规、通知、审计 | 2.5, 2.6 | 数据完整性和操作审计不足 |
 | Dashboard | PARTIAL | 聚合本地 stats 和 latest summaries | 很多页面仍需手填 ID，缺少 production selectors 和测试 | 2.6 | 主流程误操作、可用性弱 |
-| RAG | DETERMINISTIC_ONLY | document/chunk、lexical/local deterministic vector/hybrid、citations/source_refs | 无真实 embedding provider、pgvector/FAISS、embedding persistence、groundedness eval | 2.2 | 检索质量和引用可信度不足 |
+| RAG | FOUNDATION | document/chunk、lexical/vector/hybrid、local bag-of-words embedding、DB-persisted chunk vectors、citations/source_refs、RAG service-level eval | local vectorizer 不是最终 semantic embedding；无 reranker、pgvector/FAISS、production-scale vector DB、真实 LLM grounded generation、大 benchmark | 2.2 foundation, 2.6 | 检索质量、规模化和引用可信度仍不足 |
 | Agent | DETERMINISTIC_ONLY | 固定 `job_application_preparation` 同步 state machine、timeline refs | 无 resume/retry/cancel、缺槽追问、失败恢复、多 workflow production path | 2.5 | 同步 demo 无法承载真实长流程 |
 | Bad Case | PARTIAL | 人工 bad case、root cause、regression linkage | 自动 draft、真实失败样例入库、triage workflow 不足 | 2.1, 2.5 | 问题沉淀不完整 |
 | Evaluation | PARTIAL | `synthetic_smoke_v1`、service-level de-identified dataset、fileized runner、metrics/failed cases/actual outputs/run_config | 仍不是 production benchmark；当前不自动写 DB，不自动生成 Bad Case draft | 2.1 foundation, 2.2-2.6 持续 | service-level pass/fail 可能被误读为生产质量 |
@@ -39,7 +39,7 @@
 ### P0
 
 - Production-quality benchmark 缺失；阶段 2.1 service-level eval 已能调用真实服务，但仍不是真实生产质量评测。
-- RAG 无真实 embedding provider、真实 vector store、embedding persistence 和 groundedness/recall/citation 评测。
+- RAG 已有 local vector foundation 和 embedding persistence，但缺最终 semantic embedding、reranker、production-scale vector DB 和大规模 groundedness/recall/citation benchmark。
 - JD Parser、Resume Parser、Match、Project Rewrite 仍是 mock/deterministic 规则，核心求职判断不可信。
 - `raw_text` 明文存储，缺少 encryption、retention、backup erasure proof 和合规审计。
 - Docker/Auth secret 风险：阶段 2.0 已禁止 Compose 空 secret，production 仍必须接入 secret manager、rotation 和环境隔离。
@@ -61,7 +61,7 @@
 ## 4. 后续阶段映射
 
 - 2.1 Real Evaluation Foundation：已建立脱敏 service-level 样例集，让 eval runner 调用当前 service/retriever/parser/agent 路径，并输出可人工转 Bad Case 的 failed cases；自动 DB 写入和 Bad Case draft 仍是后续补齐项。
-- 2.2 Real RAG Production Path：接入真实 embedding provider、pgvector 或 FAISS、embedding persistence、metadata filter、top-k、threshold、citation、no evidence refusal 和 RAG 指标。
+- 2.2 Real RAG Production Path：已建立 local vector embedding provider、DB-persisted chunk vectors、lexical/vector/hybrid mode、metadata filter、top-k、threshold、citation、no-evidence refusal 和 RAG 指标。仍只是 production foundation。
 - 2.3 Real JD Parser + Resume Parser：接入真实 LLM parser path，补 timeout/retry/schema validation/fallback/prompt version/model config，并要求人工确认后进入后续模块。
 - 2.4 Trustworthy Match Scoring + Project Rewrite：建立六维评分、证据绑定、风险扣分、多 JD/多简历对比和 human agreement/evidence completeness 等评测。
 - 2.5 Agent Workflow Productionization：补 pending/running/completed/failed/need_more_info/cancelled/retrying、step refs、resume/retry/cancel API、失败 Bad Case draft 和多 workflow。

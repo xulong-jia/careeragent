@@ -15,10 +15,10 @@ from app.core.errors import AppError
 MAX_EMBEDDING_INPUT_CHARS = 20000
 
 
-class DeterministicEmbeddingProvider:
-    name = "deterministic"
+class LocalVectorEmbeddingProvider:
+    name = "local_bow"
 
-    def __init__(self, *, dimension: int = 384, model: str = "deterministic-hash-v1") -> None:
+    def __init__(self, *, dimension: int = 384, model: str = "local-bow-v1") -> None:
         if dimension <= 0:
             raise AppError(
                 code="embedding_provider_config_error",
@@ -27,15 +27,19 @@ class DeterministicEmbeddingProvider:
             )
         self.dimension = dimension
         self.model = model
+        self.version = "local-bow-v1"
 
     def embed_text(self, text: str) -> list[float]:
         normalized = _normalize_input(text)
         vector = [0.0] * self.dimension
         for token in _tokenize(normalized):
-            digest = hashlib.sha256(token.encode("utf-8")).digest()
-            index = int.from_bytes(digest[:4], "big") % self.dimension
+            index = _feature_index(token, self.dimension)
             vector[index] += 1.0
         return _normalize_vector(vector)
+
+
+class DeterministicEmbeddingProvider(LocalVectorEmbeddingProvider):
+    name = "deterministic"
 
 
 class OpenAICompatibleEmbeddingProvider:
@@ -55,6 +59,7 @@ class OpenAICompatibleEmbeddingProvider:
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.dimension = dimension
+        self.version = model
 
     def embed_text(self, text: str) -> list[float]:
         normalized = _normalize_input(text)
@@ -117,6 +122,11 @@ def _tokenize(text: str) -> list[str]:
     return tokens or [hashlib.sha256(text.encode("utf-8")).hexdigest()]
 
 
+def _feature_index(token: str, dimension: int) -> int:
+    digest = hashlib.sha256(token.encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big") % dimension
+
+
 def _normalize_vector(vector: list[float]) -> list[float]:
     norm = math.sqrt(sum(value * value for value in vector))
     if norm == 0:
@@ -131,8 +141,12 @@ def embedding_id_for_text(text: str, *, model: str) -> str:
 
 def build_embedding_provider(settings: Settings | None = None):
     settings = settings or get_settings()
-    if not settings.enable_real_embedding or settings.embedding_provider == "deterministic":
-        return DeterministicEmbeddingProvider(
+    if not settings.enable_real_embedding or settings.embedding_provider in {
+        "deterministic",
+        "local",
+        "local_bow",
+    }:
+        return LocalVectorEmbeddingProvider(
             dimension=settings.embedding_dimension,
             model=settings.embedding_model,
         )

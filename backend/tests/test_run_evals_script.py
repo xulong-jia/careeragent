@@ -92,10 +92,10 @@ def test_service_level_loader_reads_dataset_cases():
         "agent_workflow": 3,
         "jd_parser": 8,
         "match": 5,
-        "rag_retrieval": 5,
+        "rag_retrieval": 6,
         "resume_parser": 5,
     }
-    assert len(cases) == 26
+    assert len(cases) == 27
 
 
 def test_eval_metrics_aggregate_module_metrics():
@@ -174,3 +174,31 @@ def test_synthetic_alias_report_is_distinct_from_service_level(tmp_path):
     assert run_config["dataset_kind"] == "synthetic_contract"
     assert run_config["service_level"] is False
     assert "dataset_kind: synthetic_contract" in summary
+
+
+def test_service_level_rag_eval_covers_vector_metrics(tmp_path):
+    output_dir = tmp_path / "rag-service-level-results"
+
+    result_code = run_evals.run("service_level", "rag", output_dir)
+
+    assert result_code == 0
+    metrics = json.loads((output_dir / "metrics.json").read_text())
+    actual_outputs = json.loads((output_dir / "actual_outputs.json").read_text())
+
+    assert metrics["total_count"] == 6
+    rag_metrics = metrics["by_module"]["rag_retrieval"]["metrics"]
+    assert "retrieval_mode_match" in rag_metrics
+    assert "average_top_score" in rag_metrics
+    assert "vector_index_used" in rag_metrics
+    assert any(
+        item["actual_output"]["retrieval_debug"]["retrieval_mode"] == "vector"
+        for item in actual_outputs
+    )
+    assert any(
+        item["actual_output"]["retrieval_debug"]["retrieval_mode"] == "hybrid"
+        for item in actual_outputs
+    )
+    assert any(
+        item["actual_output"]["uncertainty"] == "no_relevant_source"
+        for item in actual_outputs
+    )
