@@ -54,7 +54,7 @@ def get_initial_version_id(client, resume_id):
     return data["items"][0]["resume_version_id"]
 
 
-def test_match_run_returns_mock_report():
+def test_match_run_returns_trustworthy_foundation_report():
     client = make_client()
     resume_id, jd_id = create_resume_and_job(client)
 
@@ -84,7 +84,10 @@ def test_match_run_returns_mock_report():
     assert data["strengths"]
     assert data["gaps"]
     assert data["rewrite_priorities"]
-    assert data["risk_flags"] == []
+    assert data["recommended_projects"] is not None
+    assert data["score_breakdown"]["foundation_only"] is True
+    assert data["scoring_method"] == "deterministic_trustworthy_match_v1"
+    assert 0 < data["confidence"] <= 1
     assert data["dimension_scores"]["skill_match"] > 70
 
 
@@ -104,6 +107,8 @@ def test_match_run_with_resume_id_persists_report_to_db(db_session):
     assert record.resume_version_id == data["resume_version_id"]
     assert record.jd_id == jd_id
     assert record.job_profile_id == data["job_profile_id"]
+    assert record.scoring_method == "deterministic_trustworthy_match_v1"
+    assert isinstance(record.score_breakdown, dict)
 
 
 def test_match_run_with_resume_version_id_persists_report_to_db(db_session):
@@ -278,6 +283,62 @@ def test_same_jd_can_match_multiple_resume_versions():
     assert {
         item["resume_version_id"] for item in reports["items"]
     } == {initial_version_id, clone_version_id}
+
+
+def test_match_compare_sorts_multiple_resume_versions_for_same_jd():
+    client = make_client()
+    resume_id, jd_id = create_resume_and_job(client)
+    initial_version_id = get_initial_version_id(client, resume_id)
+    weak_resume_response = client.post(
+        "/api/resumes/upload",
+        files={
+            "file": (
+                "weak.md",
+                b"React TypeScript frontend dashboard project.",
+                "text/markdown",
+            )
+        },
+    )
+    weak_version_id = get_initial_version_id(
+        client, get_data(weak_resume_response)["resume_id"]
+    )
+
+    response = client.post(
+        "/api/matches/compare",
+        json={
+            "jd_id": jd_id,
+            "resume_version_ids": [initial_version_id, weak_version_id],
+        },
+    )
+
+    assert response.status_code == 200
+    data = get_data(response)
+    assert data["compare_mode"] == "same_jd_multiple_resumes"
+    assert [item["rank"] for item in data["items"]] == [1, 2]
+    assert data["items"][0]["total_score"] >= data["items"][1]["total_score"]
+    assert data["items"][0]["score_delta_from_top"] == 0
+
+
+def test_match_compare_sorts_multiple_jds_for_same_resume_version():
+    client = make_client()
+    resume_id, jd_id = create_resume_and_job(client)
+    version_id = get_initial_version_id(client, resume_id)
+    weak_jd_id = create_job(
+        client,
+        title="Frontend Engineer",
+        raw_text="React TypeScript dashboard UI role.",
+    )
+
+    response = client.post(
+        "/api/matches/compare",
+        json={"resume_version_id": version_id, "jd_ids": [jd_id, weak_jd_id]},
+    )
+
+    assert response.status_code == 200
+    data = get_data(response)
+    assert data["compare_mode"] == "same_resume_multiple_jds"
+    assert {item["jd_id"] for item in data["items"]} == {jd_id, weak_jd_id}
+    assert data["items"][0]["total_score"] >= data["items"][1]["total_score"]
 
 
 def test_same_resume_version_can_match_multiple_jobs():

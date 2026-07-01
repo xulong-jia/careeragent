@@ -29,11 +29,17 @@ The runner writes `summary.md`, `metrics.json`, `failed_cases.json`, `actual_out
 
 Phase 2.3 parser cases cover 12 JD parser cases and 8 resume parser cases. Parser metrics include role/category hits, section/skill/project/education hits, risk flag hit rate, evidence coverage, confidence presence, warning expectations, and case pass.
 
+Phase 2.4 match cases cover 9 Match service-level cases, including strong/weak matches, missing project evidence, business context gaps, unsupported metric risk, education fit, and same-JD multi-resume comparison. Match metrics include dimension score presence, evidence dimension coverage, strength/gap keyword hits, expected score range, risk flag hit rate, rewrite priority hit rate, scoring method presence, confidence presence, and case pass.
+
+Phase 2.4 project rewrite cases cover 6 Project Rewrite service-level cases, including missing required skills, unsupported metrics, learning-to-business overclaim, empty original bullets, and no fabricated technologies. Project Rewrite metrics include before/after presence, evidence required presence, forbidden changes presence, risk level presence, matched/missing point hit rates, risk flag hit rate, fabrication guard pass, and case pass.
+
 Phase 2.2 RAG cases cover `lexical`, `vector`, `hybrid`, and no-evidence behavior. RAG metrics include recall/citation/source type plus `retrieval_mode_match`, `average_top_score`, `vector_index_used`, and uncertainty matching.
 
 The current RAG path uses a local bag-of-words vectorizer with DB-persisted chunk vectors. It is a production foundation, not a final semantic embedding benchmark. Run the smoke dataset before enabling any real LLM or external embedding provider, and keep real-provider experiments out of committed `evals/results/` artifacts unless they are sanitized and explicitly reviewed.
 
 The current parser path uses local deterministic parser foundation by default. Optional LLM parser runs must use runtime secrets only and must not commit raw private outputs or provider traces.
+
+The current Match and Project Rewrite paths use deterministic trustworthy foundation logic by default. Do not treat service-level pass rates as production job-search judgment quality or as permission to use rewritten bullets without human confirmation.
 
 ## Boundaries
 

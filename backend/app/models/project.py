@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, JSON, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, JSON, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -90,6 +90,7 @@ class ProjectRewrite(Base):
         default="deterministic_project_rewrite_v1",
         nullable=False,
     )
+    confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )

@@ -3,104 +3,36 @@
   "module": "match",
   "cases": [
     {
-      "case_id": "match_service_001",
+      "case_id": "match_service_001_strong_backend",
       "module": "match",
       "input": {
         "resume_seed": {
           "filename": "match_backend.md",
-          "raw_text": "Backend Match Candidate\n\nEducation\nExample University | Master of IT | 2024-02 to 2025-11\n\nProjects\nProject: API Workbench\nTech: Python, FastAPI, SQL, Docker\nResponsibilities: Built backend APIs\n\nSkills\nPython, FastAPI, SQL, Docker"
+          "raw_text": "Backend Match Candidate\n\nEducation\nExample University | Master of IT | 2024-02 to 2025-11\n\nProjects\nProject: API Workbench\nTech: Python, FastAPI, SQL, Docker\nResponsibilities: Built Python FastAPI APIs for platform workflow and SQL storage.\nResults: Created evidence-backed Docker smoke checks for API reliability.\n\nSkills\nPython, FastAPI, SQL, Docker"
         },
         "jd_seed": {
           "company": "Example API Co",
           "job_title": "Backend Engineer",
           "location": "Sydney",
-          "raw_text": "Build Python FastAPI APIs with SQL storage. Docker experience is preferred."
+          "raw_text": "Build Python FastAPI APIs with SQL storage for platform workflow users. Docker experience is preferred."
         }
       },
       "expected": {
         "expected_strength_keywords": ["Python", "FastAPI", "SQL"],
         "expected_gap_keywords": [],
-        "required_evidence_dimensions": ["skill_match"],
-        "score_range": [68, 75],
-        "risk_flags_expected": []
+        "rewrite_priorities_should_include": [],
+        "required_evidence_dimensions": ["skill_match", "project_relevance", "business_understanding", "expression_quality", "education_fit", "risk_control"],
+        "score_range": [78, 95],
+        "risk_flags_should_include": []
       }
     },
     {
-      "case_id": "match_service_002",
+      "case_id": "match_service_002_frontend_gap",
       "module": "match",
       "input": {
         "resume_seed": {
           "filename": "match_frontend.md",
-          "raw_text": "Frontend Match Candidate\n\nEducation\nExample Institute | Bachelor of Software Design | 2020-02 to 2023-11\n\nProjects\nProject: Dashboard UI\nTech: TypeScript, React, HTML, CSS\nResponsibilities: Built frontend workflows\n\nSkills\nTypeScript, React, HTML, CSS"
-        },
-        "jd_seed": {
-          "company": "Example Frontend Co",
-          "job_title": "Frontend Engineer",
-          "location": "Melbourne",
-          "raw_text": "Create React user interfaces with TypeScript and API integration."
-        }
-      },
-      "expected": {
-        "expected_strength_keywords": ["TypeScript"],
-        "expected_gap_keywords": [],
-        "required_evidence_dimensions": ["skill_match"],
-        "score_range": [68, 75],
-        "risk_flags_expected": []
-      }
-    },
-    {
-      "case_id": "match_service_003",
-      "module": "match",
-      "input": {
-        "resume_seed": {
-          "filename": "match_rag.md",
-          "raw_text": "RAG Match Candidate\n\nEducation\nExample University | Master of Computing | 2023-02 to 2024-11\n\nProjects\nProject: Grounded Search\nTech: Python, RAG, LLM, OpenAI\nResponsibilities: Built retrieval and citation checks\n\nSkills\nPython, RAG, LLM, OpenAI"
-        },
-        "jd_seed": {
-          "company": "Example Retrieval Co",
-          "job_title": "AI Application Engineer",
-          "location": "Remote",
-          "raw_text": "Build RAG services using Python, FastAPI, LLM review, and vector search."
-        }
-      },
-      "expected": {
-        "expected_strength_keywords": ["Python", "RAG"],
-        "expected_gap_keywords": ["FastAPI"],
-        "required_evidence_dimensions": ["skill_match"],
-        "score_range": [65, 72],
-        "risk_flags_expected": []
-      }
-    },
-    {
-      "case_id": "match_service_004",
-      "module": "match",
-      "input": {
-        "resume_seed": {
-          "filename": "match_data.md",
-          "raw_text": "Data Match Candidate\n\nEducation\nExample University | Master of Analytics | 2023-02 to 2024-11\n\nProjects\nProject: SQL Monitor\nTech: Python, SQL, PostgreSQL, Docker\nResponsibilities: Built validation jobs\n\nSkills\nPython, SQL, PostgreSQL, Docker"
-        },
-        "jd_seed": {
-          "company": "Example Data Co",
-          "job_title": "Data Platform Engineer",
-          "location": "Brisbane",
-          "raw_text": "Own SQL workflows and Python automation for reporting users."
-        }
-      },
-      "expected": {
-        "expected_strength_keywords": ["Python", "SQL"],
-        "expected_gap_keywords": [],
-        "required_evidence_dimensions": ["skill_match"],
-        "score_range": [68, 75],
-        "risk_flags_expected": []
-      }
-    },
-    {
-      "case_id": "match_service_005",
-      "module": "match",
-      "input": {
-        "resume_seed": {
-          "filename": "match_gap.md",
-          "raw_text": "General Candidate\n\nEducation\nExample College | Bachelor of Business Systems | 2020-02 to 2023-11\n\nProjects\nProject: Operations Board\nTech: React, TypeScript\nResponsibilities: Built UI filters\n\nSkills\nReact, TypeScript"
+          "raw_text": "Frontend Match Candidate\n\nEducation\nExample Institute | Bachelor of Software Design | 2020-02 to 2023-11\n\nProjects\nProject: Dashboard UI\nTech: TypeScript, React, HTML, CSS\nResponsibilities: Built React frontend workflows.\n\nSkills\nTypeScript, React, HTML, CSS"
         },
         "jd_seed": {
           "company": "Example Backend Co",
@@ -112,9 +44,182 @@
       "expected": {
         "expected_strength_keywords": [],
         "expected_gap_keywords": ["Python", "FastAPI", "SQL"],
-        "required_evidence_dimensions": ["skill_match"],
-        "score_range": [60, 66],
-        "risk_flags_expected": []
+        "rewrite_priorities_should_include": ["Python"],
+        "required_evidence_dimensions": ["skill_match", "project_relevance", "risk_control"],
+        "score_range": [25, 62],
+        "risk_flags_should_include": ["project_jd_mismatch", "missing_evidence"]
+      }
+    },
+    {
+      "case_id": "match_service_003_rag_missing_fastapi",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_rag.md",
+          "raw_text": "RAG Match Candidate\n\nEducation\nExample University | Master of Computing | 2023-02 to 2024-11\n\nProjects\nProject: Grounded Search\nTech: Python, RAG, LLM, OpenAI\nResponsibilities: Built retrieval and citation checks for AI workflow.\n\nSkills\nPython, RAG, LLM, OpenAI"
+        },
+        "jd_seed": {
+          "company": "Example Retrieval Co",
+          "job_title": "AI Application Engineer",
+          "location": "Remote",
+          "raw_text": "Build RAG services using Python, FastAPI, LLM review, and vector search."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["Python", "RAG", "LLM"],
+        "expected_gap_keywords": ["FastAPI"],
+        "rewrite_priorities_should_include": ["FastAPI"],
+        "required_evidence_dimensions": ["skill_match", "project_relevance", "business_understanding"],
+        "score_range": [55, 82],
+        "risk_flags_should_include": []
+      }
+    },
+    {
+      "case_id": "match_service_004_business_context_gap",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_skills_without_business.md",
+          "raw_text": "Backend Skills Candidate\n\nEducation\nExample University | Master of Software Engineering | 2023-02 to 2024-11\n\nProjects\nProject: Local API Toolkit\nTech: Python, FastAPI, SQL\nResponsibilities: Built Python FastAPI endpoints and SQL migrations for local exercises.\n\nSkills\nPython, FastAPI, SQL"
+        },
+        "jd_seed": {
+          "company": "Example Ops Co",
+          "job_title": "Platform Backend Engineer",
+          "location": "Melbourne",
+          "raw_text": "Build Python FastAPI SQL platform services for operations workflow users and stakeholder analytics."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["Python", "FastAPI", "SQL"],
+        "expected_gap_keywords": ["workflow", "users"],
+        "rewrite_priorities_should_include": ["workflow"],
+        "required_evidence_dimensions": ["business_understanding", "skill_match"],
+        "score_range": [62, 88],
+        "risk_flags_should_include": []
+      }
+    },
+    {
+      "case_id": "match_service_005_unsupported_metric",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_metric_risk.md",
+          "raw_text": "Metric Risk Candidate\n\nEducation\nExample University | Bachelor of Computer Science | 2020-02 to 2023-11\n\nProjects\nProject: Local Search Demo\nTech: Python, FastAPI, SQL\nResponsibilities: Built Python FastAPI search APIs.\nResults: Reduced latency by 40% and launched production platform for million users.\n\nSkills\nPython, FastAPI, SQL"
+        },
+        "jd_seed": {
+          "company": "Example Risk Co",
+          "job_title": "Backend Engineer",
+          "location": "Sydney",
+          "raw_text": "Build Python FastAPI SQL services with reliable production evidence."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["Python", "FastAPI", "SQL"],
+        "expected_gap_keywords": ["Risk control"],
+        "rewrite_priorities_should_include": ["unsupported_metric"],
+        "required_evidence_dimensions": ["risk_control", "skill_match"],
+        "score_range": [55, 82],
+        "risk_flags_should_include": ["unsupported_metric"]
+      }
+    },
+    {
+      "case_id": "match_service_006_no_education",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_no_education.md",
+          "raw_text": "Self Taught Candidate\n\nProjects\nProject: Automation Service\nTech: Python, SQL, Docker\nResponsibilities: Built Python SQL automation jobs for reporting workflow.\n\nSkills\nPython, SQL, Docker"
+        },
+        "jd_seed": {
+          "company": "Example Data Co",
+          "job_title": "Data Platform Engineer",
+          "location": "Brisbane",
+          "raw_text": "Own SQL workflows and Python automation for reporting users. Docker is preferred."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["Python", "SQL"],
+        "expected_gap_keywords": [],
+        "rewrite_priorities_should_include": [],
+        "required_evidence_dimensions": ["education_fit", "skill_match", "project_relevance"],
+        "score_range": [68, 90],
+        "risk_flags_should_include": []
+      }
+    },
+    {
+      "case_id": "match_service_007_skill_only_weak_evidence",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_skill_only.md",
+          "raw_text": "Skill Only Candidate\n\nEducation\nExample College | Bachelor of IT | 2020-02 to 2023-11\n\nProjects\nProject: Content Site\nTech: React, TypeScript\nResponsibilities: Built UI components.\n\nSkills\nPython, FastAPI, SQL, React, TypeScript"
+        },
+        "jd_seed": {
+          "company": "Example API Co",
+          "job_title": "Backend Engineer",
+          "location": "Sydney",
+          "raw_text": "Build Python FastAPI APIs with SQL storage."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["Python", "FastAPI", "SQL"],
+        "expected_gap_keywords": ["project evidence"],
+        "rewrite_priorities_should_include": ["project-backed"],
+        "required_evidence_dimensions": ["skill_match", "project_relevance", "risk_control"],
+        "score_range": [48, 78],
+        "risk_flags_should_include": ["weak_evidence", "project_jd_mismatch"]
+      }
+    },
+    {
+      "case_id": "match_service_008_compare_resume_versions",
+      "module": "match",
+      "input": {
+        "compare_resume_seeds": [
+          {
+            "filename": "compare_backend_strong.md",
+            "raw_text": "Strong Backend Candidate\n\nEducation\nExample University | Master of IT | 2024\n\nProjects\nProject: API Platform\nTech: Python, FastAPI, SQL, Docker\nResponsibilities: Built Python FastAPI APIs with SQL workflow storage for users.\n\nSkills\nPython, FastAPI, SQL, Docker"
+          },
+          {
+            "filename": "compare_frontend_weak.md",
+            "raw_text": "Frontend Candidate\n\nEducation\nExample College | Bachelor of Design | 2023\n\nProjects\nProject: UI Kit\nTech: React, TypeScript\nResponsibilities: Built dashboard UI.\n\nSkills\nReact, TypeScript"
+          }
+        ],
+        "jd_seed": {
+          "company": "Example API Co",
+          "job_title": "Backend Engineer",
+          "location": "Sydney",
+          "raw_text": "Build Python FastAPI APIs with SQL storage for workflow users. Docker preferred."
+        }
+      },
+      "expected": {
+        "expected_top_resume_index": 0,
+        "expected_strength_keywords": ["Python", "FastAPI", "SQL"],
+        "expected_gap_keywords": [],
+        "score_range": [78, 95]
+      }
+    },
+    {
+      "case_id": "match_service_009_same_resume_many_jd_hint",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_multi_jd_ready.md",
+          "raw_text": "Multi JD Candidate\n\nEducation\nExample University | Master of Analytics | 2024\n\nProjects\nProject: Reporting Platform\nTech: Python, SQL, PostgreSQL, Docker\nResponsibilities: Built SQL validation jobs and Python reporting workflow for analytics users.\n\nSkills\nPython, SQL, PostgreSQL, Docker"
+        },
+        "jd_seed": {
+          "company": "Example Data Co",
+          "job_title": "Data Platform Engineer",
+          "location": "Remote",
+          "raw_text": "Own SQL workflows and Python automation for analytics users. PostgreSQL and Docker are preferred."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["Python", "SQL", "PostgreSQL"],
+        "expected_gap_keywords": [],
+        "rewrite_priorities_should_include": [],
+        "required_evidence_dimensions": ["skill_match", "project_relevance", "business_understanding"],
+        "score_range": [75, 95],
+        "risk_flags_should_include": []
       }
     }
   ]

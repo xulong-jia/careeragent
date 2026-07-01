@@ -33,6 +33,10 @@ def _to_match_report(record: MatchReportModel) -> MatchReport:
         gaps=list(record.gaps or []),
         rewrite_priorities=list(record.rewrite_priorities or []),
         risk_flags=list(record.risk_flags or []),
+        recommended_projects=list(record.recommended_projects or []),
+        score_breakdown=dict(record.score_breakdown or {}),
+        scoring_method=record.scoring_method,
+        confidence=float(record.confidence or 0.0),
         created_at=record.created_at,
     )
 
@@ -50,6 +54,10 @@ def create_match_report(
     gaps: list[str],
     rewrite_priorities: list[str],
     risk_flags: list[dict[str, object]],
+    recommended_projects: list[dict[str, object]],
+    score_breakdown: dict[str, object],
+    scoring_method: str,
+    confidence: float,
 ) -> MatchReport:
     record = MatchReportModel(
         id=_next_match_report_id(db),
@@ -65,6 +73,10 @@ def create_match_report(
         gaps=gaps,
         rewrite_priorities=rewrite_priorities,
         risk_flags=risk_flags,
+        recommended_projects=recommended_projects,
+        score_breakdown=score_breakdown,
+        scoring_method=scoring_method,
+        confidence=confidence,
     )
 
     try:

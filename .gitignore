@@ -30,8 +30,10 @@ local_data/
 *.sqlite
 *.sqlite3
 uploads/
+uploads
 **/uploads/
 vector_index/
+vector_index
 **/vector_index/
 exports/
 **/exports/

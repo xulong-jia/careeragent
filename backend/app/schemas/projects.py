@@ -102,7 +102,11 @@ class ProjectRewrittenBullet(BaseModel):
     after: str
     reason: str
     evidence_required: str = ""
+    forbidden_changes: list[str] = Field(default_factory=list)
+    matched_jd_requirements: list[str] = Field(default_factory=list)
+    missing_points: list[str] = Field(default_factory=list)
     risk_level: Literal["low", "medium", "high"] = "low"
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class ProjectRiskFlag(BaseModel):
@@ -112,6 +116,9 @@ class ProjectRiskFlag(BaseModel):
         "overclaim",
         "fabricated_skill",
         "learning_to_business_overclaim",
+        "project_jd_mismatch",
+        "production_claim_unsupported",
+        "business_impact_unsupported",
     ]
     severity: Literal["low", "medium", "high"]
     source_field: str
@@ -132,4 +139,6 @@ class ProjectRewriteRecord(BaseModel):
     forbidden_changes: list[str] = Field(default_factory=list)
     risk_flags: list[ProjectRiskFlag] = Field(default_factory=list)
     rewrite_strategy: str
+    rewrite_method: str
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     created_at: datetime

@@ -1,0 +1,189 @@
+{
+  "dataset_name": "service_level",
+  "module": "project_rewrite",
+  "cases": [
+    {
+      "case_id": "project_rewrite_001_strong_backend",
+      "module": "project_rewrite",
+      "input": {
+        "project_seed": {
+          "name": "API Workbench",
+          "role": "Backend Engineer",
+          "period": "2026-02 to 2026-05",
+          "background": "Local project facts for backend API practice.",
+          "tech_stack": ["Python", "FastAPI", "SQL", "Docker"],
+          "responsibilities": ["Built Python FastAPI APIs with SQL persistence."],
+          "results": ["Prepared Docker smoke checks for API reliability."],
+          "evidence": [{"type": "repository", "description": "API modules and SQL migration notes"}],
+          "status": "active"
+        },
+        "jd_seed": {
+          "company": "Example API Co",
+          "job_title": "Backend Engineer",
+          "location": "Sydney",
+          "raw_text": "Build Python FastAPI APIs with SQL storage. Docker is preferred."
+        }
+      },
+      "expected": {
+        "matched_requirements_should_include": ["Python", "FastAPI", "SQL"],
+        "missing_points_should_include": [],
+        "bullet_keywords_should_include": ["Python", "FastAPI"],
+        "risk_flags_should_include": [],
+        "forbidden_terms_should_not_appear": ["million users", "revenue", "accuracy"]
+      }
+    },
+    {
+      "case_id": "project_rewrite_002_missing_required_skill",
+      "module": "project_rewrite",
+      "input": {
+        "project_seed": {
+          "name": "Frontend Dashboard",
+          "role": "Frontend Engineer",
+          "period": "2026-01 to 2026-03",
+          "background": "Dashboard UI project.",
+          "tech_stack": ["React", "TypeScript"],
+          "responsibilities": ["Built React filters and table views."],
+          "results": ["Created reusable UI state patterns."],
+          "evidence": [{"type": "demo", "description": "UI screenshots"}],
+          "status": "active"
+        },
+        "jd_seed": {
+          "company": "Example Backend Co",
+          "job_title": "Backend Engineer",
+          "location": "Melbourne",
+          "raw_text": "Build Python FastAPI APIs with SQL persistence."
+        }
+      },
+      "expected": {
+        "matched_requirements_should_include": [],
+        "missing_points_should_include": ["Python", "FastAPI", "SQL"],
+        "bullet_keywords_should_include": ["React"],
+        "risk_flags_should_include": ["fabricated_skill", "project_jd_mismatch"],
+        "forbidden_terms_should_not_appear": ["Python API", "FastAPI service"]
+      }
+    },
+    {
+      "case_id": "project_rewrite_003_unsupported_metric",
+      "module": "project_rewrite",
+      "input": {
+        "project_seed": {
+          "name": "Search Demo",
+          "role": "Backend Engineer",
+          "period": "2026-02",
+          "background": "Local learning project.",
+          "tech_stack": ["Python", "FastAPI", "SQL"],
+          "responsibilities": ["Built Python FastAPI search endpoints."],
+          "results": ["Reduced latency by 30% in local tests."],
+          "evidence": [],
+          "status": "active"
+        },
+        "jd_seed": {
+          "company": "Example Search Co",
+          "job_title": "Backend Engineer",
+          "location": "Sydney",
+          "raw_text": "Build Python FastAPI SQL services with reliable evidence."
+        }
+      },
+      "expected": {
+        "matched_requirements_should_include": ["Python", "FastAPI", "SQL"],
+        "missing_points_should_include": [],
+        "bullet_keywords_should_include": ["30%"],
+        "risk_flags_should_include": ["unsupported_metric", "missing_evidence", "overclaim"],
+        "requires_evidence_required": true,
+        "forbidden_terms_should_not_appear": ["million users", "revenue"]
+      }
+    },
+    {
+      "case_id": "project_rewrite_004_learning_business_overclaim",
+      "module": "project_rewrite",
+      "input": {
+        "project_seed": {
+          "name": "Local Architecture Lab",
+          "role": "Student Developer",
+          "period": "2026-01",
+          "background": "Local learning project for backend architecture practice.",
+          "tech_stack": ["Python", "FastAPI"],
+          "responsibilities": ["Built Python FastAPI modules."],
+          "results": ["Launched a commercial production platform for million users."],
+          "evidence": [],
+          "status": "active"
+        },
+        "jd_seed": {
+          "company": "Example Platform Co",
+          "job_title": "Platform Engineer",
+          "location": "Remote",
+          "raw_text": "Build Python FastAPI production services for platform users."
+        }
+      },
+      "expected": {
+        "matched_requirements_should_include": ["Python", "FastAPI"],
+        "missing_points_should_include": [],
+        "bullet_keywords_should_include": ["commercial production platform"],
+        "risk_flags_should_include": ["learning_to_business_overclaim", "production_claim_unsupported", "business_impact_unsupported"],
+        "requires_evidence_required": true,
+        "forbidden_terms_should_not_appear": ["revenue"]
+      }
+    },
+    {
+      "case_id": "project_rewrite_005_empty_original_bullet",
+      "module": "project_rewrite",
+      "input": {
+        "project_seed": {
+          "name": "Vector Tooling",
+          "role": "AI Engineer",
+          "period": "2026-03",
+          "background": null,
+          "tech_stack": ["Python", "RAG", "OpenAI"],
+          "responsibilities": [],
+          "results": [],
+          "evidence": [{"type": "notes", "description": "RAG retrieval experiment notes"}],
+          "status": "active"
+        },
+        "jd_seed": {
+          "company": "Example AI Co",
+          "job_title": "AI Application Engineer",
+          "location": "Remote",
+          "raw_text": "Build Python RAG services using OpenAI and grounded citations."
+        }
+      },
+      "expected": {
+        "matched_requirements_should_include": ["Python", "RAG", "OpenAI"],
+        "missing_points_should_include": [],
+        "bullet_keywords_should_include": ["Python", "RAG"],
+        "risk_flags_should_include": [],
+        "requires_evidence_required": true,
+        "forbidden_terms_should_not_appear": ["accuracy", "million users", "production"]
+      }
+    },
+    {
+      "case_id": "project_rewrite_006_no_fabricated_technology",
+      "module": "project_rewrite",
+      "input": {
+        "project_seed": {
+          "name": "SQL Monitor",
+          "role": "Data Engineer",
+          "period": "2026-04",
+          "background": "Reporting validation project.",
+          "tech_stack": ["Python", "SQL", "PostgreSQL"],
+          "responsibilities": ["Built SQL validation jobs and Python reporting checks."],
+          "results": ["Created repeatable local validation runs."],
+          "evidence": [{"type": "checklist", "description": "Validation test checklist"}],
+          "status": "active"
+        },
+        "jd_seed": {
+          "company": "Example AI Co",
+          "job_title": "AI Platform Engineer",
+          "location": "Remote",
+          "raw_text": "Build Python SQL workflows and RAG services with FastAPI."
+        }
+      },
+      "expected": {
+        "matched_requirements_should_include": ["Python", "SQL"],
+        "missing_points_should_include": ["RAG", "FastAPI"],
+        "bullet_keywords_should_include": ["SQL", "Python"],
+        "risk_flags_should_include": ["fabricated_skill"],
+        "forbidden_terms_should_not_appear": ["RAG service", "FastAPI"]
+      }
+    }
+  ]
+}

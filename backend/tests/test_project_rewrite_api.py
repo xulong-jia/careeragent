@@ -114,9 +114,22 @@ def test_create_project_rewrite_success_and_get_detail():
     assert data["id"].startswith("project_rewrite_")
     assert data["project_id"] == project["id"]
     assert data["jd_id"] == job["jd_id"]
-    assert data["rewrite_strategy"] == "deterministic_project_rewrite_v1"
+    assert data["rewrite_strategy"] == "deterministic_trustworthy_project_rewrite_v1"
+    assert data["rewrite_method"] == "deterministic_trustworthy_project_rewrite_v1"
+    assert 0 < data["confidence"] <= 1
     assert "FastAPI" in {point["skill"] for point in data["matched_points"]}
     assert data["rewritten_bullets"]
+    assert {
+        "before",
+        "after",
+        "reason",
+        "evidence_required",
+        "forbidden_changes",
+        "matched_jd_requirements",
+        "missing_points",
+        "risk_level",
+        "confidence",
+    }.issubset(data["rewritten_bullets"][0])
     assert data["forbidden_changes"]
     _assert_private_safe(data)
 

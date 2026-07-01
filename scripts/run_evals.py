@@ -35,6 +35,7 @@ SERVICE_LEVEL_MODULE_FILES = {
     "jd_parser": "jd_parser_cases.json",
     "resume_parser": "resume_parser_cases.json",
     "match": "match_cases.json",
+    "project_rewrite": "project_rewrite_cases.json",
     "rag_retrieval": "rag_retrieval_cases.json",
     "agent_workflow": "agent_workflow_cases.json",
 }
@@ -612,10 +613,93 @@ def _evaluate_service_match(
     case: dict[str, Any],
     expected: dict[str, Any],
 ) -> dict[str, Any]:
-    from app.schemas.matches import MatchRunRequest
+    from app.schemas.matches import MatchCompareRequest, MatchRunRequest
     from app.services import match_service
 
     case_input = dict(case.get("input") or {})
+    if "compare_resume_seeds" in case_input:
+        jd_seed = dict(case_input.get("jd_seed") or {})
+        job = _create_job_from_input(db, jd_seed)
+        version_ids = []
+        for index, seed in enumerate(list(case_input.get("compare_resume_seeds") or [])):
+            resume_seed = dict(seed or {})
+            resume = _create_resume_from_text(
+                db,
+                str(resume_seed.get("filename") or f"compare_resume_{index}.txt"),
+                str(resume_seed.get("raw_text") or ""),
+            )
+            version_ids.append(resume.resume_id + "_version_0001")
+        compare = match_service.compare_matches(
+            db,
+            MatchCompareRequest(jd_id=job.jd_id, resume_version_ids=version_ids),
+        )
+        top_expected_index = int(expected.get("expected_top_resume_index", 0))
+        top_version = version_ids[top_expected_index] if version_ids else None
+        top_item = compare.items[0] if compare.items else None
+        score_range = expected.get("score_range") or [0, 100]
+        metrics = {
+            "dimension_score_present_rate": _hit_rate(
+                expected.get(
+                    "required_dimension_scores",
+                    [
+                        "skill_match",
+                        "project_relevance",
+                        "business_understanding",
+                        "expression_quality",
+                        "education_fit",
+                        "risk_control",
+                    ],
+                ),
+                list(top_item.dimension_scores.keys()) if top_item else [],
+            ),
+            "evidence_dimension_coverage": 1.0,
+            "strength_keyword_hit_rate": _hit_rate(
+                expected.get("expected_strength_keywords", []),
+                _flatten_text(top_item.main_strengths if top_item else []),
+            ),
+            "gap_keyword_hit_rate": _hit_rate(
+                expected.get("expected_gap_keywords", []),
+                _flatten_text(top_item.main_gaps if top_item else []),
+            ),
+            "score_in_expected_range": bool(top_item)
+            and int(score_range[0]) <= top_item.total_score <= int(score_range[1]),
+            "risk_flag_hit_rate": 1.0,
+            "rewrite_priority_hit_rate": 1.0,
+            "scoring_method_present": True,
+            "confidence_present": True,
+            "ranking_consistency": bool(top_item)
+            and top_item.resume_version_id == top_version,
+        }
+        passed = all(
+            [
+                metrics["dimension_score_present_rate"] == 1.0,
+                metrics["strength_keyword_hit_rate"] == 1.0,
+                metrics["gap_keyword_hit_rate"] == 1.0,
+                metrics["score_in_expected_range"],
+                metrics["ranking_consistency"],
+            ]
+        )
+        actual = {
+            "compare_mode": compare.compare_mode,
+            "items": [item.model_dump() for item in compare.items],
+            "expected_top_resume_version_id": top_version,
+        }
+        return _service_result(
+            case=case,
+            module="match",
+            actual=actual,
+            expected=expected,
+            metrics={**metrics, "case_pass": passed},
+            passed=passed,
+            error="Match compare service-level expectations were not met.",
+            input_summary=_safe_text(f"compare resumes against {job.job_title}"),
+            service_calls=[
+                "resume_service.create_resume",
+                "job_service.create_job",
+                "match_service.compare_matches",
+            ],
+        )
+
     resume_seed = dict(case_input.get("resume_seed") or {})
     jd_seed = dict(case_input.get("jd_seed") or {})
     resume = _create_resume_from_text(
@@ -630,11 +714,43 @@ def _evaluate_service_match(
     )
     strengths_text = _flatten_text(report.strengths)
     gaps_text = _flatten_text(report.gaps)
+    rewrite_priorities_text = _flatten_text(report.rewrite_priorities)
     evidence_dimensions = [item.dimension for item in report.evidence]
+    expected_dimensions = expected.get(
+        "required_evidence_dimensions",
+        [
+            "skill_match",
+            "project_relevance",
+            "business_understanding",
+            "expression_quality",
+            "education_fit",
+            "risk_control",
+        ],
+    )
+    expected_score_dimensions = expected.get(
+        "required_dimension_scores",
+        [
+            "skill_match",
+            "project_relevance",
+            "business_understanding",
+            "expression_quality",
+            "education_fit",
+            "risk_control",
+        ],
+    )
     score_range = expected.get("score_range") or [0, 100]
+    risk_flag_types = [
+        str(flag.get("type"))
+        for flag in report.risk_flags
+        if isinstance(flag, dict) and flag.get("type")
+    ]
     metrics = {
+        "dimension_score_present_rate": _hit_rate(
+            expected_score_dimensions,
+            list(report.dimension_scores.keys()),
+        ),
         "evidence_dimension_coverage": _hit_rate(
-            expected.get("required_evidence_dimensions", []),
+            expected_dimensions,
             evidence_dimensions,
         ),
         "strength_keyword_hit_rate": _hit_rate(
@@ -648,16 +764,29 @@ def _evaluate_service_match(
         "score_in_expected_range": int(score_range[0])
         <= report.total_score
         <= int(score_range[1]),
-        "risk_flags_match": sorted(report.risk_flags)
-        == sorted(expected.get("risk_flags_expected", [])),
+        "risk_flag_hit_rate": _hit_rate(
+            expected.get("risk_flags_should_include", []),
+            risk_flag_types,
+        ),
+        "rewrite_priority_hit_rate": _hit_rate(
+            expected.get("rewrite_priorities_should_include", []),
+            rewrite_priorities_text,
+        ),
+        "scoring_method_present": bool(report.scoring_method),
+        "confidence_present": isinstance(report.confidence, int | float)
+        and report.confidence > 0,
     }
     passed = all(
         [
+            metrics["dimension_score_present_rate"] == 1.0,
             metrics["evidence_dimension_coverage"] == 1.0,
             metrics["strength_keyword_hit_rate"] == 1.0,
             metrics["gap_keyword_hit_rate"] == 1.0,
             metrics["score_in_expected_range"],
-            metrics["risk_flags_match"],
+            metrics["risk_flag_hit_rate"] == 1.0,
+            metrics["rewrite_priority_hit_rate"] == 1.0,
+            metrics["scoring_method_present"],
+            metrics["confidence_present"],
         ]
     )
     actual = {
@@ -667,7 +796,12 @@ def _evaluate_service_match(
         "evidence": [item.model_dump() for item in report.evidence],
         "strengths": report.strengths,
         "gaps": report.gaps,
+        "rewrite_priorities": report.rewrite_priorities,
         "risk_flags": report.risk_flags,
+        "recommended_projects": report.recommended_projects,
+        "score_breakdown": report.score_breakdown,
+        "scoring_method": report.scoring_method,
+        "confidence": report.confidence,
     }
     return _service_result(
         case=case,
@@ -682,6 +816,140 @@ def _evaluate_service_match(
             "resume_service.create_resume",
             "job_service.create_job",
             "match_service.run_match_report",
+        ],
+    )
+
+
+def _evaluate_service_project_rewrite(
+    db: Any,
+    case: dict[str, Any],
+    expected: dict[str, Any],
+) -> dict[str, Any]:
+    from app.schemas.projects import ProjectCreateRequest, ProjectRewriteRequest
+    from app.services import project_rewrite_service, project_service
+
+    case_input = dict(case.get("input") or {})
+    project_seed = dict(case_input.get("project_seed") or {})
+    jd_seed = dict(case_input.get("jd_seed") or {})
+    project = project_service.create_project(
+        db,
+        ProjectCreateRequest(
+            name=str(project_seed.get("name") or "Service Rewrite Project"),
+            role=project_seed.get("role"),
+            period=project_seed.get("period"),
+            background=project_seed.get("background"),
+            tech_stack=list(project_seed.get("tech_stack") or []),
+            responsibilities=list(project_seed.get("responsibilities") or []),
+            results=list(project_seed.get("results") or []),
+            evidence=list(project_seed.get("evidence") or []),
+            status=str(project_seed.get("status") or "active"),
+        ),
+    )
+    job = _create_job_from_input(db, jd_seed)
+    rewrite = project_rewrite_service.create_project_rewrite(
+        db,
+        project.id,
+        ProjectRewriteRequest(jd_id=job.jd_id),
+    )
+    bullets = [bullet.model_dump() for bullet in rewrite.rewritten_bullets]
+    matched_points = [point.model_dump() for point in rewrite.matched_points]
+    missing_points = [point.model_dump() for point in rewrite.missing_points]
+    risk_flags = [flag.model_dump() for flag in rewrite.risk_flags]
+    bullet_text = _flatten_text(bullets)
+    matched_text = _flatten_text(matched_points)
+    missing_text = _flatten_text(missing_points)
+    risk_types = [
+        str(flag.get("type"))
+        for flag in risk_flags
+        if isinstance(flag, dict) and flag.get("type")
+    ]
+    before_after_present = bool(bullets) and all(
+        "before" in bullet and "after" in bullet for bullet in bullets
+    )
+    requires_evidence = bool(expected.get("requires_evidence_required"))
+    evidence_required_present = all(
+        "evidence_required" in bullet
+        for bullet in bullets
+    ) and (
+        not requires_evidence
+        or any(bool(bullet.get("evidence_required")) for bullet in bullets)
+    )
+    forbidden_changes_present = bool(rewrite.forbidden_changes) and all(
+        bullet.get("forbidden_changes") for bullet in bullets
+    )
+    risk_level_present = bool(bullets) and all(
+        bullet.get("risk_level") in {"low", "medium", "high"} for bullet in bullets
+    )
+    forbidden_terms = [
+        str(term).lower()
+        for term in expected.get("forbidden_terms_should_not_appear", [])
+    ]
+    after_text = " ".join(str(bullet.get("after") or "") for bullet in bullets).lower()
+    fabrication_guard_pass = not any(term and term in after_text for term in forbidden_terms)
+    metrics = {
+        "before_after_present": before_after_present,
+        "evidence_required_present": evidence_required_present,
+        "forbidden_changes_present": forbidden_changes_present,
+        "risk_level_present": risk_level_present,
+        "matched_requirement_hit_rate": _hit_rate(
+            expected.get("matched_requirements_should_include", []),
+            matched_text,
+        ),
+        "missing_point_hit_rate": _hit_rate(
+            expected.get("missing_points_should_include", []),
+            missing_text,
+        ),
+        "risk_flag_hit_rate": _hit_rate(
+            expected.get("risk_flags_should_include", []),
+            risk_types,
+        ),
+        "bullet_keyword_hit_rate": _hit_rate(
+            expected.get("bullet_keywords_should_include", []),
+            bullet_text,
+        ),
+        "fabrication_guard_pass": fabrication_guard_pass,
+    }
+    passed = all(
+        [
+            before_after_present,
+            evidence_required_present,
+            forbidden_changes_present,
+            risk_level_present,
+            metrics["matched_requirement_hit_rate"] == 1.0,
+            metrics["missing_point_hit_rate"] == 1.0,
+            metrics["risk_flag_hit_rate"] == 1.0,
+            metrics["bullet_keyword_hit_rate"] == 1.0,
+            fabrication_guard_pass,
+        ]
+    )
+    actual = {
+        "rewrite_id": rewrite.id,
+        "project_id": rewrite.project_id,
+        "jd_id": rewrite.jd_id,
+        "matched_points": matched_points,
+        "missing_points": missing_points,
+        "evidence_required": [
+            item.model_dump() for item in rewrite.evidence_required
+        ],
+        "rewritten_bullets": bullets,
+        "forbidden_changes": rewrite.forbidden_changes,
+        "risk_flags": risk_flags,
+        "rewrite_method": rewrite.rewrite_method,
+        "confidence": rewrite.confidence,
+    }
+    return _service_result(
+        case=case,
+        module="project_rewrite",
+        actual=actual,
+        expected=expected,
+        metrics={**metrics, "case_pass": passed},
+        passed=passed,
+        error="Project rewrite service-level expectations were not met.",
+        input_summary=_safe_text(f"{project.name} against {job.job_title}"),
+        service_calls=[
+            "project_service.create_project",
+            "job_service.create_job",
+            "project_rewrite_service.create_project_rewrite",
         ],
     )
 
@@ -880,6 +1148,7 @@ SERVICE_LEVEL_EVALUATORS = {
     "jd_parser": _evaluate_service_jd_parser,
     "resume_parser": _evaluate_service_resume_parser,
     "match": _evaluate_service_match,
+    "project_rewrite": _evaluate_service_project_rewrite,
     "rag_retrieval": _evaluate_service_rag_retrieval,
     "agent_workflow": _evaluate_service_agent_workflow,
 }

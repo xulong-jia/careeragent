@@ -91,11 +91,12 @@ def test_service_level_loader_reads_dataset_cases():
     assert by_module == {
         "agent_workflow": 3,
         "jd_parser": 12,
-        "match": 5,
+        "match": 9,
+        "project_rewrite": 6,
         "rag_retrieval": 6,
         "resume_parser": 8,
     }
-    assert len(cases) == 34
+    assert len(cases) == 44
 
 
 def test_eval_metrics_aggregate_module_metrics():
@@ -240,3 +241,37 @@ def test_service_level_resume_parser_eval_covers_parser_metrics(tmp_path):
         item["actual_output"]["parser_metadata"]["foundation_only"] is True
         for item in actual_outputs
     )
+
+
+def test_service_level_match_eval_covers_trustworthy_metrics(tmp_path):
+    output_dir = tmp_path / "match-service-level-results"
+
+    result_code = run_evals.run("service_level", "match", output_dir)
+
+    assert result_code == 0
+    metrics = json.loads((output_dir / "metrics.json").read_text())
+    match_metrics = metrics["by_module"]["match"]["metrics"]
+
+    assert metrics["total_count"] == 9
+    assert "dimension_score_present_rate" in match_metrics
+    assert "risk_flag_hit_rate" in match_metrics
+    assert "rewrite_priority_hit_rate" in match_metrics
+    assert "scoring_method_present" in match_metrics
+    assert "confidence_present" in match_metrics
+
+
+def test_service_level_project_rewrite_eval_covers_guardrail_metrics(tmp_path):
+    output_dir = tmp_path / "project-rewrite-service-level-results"
+
+    result_code = run_evals.run("service_level", "project_rewrite", output_dir)
+
+    assert result_code == 0
+    metrics = json.loads((output_dir / "metrics.json").read_text())
+    rewrite_metrics = metrics["by_module"]["project_rewrite"]["metrics"]
+
+    assert metrics["total_count"] == 6
+    assert "before_after_present" in rewrite_metrics
+    assert "evidence_required_present" in rewrite_metrics
+    assert "forbidden_changes_present" in rewrite_metrics
+    assert "risk_level_present" in rewrite_metrics
+    assert "fabrication_guard_pass" in rewrite_metrics

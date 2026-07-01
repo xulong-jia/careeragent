@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -37,6 +37,14 @@ class MatchReport(Base):
     gaps: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     rewrite_priorities: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     risk_flags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    recommended_projects: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    score_breakdown: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    scoring_method: Mapped[str] = mapped_column(
+        String(120),
+        default="deterministic_trustworthy_match_v1",
+        nullable=False,
+    )
+    confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )

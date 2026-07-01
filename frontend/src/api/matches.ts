@@ -1,5 +1,10 @@
 import { requestJson } from "./client";
-import type { ListResponse, MatchReport } from "../types/api";
+import type {
+  ListResponse,
+  MatchCompareRequest,
+  MatchCompareResponse,
+  MatchReport,
+} from "../types/api";
 
 type MatchListFilters = {
   jdId?: string;
@@ -34,4 +39,16 @@ export function listMatches(
 
 export function getMatch(matchReportId: string): Promise<MatchReport> {
   return requestJson<MatchReport>(`/api/matches/${matchReportId}`);
+}
+
+export function compareMatches(
+  payload: MatchCompareRequest,
+): Promise<MatchCompareResponse> {
+  return requestJson<MatchCompareResponse>("/api/matches/compare", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 }

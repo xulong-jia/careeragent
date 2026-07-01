@@ -143,8 +143,22 @@ Rewrite response 关键字段：
 - `forbidden_changes`
 - `risk_flags`
 - `rewrite_strategy`
+- `rewrite_method`
+- `confidence`
 
-当前 Project Rewrite 是 deterministic rule-based backend：只从用户保存的 project facts 和 JD profile 中提取匹配点，不接真实 LLM，不自动改写简历版本，不编造公司、用户量、收益、准确率、上线状态、业务规模、技术栈或 unsupported metric。risk_flags 覆盖 unsupported metric、fabricated skill、missing evidence、overclaim 和 learning-to-business overclaim。Project API 不返回 Resume raw text，也不自动从简历生成项目事实。
+每条 `rewritten_bullets` item 包含：
+
+- `before`
+- `after`
+- `reason`
+- `evidence_required`
+- `forbidden_changes`
+- `matched_jd_requirements`
+- `missing_points`
+- `risk_level`
+- `confidence`
+
+当前 Project Rewrite 是 deterministic trustworthy foundation backend：只从用户保存的 project facts 和 JD profile 中提取匹配点，不接真实 LLM，不自动改写简历版本，不编造公司、用户量、收益、准确率、上线状态、业务规模、技术栈或 unsupported metric。risk_flags 覆盖 unsupported metric、fabricated skill、missing evidence、overclaim、learning-to-business overclaim、project/JD mismatch、unsupported production claim 和 unsupported business impact。Project API 不返回 Resume raw text，也不自动从简历生成项目事实。
 
 前端流程：ProjectOptimizationPage 支持创建 / 更新 project facts、选择 project、输入 JD ID 运行 rewrite，并展示 matched points、missing points、evidence required、rewritten bullets、forbidden changes 和 risk flags。页面只展示建议，不自动写回 Resume Version。
 
@@ -227,7 +241,8 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| POST | `/api/matches/run` | 针对 resume version 和 JD 运行 deterministic match |
+| POST | `/api/matches/run` | 针对 resume version 和 JD 运行 trustworthy deterministic match foundation |
+| POST | `/api/matches/compare` | 同一 JD 比较多个 resume versions，或同一 resume version 比较多个 JDs |
 | GET | `/api/matches` | 查询 match reports |
 | GET | `/api/matches?jd_id={jd_id}` | 按 JD 筛选 |
 | GET | `/api/matches?resume_version_id={resume_version_id}` | 按 resume version 筛选 |
@@ -241,6 +256,36 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 - `strengths`
 - `gaps`
 - `evidence`
+- `rewrite_priorities`
+- `risk_flags`
+- `recommended_projects`
+- `score_breakdown`
+- `scoring_method`
+- `confidence`
+
+`dimension_scores` 固定覆盖六维：`skill_match`、`project_relevance`、`business_understanding`、`expression_quality`、`education_fit`、`risk_control`。`score_breakdown` 记录 weights、weighted score、risk penalty、matched/missing required skills、project-supported required skills 和 `foundation_only=true`。
+
+`POST /api/matches/compare` request 二选一：
+
+- `{"jd_id": "...", "resume_version_ids": ["...", "..."]}`
+- `{"resume_version_id": "...", "jd_ids": ["...", "..."]}`
+
+Compare response 关键字段：
+
+- `compare_mode`
+- `sort_key`
+- `items[].rank`
+- `items[].match_report_id`
+- `items[].resume_version_id`
+- `items[].jd_id`
+- `items[].total_score`
+- `items[].score_delta_from_top`
+- `items[].main_strengths`
+- `items[].main_gaps`
+- `items[].risk_flags`
+- `items[].dimension_scores`
+
+当前 Match 是 deterministic trustworthy foundation，不是生产级求职判断。分数必须结合 evidence、risk flags 和人工确认使用。
 
 ## Interview APIs
 
@@ -786,4 +831,4 @@ P1 privacy endpoints 只作用于当前 authenticated user/workspace，并使用
 - `evaluation_results.passed`
 - `evaluation_results.score`
 
-当前支持 7 个 deterministic modules：`jd_parser`、`resume_parser`、`match`、`rag`、`agent`、`application`、`bad_case`。内置 `synthetic_smoke_v1` 覆盖全部模块，文件化 smoke fixtures 位于 `evals/datasets/smoke` 和 `evals/expected/smoke`。当前只支持 deterministic smoke / regression tracking，不做 LLM judge，不做多模型对比。
+当前内置 synthetic smoke 支持 7 个 deterministic modules：`jd_parser`、`resume_parser`、`match`、`rag`、`agent`、`application`、`bad_case`。`service_level` dataset 额外覆盖 `project_rewrite`，并将 Match 扩展到 trustworthy foundation metrics。文件化 fixtures 位于 `evals/datasets/` 和 `evals/expected/`。当前只支持 deterministic smoke / service-level foundation / regression tracking，不做 LLM judge，不做多模型对比。

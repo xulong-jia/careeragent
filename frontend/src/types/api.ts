@@ -266,7 +266,11 @@ export type ProjectRewrittenBullet = {
   after: string;
   reason: string;
   evidence_required: string;
+  forbidden_changes: string[];
+  matched_jd_requirements: string[];
+  missing_points: string[];
   risk_level: "low" | "medium" | "high";
+  confidence: number;
 };
 
 export type ProjectRiskFlag = {
@@ -275,7 +279,10 @@ export type ProjectRiskFlag = {
     | "missing_evidence"
     | "overclaim"
     | "fabricated_skill"
-    | "learning_to_business_overclaim";
+    | "learning_to_business_overclaim"
+    | "project_jd_mismatch"
+    | "production_claim_unsupported"
+    | "business_impact_unsupported";
   severity: "low" | "medium" | "high";
   source_field: string;
   message: string;
@@ -306,6 +313,8 @@ export type ProjectRewriteRecord = {
   forbidden_changes: ProjectForbiddenChange[];
   risk_flags: ProjectRiskFlag[];
   rewrite_strategy: string;
+  rewrite_method: string;
+  confidence: number;
   created_at: string;
 };
 
@@ -556,6 +565,8 @@ export type MatchEvidence = {
   jd_requirement: string;
   resume_signal: string | null;
   score_impact: string;
+  source?: string | null;
+  confidence?: number | null;
 };
 
 export type MatchReport = {
@@ -571,7 +582,38 @@ export type MatchReport = {
   gaps: string[];
   rewrite_priorities: string[];
   risk_flags: Record<string, unknown>[];
+  recommended_projects: Record<string, unknown>[];
+  score_breakdown: Record<string, unknown>;
+  scoring_method: string;
+  confidence: number;
   created_at?: string | null;
+};
+
+export type MatchCompareRequest = {
+  jd_id?: string | null;
+  resume_version_ids?: string[];
+  resume_version_id?: string | null;
+  jd_ids?: string[];
+};
+
+export type MatchCompareItem = {
+  rank: number;
+  match_report_id: string;
+  resume_id: string;
+  resume_version_id?: string | null;
+  jd_id: string;
+  total_score: number;
+  score_delta_from_top: number;
+  main_strengths: string[];
+  main_gaps: string[];
+  risk_flags: Record<string, unknown>[];
+  dimension_scores: Record<string, number>;
+};
+
+export type MatchCompareResponse = {
+  compare_mode: string;
+  sort_key: string;
+  items: MatchCompareItem[];
 };
 
 export type RagDocumentRecord = {

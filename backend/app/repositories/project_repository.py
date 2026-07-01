@@ -76,6 +76,8 @@ def _to_project_rewrite_record(record: ProjectRewrite) -> ProjectRewriteRecord:
         forbidden_changes=list(record.forbidden_changes or []),
         risk_flags=list(record.risk_flags or []),
         rewrite_strategy=record.rewrite_strategy,
+        rewrite_method=record.rewrite_strategy,
+        confidence=float(record.confidence or 0.0),
         created_at=record.created_at,
     )
 
@@ -136,6 +138,7 @@ def create_project_rewrite(
     forbidden_changes: list[str],
     risk_flags: list[dict[str, object]],
     rewrite_strategy: str,
+    confidence: float,
 ) -> ProjectRewriteRecord:
     record = ProjectRewrite(
         id=_next_project_rewrite_id(db),
@@ -153,6 +156,7 @@ def create_project_rewrite(
         forbidden_changes=forbidden_changes,
         risk_flags=risk_flags,
         rewrite_strategy=rewrite_strategy,
+        confidence=confidence,
     )
     try:
         db.add(record)

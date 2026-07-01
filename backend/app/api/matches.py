@@ -3,8 +3,14 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.common import ApiResponse, ListResponse
-from app.schemas.matches import MatchReport, MatchRunRequest
+from app.schemas.matches import (
+    MatchCompareRequest,
+    MatchCompareResponse,
+    MatchReport,
+    MatchRunRequest,
+)
 from app.services.match_service import (
+    compare_matches,
     get_match_report,
     list_match_reports,
     run_match_report,
@@ -24,6 +30,14 @@ async def run_match(
 ) -> dict[str, object]:
     report = run_match_report(db, payload)
     return {"data": report, "request_id": request.state.request_id}
+
+
+@router.post("/compare", response_model=ApiResponse[MatchCompareResponse])
+async def compare_match_reports(
+    request: Request, payload: MatchCompareRequest, db: Session = Depends(get_db)
+) -> dict[str, object]:
+    result = compare_matches(db, payload)
+    return {"data": result, "request_id": request.state.request_id}
 
 
 @router.get("", response_model=ApiResponse[ListResponse[MatchReport]])

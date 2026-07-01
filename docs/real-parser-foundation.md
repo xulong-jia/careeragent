@@ -98,6 +98,6 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset servi
 - Not default production LLM parser: real provider path is opt-in and must be calibrated separately.
 - Complex bilingual PDFs, tables, unusual layouts, and noisy resumes still need larger evaluation.
 - `raw_text` remains plaintext and is a 2.6 privacy/security blocker.
-- Match scoring remains 2.4 scope; Agent workflow remains 2.5 scope; deployment/privacy hardening remains 2.6 scope.
+- Match scoring and Project Rewrite have 2.4 trustworthy foundation, but still require larger human agreement/ranking stability validation. Agent workflow remains 2.5 scope; deployment/privacy hardening remains 2.6 scope.
 
-Next phase: 2.4 Trustworthy Match Scoring + Project Rewrite.
+Next phase: 2.5 Agent Workflow Productionization.

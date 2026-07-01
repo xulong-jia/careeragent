@@ -93,6 +93,8 @@ def test_rewrite_rules_generate_evidence_required_and_risk_flags_for_metrics():
     assert any(
         bullet["risk_level"] in {"medium", "high"}
         and "evidence" in bullet["evidence_required"].lower()
+        and bullet["forbidden_changes"]
+        and isinstance(bullet["confidence"], float)
         for bullet in rewrite["rewritten_bullets"]
     )
 
@@ -162,3 +164,26 @@ def test_forbidden_changes_include_project_fabrication_boundaries():
         "tech_stack_not_in_facts",
         "unsupported_metric",
     }.issubset(set(rewrite["forbidden_changes"]))
+
+
+def test_rewrite_rules_generate_conservative_bullet_when_original_bullet_empty():
+    client = make_client()
+    project = _create_project(
+        client,
+        background=None,
+        tech_stack=["Python", "RAG"],
+        responsibilities=[],
+        results=[],
+        evidence=[{"type": "notes", "description": "RAG experiment notes"}],
+    )
+    job = _create_job(client)
+
+    rewrite = _run_rewrite(client, project["id"], job["jd_id"])
+
+    assert rewrite["rewritten_bullets"]
+    bullet = rewrite["rewritten_bullets"][0]
+    assert bullet["before"] == ""
+    assert bullet["after"]
+    assert bullet["risk_level"] in {"medium", "high"}
+    assert bullet["evidence_required"]
+    assert bullet["forbidden_changes"]

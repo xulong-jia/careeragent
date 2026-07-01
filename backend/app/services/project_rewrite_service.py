@@ -22,7 +22,7 @@ from app.schemas.projects import (
 )
 
 
-REWRITE_STRATEGY = "deterministic_project_rewrite_v1"
+REWRITE_STRATEGY = "deterministic_trustworthy_project_rewrite_v1"
 
 FORBIDDEN_CHANGES = [
     "company",
@@ -33,6 +33,7 @@ FORBIDDEN_CHANGES = [
     "business_scale",
     "tech_stack_not_in_facts",
     "unsupported_metric",
+    "unsupported_production_or_business_impact",
 ]
 
 METRIC_PATTERN = re.compile(
@@ -117,7 +118,14 @@ def create_project_rewrite(
     rewritten_bullets = _build_rewritten_bullets(
         project,
         matched_points=matched_points,
+        missing_points=missing_points,
         evidence_required=evidence_required,
+    )
+    confidence = _rewrite_confidence(
+        matched_points=matched_points,
+        missing_points=missing_points,
+        evidence_required=evidence_required,
+        risk_flags=risk_flags,
     )
 
     return project_repository.create_project_rewrite(
@@ -134,6 +142,7 @@ def create_project_rewrite(
         forbidden_changes=FORBIDDEN_CHANGES,
         risk_flags=[flag.model_dump() for flag in risk_flags],
         rewrite_strategy=REWRITE_STRATEGY,
+        confidence=confidence,
     )
 
 
@@ -452,6 +461,22 @@ def _build_risk_flags(
             )
             seen.add(key)
 
+    if any(point.requirement_type == "required_skill" for point in missing_points):
+        key = ("project_jd_mismatch", "required_skill_gap")
+        if key not in seen:
+            risk_flags.append(
+                ProjectRiskFlag(
+                    type="project_jd_mismatch",
+                    severity="high",
+                    source_field="jd_requirement",
+                    message=(
+                        "Project facts do not cover every required JD skill; do not "
+                        "rewrite as a full project/JD match."
+                    ),
+                )
+            )
+            seen.add(key)
+
     for item in evidence_required:
         key = (item.type, item.project_text)
         if key in seen:
@@ -510,6 +535,28 @@ def _build_risk_flags(
                         ),
                     )
                 )
+                risk_flags.append(
+                    ProjectRiskFlag(
+                        type="production_claim_unsupported",
+                        severity="high",
+                        source_field=item.source_field,
+                        message=(
+                            "Production launch claims require external project "
+                            "evidence before reuse."
+                        ),
+                    )
+                )
+                risk_flags.append(
+                    ProjectRiskFlag(
+                        type="business_impact_unsupported",
+                        severity="high",
+                        source_field=item.source_field,
+                        message=(
+                            "Business scale or impact claims require explicit "
+                            "supporting evidence."
+                        ),
+                    )
+                )
         seen.add(key)
 
     return risk_flags
@@ -519,6 +566,7 @@ def _build_rewritten_bullets(
     project: Project,
     *,
     matched_points: list[ProjectMatchedPoint],
+    missing_points: list[ProjectMissingPoint],
     evidence_required: list[ProjectEvidenceRequired],
 ) -> list[ProjectRewrittenBullet]:
     bullets: list[ProjectRewrittenBullet] = []
@@ -527,6 +575,28 @@ def _build_rewritten_bullets(
         background = _clean_text(project.background)
         if background:
             source_bullets = [background]
+
+    if not source_bullets:
+        after = _conservative_empty_bullet(project, matched_points)
+        return [
+            ProjectRewrittenBullet(
+                before="",
+                after=after,
+                reason=(
+                    "No original project bullet exists; generated a conservative "
+                    "draft from verified project facts only."
+                ),
+                evidence_required=(
+                    "Evidence required: user must add concrete responsibility, "
+                    "scope, and result evidence before using this bullet."
+                ),
+                forbidden_changes=FORBIDDEN_CHANGES,
+                matched_jd_requirements=_matched_requirement_labels(matched_points),
+                missing_points=_missing_requirement_labels(missing_points),
+                risk_level="medium",
+                confidence=0.45,
+            )
+        ]
 
     for before in source_bullets:
         evidence_note = _evidence_note_for_text(before, evidence_required)
@@ -537,10 +607,64 @@ def _build_rewritten_bullets(
                 after=after,
                 reason="Rewritten only from existing project facts and matched JD skills.",
                 evidence_required=evidence_note,
+                forbidden_changes=FORBIDDEN_CHANGES,
+                matched_jd_requirements=_matched_requirement_labels(
+                    _matched_points_for_text(before, matched_points)
+                ),
+                missing_points=_missing_requirement_labels(missing_points),
                 risk_level=_risk_level_for_bullet(evidence_note, before),
+                confidence=_bullet_confidence(evidence_note, before, matched_points),
             )
         )
     return bullets
+
+
+def _conservative_empty_bullet(
+    project: Project,
+    matched_points: list[ProjectMatchedPoint],
+) -> str:
+    facts = _dedupe_clean(_clean_list(project.tech_stack))
+    matched = _matched_requirement_labels(matched_points)
+    parts = []
+    if facts:
+        parts.append("Worked on project facts involving " + ", ".join(facts[:4]))
+    if matched:
+        parts.append("with verified JD alignment to " + ", ".join(matched[:3]))
+    if not parts:
+        parts.append("Documented project facts for later resume rewrite")
+    return "; ".join(parts) + "."
+
+
+def _matched_points_for_text(
+    text: str,
+    matched_points: list[ProjectMatchedPoint],
+) -> list[ProjectMatchedPoint]:
+    return [
+        point
+        for point in matched_points
+        if point.project_text == text or _contains_skill(text, point.skill)
+    ]
+
+
+def _matched_requirement_labels(points: list[ProjectMatchedPoint]) -> list[str]:
+    return _dedupe_clean([point.jd_requirement for point in points])
+
+
+def _missing_requirement_labels(points: list[ProjectMissingPoint]) -> list[str]:
+    return _dedupe_clean([point.requirement for point in points])
+
+
+def _bullet_confidence(
+    evidence_note: str,
+    before: str,
+    matched_points: list[ProjectMatchedPoint],
+) -> float:
+    base = 0.72 if matched_points else 0.55
+    if evidence_note:
+        base -= 0.18
+    if _has_metric_claim(before):
+        base -= 0.12
+    return round(max(0.0, min(1.0, base)), 4)
 
 
 def _rewrite_without_fabrication(
@@ -574,6 +698,20 @@ def _risk_level_for_bullet(evidence_note: str, before: str) -> str:
     if _has_metric_claim(before):
         return "high"
     return "medium"
+
+
+def _rewrite_confidence(
+    *,
+    matched_points: list[ProjectMatchedPoint],
+    missing_points: list[ProjectMissingPoint],
+    evidence_required: list[ProjectEvidenceRequired],
+    risk_flags: list[ProjectRiskFlag],
+) -> float:
+    coverage = len(matched_points) / max(1, len(matched_points) + len(missing_points))
+    base = 0.45 + coverage * 0.35
+    base -= min(0.2, len(evidence_required) * 0.04)
+    base -= min(0.18, len(risk_flags) * 0.03)
+    return round(max(0.0, min(1.0, base)), 4)
 
 
 def _evidence_note_for_text(
