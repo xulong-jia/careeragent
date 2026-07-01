@@ -1,0 +1,86 @@
+{
+  "dataset_name": "service_level",
+  "module": "resume_parser",
+  "cases": [
+    {
+      "case_id": "resume_service_001",
+      "module": "resume_parser",
+      "input": {
+        "filename": "backend_candidate.md",
+        "file_type": "md",
+        "raw_text": "Backend Candidate\nLocation: Sydney\n\nEducation\nExample University | Master of Information Technology | Major: Software Engineering | 2024-02 to 2025-11\n\nProjects\nProject: API Reliability Workbench\nRole: Backend Developer\nPeriod: 2025-03 to 2025-06\nTech: Python, FastAPI, SQL, Docker\nResponsibilities: Built health check APIs and migration checks\nResults: Reduced failed local setup cases in synthetic tests\n\nSkills\nPython, FastAPI, SQL, Docker, Git"
+      },
+      "expected": {
+        "sections_should_include": ["education", "projects", "skills"],
+        "skills_should_include": ["Python", "FastAPI", "SQL", "Docker"],
+        "projects_should_include": ["API Reliability Workbench"],
+        "education_should_include": ["Example University", "Master"],
+        "risk_flags_expected": ["unsupported_metric", "missing_evidence"]
+      }
+    },
+    {
+      "case_id": "resume_service_002",
+      "module": "resume_parser",
+      "input": {
+        "filename": "rag_candidate.txt",
+        "file_type": "txt",
+        "raw_text": "RAG Candidate\nLocation: Melbourne\n\nEducation\nExample University | Bachelor of Computer Science | Major: Data Systems | 2021-02 to 2024-11\n\nProjects\nProject: Document Grounding Assistant\nRole: AI Application Intern\nPeriod: 2024-03 to 2024-08\nTech: Python, RAG, LLM, OpenAI, PostgreSQL\nResponsibilities: Built retrieval checks and citation review flow\nResults: Improved answer review coverage in de-identified cases\n\nSkills\nPython, RAG, LLM, OpenAI, PostgreSQL"
+      },
+      "expected": {
+        "sections_should_include": ["education", "projects", "skills"],
+        "skills_should_include": ["Python", "RAG", "LLM", "OpenAI", "PostgreSQL"],
+        "projects_should_include": ["Document Grounding Assistant"],
+        "education_should_include": ["Example University", "Bachelor"],
+        "risk_flags_expected": ["unsupported_metric", "missing_evidence"]
+      }
+    },
+    {
+      "case_id": "resume_service_003",
+      "module": "resume_parser",
+      "input": {
+        "filename": "frontend_candidate.md",
+        "file_type": "md",
+        "raw_text": "Frontend Candidate\nLocation: Brisbane\n\nEducation\nExample Institute | Bachelor of Software Design | Major: Interaction Systems | 2020-02 to 2023-11\n\nProjects\nProject: Hiring Dashboard UI\nRole: Frontend Developer\nPeriod: 2023-07 to 2023-12\nTech: TypeScript, React, HTML, CSS\nResponsibilities: Built responsive workflow panels and API error states\nResults: Improved task completion in synthetic usability review\n\nSkills\nTypeScript, React, HTML, CSS, Git"
+      },
+      "expected": {
+        "sections_should_include": ["education", "projects", "skills"],
+        "skills_should_include": ["TypeScript", "React", "HTML", "CSS"],
+        "projects_should_include": ["Hiring Dashboard UI"],
+        "education_should_include": ["Example Institute", "Bachelor"],
+        "risk_flags_expected": ["unsupported_metric", "missing_evidence"]
+      }
+    },
+    {
+      "case_id": "resume_service_004",
+      "module": "resume_parser",
+      "input": {
+        "filename": "data_candidate.txt",
+        "file_type": "txt",
+        "raw_text": "Data Candidate\nLocation: Adelaide\n\nEducation\nExample University | Master of Data Analytics | Major: Analytics Engineering | 2023-02 to 2024-11\n\nProjects\nProject: SQL Quality Monitor\nRole: Data Platform Intern\nPeriod: 2024-04 to 2024-09\nTech: Python, SQL, PostgreSQL, Docker\nResponsibilities: Created validation jobs for reporting tables\nResults: Flagged stale records in synthetic data checks\n\nSkills\nPython, SQL, PostgreSQL, Docker, Linux"
+      },
+      "expected": {
+        "sections_should_include": ["education", "projects", "skills"],
+        "skills_should_include": ["Python", "SQL", "PostgreSQL", "Docker"],
+        "projects_should_include": ["SQL Quality Monitor"],
+        "education_should_include": ["Example University", "Master"],
+        "risk_flags_expected": ["missing_evidence"]
+      }
+    },
+    {
+      "case_id": "resume_service_005",
+      "module": "resume_parser",
+      "input": {
+        "filename": "fullstack_candidate.md",
+        "file_type": "md",
+        "raw_text": "Fullstack Candidate\nLocation: Perth\n\nEducation\nExample College | Bachelor of Information Systems | Major: Web Engineering | 2020-02 to 2023-11\n\nProjects\nProject: Application Tracker\nRole: Fullstack Developer\nPeriod: 2023-03 to 2023-10\nTech: TypeScript, React, Python, FastAPI, SQLite\nResponsibilities: Built application board APIs and frontend filters\nResults: Simplified synthetic application tracking reviews\n\nSkills\nTypeScript, React, Python, FastAPI, SQLite"
+      },
+      "expected": {
+        "sections_should_include": ["education", "projects", "skills"],
+        "skills_should_include": ["TypeScript", "React", "Python", "FastAPI", "SQLite"],
+        "projects_should_include": ["Application Tracker"],
+        "education_should_include": ["Example College", "Bachelor"],
+        "risk_flags_expected": ["missing_evidence"]
+      }
+    }
+  ]
+}

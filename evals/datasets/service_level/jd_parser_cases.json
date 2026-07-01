@@ -1,0 +1,158 @@
+{
+  "dataset_name": "service_level",
+  "module": "jd_parser",
+  "cases": [
+    {
+      "case_id": "jd_service_001",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example AI Co",
+        "job_title": "Backend Engineer",
+        "location": "Sydney",
+        "raw_text": "Build Python FastAPI services for student workflow APIs. Responsibilities include SQL data modelling, Docker packaging, and API reliability reviews."
+      },
+      "expected": {
+        "role_category": "Python Backend Developer",
+        "required_skills_should_include": ["Python", "FastAPI", "SQL"],
+        "preferred_skills_should_include": ["Docker"],
+        "responsibilities_should_include": ["Build", "FastAPI"],
+        "minimum_required_skill_hits": 3,
+        "minimum_preferred_skill_hits": 1,
+        "minimum_responsibility_hits": 2
+      }
+    },
+    {
+      "case_id": "jd_service_002",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example Cloud Lab",
+        "job_title": "Fullstack Developer",
+        "location": "Melbourne",
+        "raw_text": "Deliver TypeScript dashboards with React for operations teams. Responsibilities include SQL-backed reporting, Docker-based local environments, and frontend quality checks."
+      },
+      "expected": {
+        "role_category": "Frontend / Fullstack Developer",
+        "required_skills_should_include": ["TypeScript", "SQL"],
+        "preferred_skills_should_include": ["React", "Docker"],
+        "responsibilities_should_include": ["Deliver", "React"],
+        "minimum_required_skill_hits": 2,
+        "minimum_preferred_skill_hits": 2,
+        "minimum_responsibility_hits": 2
+      }
+    },
+    {
+      "case_id": "jd_service_003",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example Search Studio",
+        "job_title": "AI Application Engineer",
+        "location": "Remote",
+        "raw_text": "Build RAG workflows for document-grounded answers. Responsibilities include Python service integration, FastAPI APIs, LLM prompt contracts, and vector search evaluation."
+      },
+      "expected": {
+        "role_category": "AI Application Engineer",
+        "required_skills_should_include": ["Python", "FastAPI", "RAG"],
+        "preferred_skills_should_include": ["LLM", "Vector Search"],
+        "responsibilities_should_include": ["Build", "RAG"],
+        "minimum_required_skill_hits": 3,
+        "minimum_preferred_skill_hits": 2,
+        "minimum_responsibility_hits": 2
+      }
+    },
+    {
+      "case_id": "jd_service_004",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example Data Tools",
+        "job_title": "Data Platform Engineer",
+        "location": "Brisbane",
+        "raw_text": "Own SQL data workflows and Python automation for analytics users. Responsibilities include Docker jobs, data quality checks, and backend service monitoring."
+      },
+      "expected": {
+        "role_category": "Data Platform Engineer",
+        "required_skills_should_include": ["Python", "SQL"],
+        "preferred_skills_should_include": ["Docker"],
+        "responsibilities_should_include": ["Own", "SQL"],
+        "minimum_required_skill_hits": 2,
+        "minimum_preferred_skill_hits": 1,
+        "minimum_responsibility_hits": 2
+      }
+    },
+    {
+      "case_id": "jd_service_005",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example Product UI",
+        "job_title": "Frontend Engineer",
+        "location": "Perth",
+        "raw_text": "Create React interfaces with TypeScript for candidate workflows. Responsibilities include component states, accessibility checks, and API integration."
+      },
+      "expected": {
+        "role_category": "Frontend / Fullstack Developer",
+        "required_skills_should_include": ["TypeScript"],
+        "preferred_skills_should_include": ["React"],
+        "responsibilities_should_include": ["Create", "React"],
+        "minimum_required_skill_hits": 1,
+        "minimum_preferred_skill_hits": 1,
+        "minimum_responsibility_hits": 2
+      }
+    },
+    {
+      "case_id": "jd_service_006",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example Retrieval Group",
+        "job_title": "RAG Engineer",
+        "location": "Adelaide",
+        "raw_text": "Improve RAG retrieval quality for policy documents. Responsibilities include vector search experiments, LLM answer review, Python tooling, and citation checks."
+      },
+      "expected": {
+        "role_category": "AI Application Engineer",
+        "required_skills_should_include": ["Python", "RAG"],
+        "preferred_skills_should_include": ["LLM", "Vector Search"],
+        "responsibilities_should_include": ["Improve", "RAG"],
+        "minimum_required_skill_hits": 2,
+        "minimum_preferred_skill_hits": 2,
+        "minimum_responsibility_hits": 2
+      }
+    },
+    {
+      "case_id": "jd_service_007",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example API Works",
+        "job_title": "Backend API Developer",
+        "location": "Canberra",
+        "raw_text": "Maintain FastAPI services for internal hiring tools. Responsibilities include SQL query tuning, Python tests, and Docker compose support."
+      },
+      "expected": {
+        "role_category": "Python Backend Developer",
+        "required_skills_should_include": ["Python", "FastAPI", "SQL"],
+        "preferred_skills_should_include": ["Docker"],
+        "responsibilities_should_include": ["Maintain", "FastAPI"],
+        "minimum_required_skill_hits": 3,
+        "minimum_preferred_skill_hits": 1,
+        "minimum_responsibility_hits": 2
+      }
+    },
+    {
+      "case_id": "jd_service_008",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example LLM Platform",
+        "job_title": "LLM Platform Engineer",
+        "location": "Hobart",
+        "raw_text": "Operate LLM application services with Python and FastAPI. Responsibilities include Docker deployment checks, SQL-backed trace storage, and prompt version records."
+      },
+      "expected": {
+        "role_category": "AI Application Engineer",
+        "required_skills_should_include": ["Python", "FastAPI", "SQL"],
+        "preferred_skills_should_include": ["LLM", "Docker"],
+        "responsibilities_should_include": ["Operate", "LLM"],
+        "minimum_required_skill_hits": 3,
+        "minimum_preferred_skill_hits": 2,
+        "minimum_responsibility_hits": 2
+      }
+    }
+  ]
+}

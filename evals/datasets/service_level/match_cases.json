@@ -1,0 +1,121 @@
+{
+  "dataset_name": "service_level",
+  "module": "match",
+  "cases": [
+    {
+      "case_id": "match_service_001",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_backend.md",
+          "raw_text": "Backend Match Candidate\n\nEducation\nExample University | Master of IT | 2024-02 to 2025-11\n\nProjects\nProject: API Workbench\nTech: Python, FastAPI, SQL, Docker\nResponsibilities: Built backend APIs\n\nSkills\nPython, FastAPI, SQL, Docker"
+        },
+        "jd_seed": {
+          "company": "Example API Co",
+          "job_title": "Backend Engineer",
+          "location": "Sydney",
+          "raw_text": "Build Python FastAPI APIs with SQL storage. Docker experience is preferred."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["Python", "FastAPI", "SQL"],
+        "expected_gap_keywords": [],
+        "required_evidence_dimensions": ["skill_match"],
+        "score_range": [68, 75],
+        "risk_flags_expected": []
+      }
+    },
+    {
+      "case_id": "match_service_002",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_frontend.md",
+          "raw_text": "Frontend Match Candidate\n\nEducation\nExample Institute | Bachelor of Software Design | 2020-02 to 2023-11\n\nProjects\nProject: Dashboard UI\nTech: TypeScript, React, HTML, CSS\nResponsibilities: Built frontend workflows\n\nSkills\nTypeScript, React, HTML, CSS"
+        },
+        "jd_seed": {
+          "company": "Example Frontend Co",
+          "job_title": "Frontend Engineer",
+          "location": "Melbourne",
+          "raw_text": "Create React user interfaces with TypeScript and API integration."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["TypeScript"],
+        "expected_gap_keywords": [],
+        "required_evidence_dimensions": ["skill_match"],
+        "score_range": [68, 75],
+        "risk_flags_expected": []
+      }
+    },
+    {
+      "case_id": "match_service_003",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_rag.md",
+          "raw_text": "RAG Match Candidate\n\nEducation\nExample University | Master of Computing | 2023-02 to 2024-11\n\nProjects\nProject: Grounded Search\nTech: Python, RAG, LLM, OpenAI\nResponsibilities: Built retrieval and citation checks\n\nSkills\nPython, RAG, LLM, OpenAI"
+        },
+        "jd_seed": {
+          "company": "Example Retrieval Co",
+          "job_title": "AI Application Engineer",
+          "location": "Remote",
+          "raw_text": "Build RAG services using Python, FastAPI, LLM review, and vector search."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["Python", "RAG"],
+        "expected_gap_keywords": ["FastAPI"],
+        "required_evidence_dimensions": ["skill_match"],
+        "score_range": [65, 72],
+        "risk_flags_expected": []
+      }
+    },
+    {
+      "case_id": "match_service_004",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_data.md",
+          "raw_text": "Data Match Candidate\n\nEducation\nExample University | Master of Analytics | 2023-02 to 2024-11\n\nProjects\nProject: SQL Monitor\nTech: Python, SQL, PostgreSQL, Docker\nResponsibilities: Built validation jobs\n\nSkills\nPython, SQL, PostgreSQL, Docker"
+        },
+        "jd_seed": {
+          "company": "Example Data Co",
+          "job_title": "Data Platform Engineer",
+          "location": "Brisbane",
+          "raw_text": "Own SQL workflows and Python automation for reporting users."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": ["Python", "SQL"],
+        "expected_gap_keywords": [],
+        "required_evidence_dimensions": ["skill_match"],
+        "score_range": [68, 75],
+        "risk_flags_expected": []
+      }
+    },
+    {
+      "case_id": "match_service_005",
+      "module": "match",
+      "input": {
+        "resume_seed": {
+          "filename": "match_gap.md",
+          "raw_text": "General Candidate\n\nEducation\nExample College | Bachelor of Business Systems | 2020-02 to 2023-11\n\nProjects\nProject: Operations Board\nTech: React, TypeScript\nResponsibilities: Built UI filters\n\nSkills\nReact, TypeScript"
+        },
+        "jd_seed": {
+          "company": "Example Backend Co",
+          "job_title": "Backend API Developer",
+          "location": "Canberra",
+          "raw_text": "Maintain Python FastAPI services with SQL persistence."
+        }
+      },
+      "expected": {
+        "expected_strength_keywords": [],
+        "expected_gap_keywords": ["Python", "FastAPI", "SQL"],
+        "required_evidence_dimensions": ["skill_match"],
+        "score_range": [60, 66],
+        "risk_flags_expected": []
+      }
+    }
+  ]
+}

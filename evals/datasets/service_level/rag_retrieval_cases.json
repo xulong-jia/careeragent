@@ -1,0 +1,106 @@
+{
+  "dataset_name": "service_level",
+  "module": "rag_retrieval",
+  "cases": [
+    {
+      "case_id": "rag_service_001",
+      "module": "rag_retrieval",
+      "documents": [
+        {
+          "title": "Backend Interview Notes",
+          "source_type": "manual",
+          "raw_text": "FastAPI interview preparation should cover dependency injection, request validation, SQL migrations, and Docker compose checks.",
+          "metadata": {"topic": "backend", "case": "rag_service_001"}
+        }
+      ],
+      "query": "What should FastAPI interview preparation cover?",
+      "top_k": 3,
+      "expected": {
+        "relevant_terms_should_appear": ["FastAPI", "SQL", "Docker"],
+        "minimum_recall_at_k": 1.0,
+        "expected_source_type": "manual",
+        "should_have_citation": true
+      }
+    },
+    {
+      "case_id": "rag_service_002",
+      "module": "rag_retrieval",
+      "documents": [
+        {
+          "title": "RAG Citation Notes",
+          "source_type": "learning",
+          "raw_text": "Grounded RAG answers should cite source snippets, mark uncertainty when evidence is missing, and avoid unsupported claims.",
+          "metadata": {"topic": "rag", "case": "rag_service_002"}
+        }
+      ],
+      "query": "How should grounded RAG answers handle evidence?",
+      "top_k": 3,
+      "expected": {
+        "relevant_terms_should_appear": ["cite", "uncertainty", "unsupported"],
+        "minimum_recall_at_k": 1.0,
+        "expected_source_type": "learning",
+        "should_have_citation": true
+      }
+    },
+    {
+      "case_id": "rag_service_003",
+      "module": "rag_retrieval",
+      "documents": [
+        {
+          "title": "Project Rewrite Guardrails",
+          "source_type": "project",
+          "raw_text": "Project rewrite suggestions must preserve evidence, list forbidden changes, and avoid fabricating metrics or business impact.",
+          "metadata": {"topic": "rewrite", "case": "rag_service_003"}
+        }
+      ],
+      "query": "What should project rewrite suggestions avoid?",
+      "top_k": 3,
+      "expected": {
+        "relevant_terms_should_appear": ["evidence", "forbidden", "fabricating"],
+        "minimum_recall_at_k": 1.0,
+        "expected_source_type": "project",
+        "should_have_citation": true
+      }
+    },
+    {
+      "case_id": "rag_service_004",
+      "module": "rag_retrieval",
+      "documents": [
+        {
+          "title": "Application Tracking Notes",
+          "source_type": "manual",
+          "raw_text": "Application tracking records should keep manual status history, reflection summaries, priority, and upcoming interview notes.",
+          "metadata": {"topic": "application", "case": "rag_service_004"}
+        }
+      ],
+      "query": "What fields should application tracking keep?",
+      "top_k": 3,
+      "expected": {
+        "relevant_terms_should_appear": ["status", "reflection", "priority"],
+        "minimum_recall_at_k": 1.0,
+        "expected_source_type": "manual",
+        "should_have_citation": true
+      }
+    },
+    {
+      "case_id": "rag_service_005",
+      "module": "rag_retrieval",
+      "documents": [
+        {
+          "title": "Study Gap Plan",
+          "source_type": "learning",
+          "raw_text": "A study gap plan should turn missing skills into tasks, resources, deliverables, and acceptance criteria before resume edits.",
+          "metadata": {"topic": "study_plan", "case": "rag_service_005"}
+        }
+      ],
+      "query": "How should a study gap plan handle missing skills?",
+      "top_k": 3,
+      "expected": {
+        "relevant_terms_should_appear": ["tasks", "resources", "deliverables"],
+        "minimum_recall_at_k": 1.0,
+        "expected_source_type": "learning",
+        "should_have_citation": true
+      }
+    }
+  ]
+}

@@ -108,13 +108,14 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 
 ## Evaluation
 
-- [ ] Evaluation 当前是 deterministic smoke / regression tracking。
+- [ ] Evaluation 当前包含 deterministic smoke / regression tracking 和 service-level foundation。
 - [ ] 不做 LLM judge。
 - [ ] 不做多模型对比。
 - [ ] Evaluation Case 不复制 `raw_text`。
+- [ ] `evals/datasets/service_level/` 只能使用脱敏/自造 JD、简历、RAG 文档和 workflow case，不放真实手机号、真实邮箱、真实招聘链接、真实简历或真实隐私材料。
 - [ ] 从 Bad Case 创建 evaluation case 时只保存 refs 和短摘要。
 - [ ] Evaluation `run_config` 只记录 prompt/schema/retrieval/model/code/evaluation version，不记录 secret。
-- [ ] `scripts/run_evals.py` 输出的 `metrics.json` / `failed_cases.json` 不包含 raw private text keys。
+- [ ] `scripts/run_evals.py` 输出的 `metrics.json` / `failed_cases.json` / `actual_outputs.json` / `run_config.json` 不包含 raw private text keys，且输出目录默认在 ignored `evals/results/` 或 `/tmp`。
 
 ## Version Tracking
 

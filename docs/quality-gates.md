@@ -1,6 +1,6 @@
-# CareerAgent Phase 2.0 Quality Gates
+# CareerAgent Quality Gates
 
-这些门禁只证明 production hardening baseline 可继续迭代，不证明 CareerAgent production-ready。
+这些门禁只证明 production hardening / real evaluation foundation 可继续迭代，不证明 CareerAgent production-ready。
 
 ## Required Baseline Gates
 
@@ -17,7 +17,8 @@
 | Ignore hygiene | `git check-ignore -v .env local_data/careeragent.db backend/local_data/careeragent.db frontend/dist/index.html frontend/node_modules/react/package.json evals/results/smoke/summary.md` | 本地 secret/data/build artifacts 被 ignore | 不证明历史仓库无敏感数据 |
 | Tracked artifact scan | `git ls-files local_data backend/local_data frontend/dist frontend/node_modules .pytest_cache backend/.venv` | 不应返回被跟踪 artifact | 仍需人工判断其他路径 |
 | Secret scan | `rg -n "sk-[A-Za-z0-9_-]{12,}|BEGIN (RSA|OPENSSH|PRIVATE)|AUTH_JWT_SECRET=|API_KEY=" --hidden -g '!frontend/node_modules/**' -g '!backend/.venv/**' .` | 查找明显 secret/private key/placeholder 命中 | `.env.example` 和测试 fake key 需要人工确认 |
-| Eval smoke | `backend/.venv/bin/python scripts/run_evals.py --dataset smoke --output-dir /tmp/careeragent-phase20-evals` | synthetic contract runner 仍可执行 | 不是真实质量评测 |
+| Synthetic eval | `backend/.venv/bin/python scripts/run_evals.py --dataset synthetic --output-dir /tmp/careeragent-evals-synthetic` | synthetic contract runner 仍可执行 | 只防 contract fixture 破坏 |
+| Service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --output-dir /tmp/careeragent-evals-service` | runner 真实调用当前 service/retriever/parser/agent 路径并输出 metrics/failed cases | foundation，不是 production benchmark |
 
 ## Auth Secret Gate
 
@@ -31,12 +32,13 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 
 ## Evaluation Boundary
 
-当前 smoke eval 是 synthetic contract regression。它只检查 JD Parser、Resume Parser、Match、RAG、Agent、Application、Bad Case 的固定 contract 是否还跑得通。
+当前 smoke/synthetic eval 是 synthetic contract regression。它只检查 JD Parser、Resume Parser、Match、RAG、Agent、Application、Bad Case 的固定 contract 是否还跑得通。
 
-阶段 2.1 必须补齐：
+阶段 2.1 已新增 `service_level` evaluation foundation：
 
-- 真实脱敏 JD、简历、项目文档、RAG 问题、match case、agent workflow case、bad case。
-- Eval runner 真实调用 service/retriever/parser/agent，而不是在脚本中构造 `actual`。
-- JD Parser、Resume Parser、Match、RAG、Agent、Bad Case 的基础指标和失败样例入库。
+- 脱敏/自造 JD、简历、RAG 文档、match case、agent workflow case。
+- Eval runner 调用 `job_service`、`resume_service`、`match_service`、`rag_service`、`agent.runner`。
+- 输出 `summary.md`、`metrics.json`、`failed_cases.json`、`actual_outputs.json`、`run_config.json`。
+- 失败样例包含可人工转 Bad Case 的摘要字段。
 
-在 2.1 完成前，smoke pass 不得解释为核心 AI 能力生产完成。
+当前仍未做自动 DB 写入和 Bad Case draft。service-level pass/fail 都不得解释为核心 AI 能力生产完成。

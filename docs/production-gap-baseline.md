@@ -1,12 +1,12 @@
-# CareerAgent Phase 2.0 Production Gap Baseline
+# CareerAgent Production Gap Baseline
 
-阶段 2.0 目标是把当前仓库整理成可以严肃继续迭代的 production hardening baseline。本文档不声明 production-ready。
+阶段 2.1 后，当前仓库是 production hardening + real evaluation foundation。本文档不声明 production-ready。
 
 ## 1. 当前总体判断
 
-当前版本可以作为 production hardening baseline，因为主业务对象已经有持久化、Auth/Workspace 基础隔离、隐私 preview 收敛、Docker 本地骨架、Alembic migration、后端测试、前端 build 和 synthetic smoke regression。
+当前版本可以作为 production hardening + real evaluation foundation，因为主业务对象已经有持久化、Auth/Workspace 基础隔离、隐私 preview 收敛、Docker 本地骨架、Alembic migration、后端测试、前端 build、synthetic smoke regression 和 service-level evaluation runner。
 
-当前版本不是 production-ready，原因是核心 AI 能力仍大量依赖 deterministic、mock、synthetic 或本地 prototype 路径：RAG 没有真实 embedding/vector store 持久化，JD/Resume parser 没有真实 LLM 生产路径，Match/Rewrite 仍是规则和 overlap，Agent 是同步固定 workflow，Evaluation 是 synthetic contract，raw_text 仍明文保存，生产 DB、observability、retention、backup、RBAC 和部署策略不足。
+当前版本不是 production-ready，原因是核心 AI 能力仍大量依赖 deterministic、mock、synthetic 或本地 prototype 路径：RAG 没有真实 embedding/vector store 持久化，JD/Resume parser 没有真实 LLM 生产路径，Match/Rewrite 仍是规则和 overlap，Agent 是同步固定 workflow，Evaluation 仍只是 foundation benchmark，raw_text 仍明文保存，生产 DB、observability、retention、backup、RBAC 和部署策略不足。
 
 完成标准口径：mock、stub、deterministic、synthetic、prototype、本地可演示、骨架完整都不能标为 DONE，只能标为 PARTIAL、FOUNDATION、MOCK_ONLY、DETERMINISTIC_ONLY、SYNTHETIC_ONLY 或 RISKY。
 
@@ -26,7 +26,7 @@
 | RAG | DETERMINISTIC_ONLY | document/chunk、lexical/local deterministic vector/hybrid、citations/source_refs | 无真实 embedding provider、pgvector/FAISS、embedding persistence、groundedness eval | 2.2 | 检索质量和引用可信度不足 |
 | Agent | DETERMINISTIC_ONLY | 固定 `job_application_preparation` 同步 state machine、timeline refs | 无 resume/retry/cancel、缺槽追问、失败恢复、多 workflow production path | 2.5 | 同步 demo 无法承载真实长流程 |
 | Bad Case | PARTIAL | 人工 bad case、root cause、regression linkage | 自动 draft、真实失败样例入库、triage workflow 不足 | 2.1, 2.5 | 问题沉淀不完整 |
-| Evaluation | SYNTHETIC_ONLY | `synthetic_smoke_v1`、runs/cases/results、fileized runner | 无真实脱敏样例集，runner 未覆盖真实服务调用质量 | 2.1 | synthetic pass 造成 false confidence |
+| Evaluation | PARTIAL | `synthetic_smoke_v1`、service-level de-identified dataset、fileized runner、metrics/failed cases/actual outputs/run_config | 仍不是 production benchmark；当前不自动写 DB，不自动生成 Bad Case draft | 2.1 foundation, 2.2-2.6 持续 | service-level pass/fail 可能被误读为生产质量 |
 | Auth / Workspace | PRODUCTION_FOUNDATION | register/login/me/logout、bearer token、workspace owner filtering、basic audit | 无 SSO/MFA/refresh token/full RBAC/session 管理/SIEM | 2.6 | 多租户和认证强度不足 |
 | Database | RISKY | Alembic、SQLite default、PostgreSQL driver readiness | PostgreSQL 不是生产默认，无 backup/restore/retention/erasure proof | 2.6 | 本地 DB 路径不可作为生产数据层 |
 | Frontend | PARTIAL | React workbench、多页面业务流、auth token client | 缺 lint/minimal tests/object selectors，主流程仍有手填 ID | 2.6 | 生产操作易错且回归难发现 |
@@ -38,7 +38,7 @@
 
 ### P0
 
-- 真实 evaluation 缺失，当前 `synthetic_smoke_v1` 只能证明 contract regression。
+- Production-quality benchmark 缺失；阶段 2.1 service-level eval 已能调用真实服务，但仍不是真实生产质量评测。
 - RAG 无真实 embedding provider、真实 vector store、embedding persistence 和 groundedness/recall/citation 评测。
 - JD Parser、Resume Parser、Match、Project Rewrite 仍是 mock/deterministic 规则，核心求职判断不可信。
 - `raw_text` 明文存储，缺少 encryption、retention、backup erasure proof 和合规审计。
@@ -54,13 +54,13 @@
 
 ### P2
 
-- Demo/synthetic 数据和评测文档容易被误读为真实质量保障。
+- Demo/synthetic/service-level foundation 数据和评测文档容易被误读为真实质量保障。
 - 历史 release/acceptance 文档有“已完成/final”语境，需要持续以本 baseline 为准。
 - Application/Interview/Study Plan 还没有真实外部系统、日历、通知、学习资源质量和运营审计。
 
 ## 4. 后续阶段映射
 
-- 2.1 Real Evaluation Foundation：建立真实脱敏样例集，让 eval runner 调用真实 service/retriever/parser/agent 路径，并把失败样例沉淀到 Bad Case。
+- 2.1 Real Evaluation Foundation：已建立脱敏 service-level 样例集，让 eval runner 调用当前 service/retriever/parser/agent 路径，并输出可人工转 Bad Case 的 failed cases；自动 DB 写入和 Bad Case draft 仍是后续补齐项。
 - 2.2 Real RAG Production Path：接入真实 embedding provider、pgvector 或 FAISS、embedding persistence、metadata filter、top-k、threshold、citation、no evidence refusal 和 RAG 指标。
 - 2.3 Real JD Parser + Resume Parser：接入真实 LLM parser path，补 timeout/retry/schema validation/fallback/prompt version/model config，并要求人工确认后进入后续模块。
 - 2.4 Trustworthy Match Scoring + Project Rewrite：建立六维评分、证据绑定、风险扣分、多 JD/多简历对比和 human agreement/evidence completeness 等评测。

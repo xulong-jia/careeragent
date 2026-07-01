@@ -2,7 +2,7 @@
 
 本文档描述当前仓库真实实现状态。历史阶段文档保留当时阶段边界；如果历史文档写“暂不做某模块”，以本文档和 README 的当前状态为准。
 
-阶段 2.0 口径：当前版本是 production hardening baseline，不是 production-ready。deterministic、mock、synthetic、prototype、本地可演示或骨架完整模块只能算 foundation / partial / risky。生产缺口基线见 `docs/production-gap-baseline.md`，质量门禁见 `docs/quality-gates.md`。
+阶段 2.1 口径：当前版本是 production hardening + real evaluation foundation，不是 production-ready。deterministic、mock、synthetic、prototype、本地可演示或骨架完整模块只能算 foundation / partial / risky。生产缺口基线见 `docs/production-gap-baseline.md`，质量门禁见 `docs/quality-gates.md`，评测基础见 `docs/real-evaluation-foundation.md`。
 
 ## 1. 当前定位
 
@@ -128,7 +128,7 @@ sqlite:///./local_data/careeragent.db
 - Match：deterministic scoring。
 - RAG：deterministic chunking + lexical/vector/hybrid local retrieval + deterministic grounded answer。v1.2 RAG Completion deterministic MVP 已完成，覆盖 contract tightening、grounded answer persistence、KnowledgeBasePage answer history UI、Dashboard RAG stats 和 optional downstream refs；v1.6 增加 deterministic embedding id、local vector/hybrid retrieval mode、score threshold 和 provider metadata。默认 retrieval mode 仍为 lexical，不接真实 LLM、外部 embedding 或 vector DB。
 - Agent：v1.3 deterministic workflow baseline，固定 `job_application_preparation` state machine 串联 Resume Version、JD、Match、可选 RAG search、RAG context summary、Project Rewrite、Interview Questions、Study Plan 和 Application linkage；不是自由工具调用 Agent，不自动投递。
-- Evaluation：v1.5B deterministic smoke/regression foundation，包含 7 模块 smoke set、Bad Case regression linkage 和文件化 eval runner，不是 LLM judge；v1.5C 在 API run_config 和 fileized metrics 中加入 prompt/schema/retrieval/model/code/evaluation version metadata。
+- Evaluation：v1.5B deterministic smoke/regression foundation，包含 7 模块 smoke set、Bad Case regression linkage 和文件化 eval runner，不是 LLM judge；v1.5C 在 API run_config 和 fileized metrics 中加入 prompt/schema/retrieval/model/code/evaluation version metadata；阶段 2.1 新增 `service_level` 脱敏样例集，runner 真实调用当前 service/retriever/parser/agent 路径并输出 metrics、failed cases、actual outputs 和 run config。
 - Privacy / Data Governance：v1.5C 新增 `app.core.privacy` redaction helpers、`app.core.versioning` constants、Resume/JD/Application/RAG delete/archive endpoints、默认列表隐藏 deleted/archived 数据，以及前端确认式删除/归档入口。P1 增加当前 user/workspace scope 的 privacy export、delete-all 和 audit-log baseline。Resume/JD/RAG 默认响应只展示短 preview；Agent step/final summary、Bad Case、Evaluation 和 Application 只保存 refs、summary、counts 或 version metadata，不保存大段原文。
 
 ### Resume Center v0.8

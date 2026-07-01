@@ -1,0 +1,81 @@
+{
+  "dataset_name": "service_level",
+  "module": "agent_workflow",
+  "cases": [
+    {
+      "case_id": "agent_service_001",
+      "module": "agent_workflow",
+      "input": {
+        "workflow_name": "job_application_preparation",
+        "seed_data": {
+          "resume": {
+            "filename": "agent_backend.md",
+            "raw_text": "Agent Backend Candidate\n\nEducation\nExample University | Master of IT | 2024-02 to 2025-11\n\nProjects\nProject: API Workbench\nTech: Python, FastAPI, SQL\nResponsibilities: Built backend APIs\n\nSkills\nPython, FastAPI, SQL"
+          },
+          "jd": {
+            "company": "Example Agent Co",
+            "job_title": "Backend Engineer",
+            "location": "Sydney",
+            "raw_text": "Build Python FastAPI APIs with SQL persistence."
+          }
+        },
+        "payload": {
+          "workflow_name": "job_application_preparation",
+          "create_application": false,
+          "use_rag": false
+        }
+      },
+      "expected": {
+        "expected_status": "completed",
+        "expected_steps_should_include": ["validate_inputs", "load_resume_version", "load_job_profile", "run_match_report", "build_final_summary"],
+        "expected_missing_slots": []
+      }
+    },
+    {
+      "case_id": "agent_service_002",
+      "module": "agent_workflow",
+      "input": {
+        "workflow_name": "job_application_preparation",
+        "payload": {
+          "workflow_name": "job_application_preparation",
+          "create_application": false,
+          "use_rag": false
+        }
+      },
+      "expected": {
+        "expected_status": "need_more_info",
+        "expected_steps_should_include": ["validate_inputs"],
+        "expected_missing_slots": ["resume_version_id", "jd_id"]
+      }
+    },
+    {
+      "case_id": "agent_service_003",
+      "module": "agent_workflow",
+      "input": {
+        "workflow_name": "job_application_preparation",
+        "seed_data": {
+          "resume": {
+            "filename": "agent_rag.md",
+            "raw_text": "Agent RAG Candidate\n\nEducation\nExample University | Master of Computing | 2023-02 to 2024-11\n\nProjects\nProject: Grounded Search\nTech: Python, RAG, LLM\nResponsibilities: Built retrieval checks\n\nSkills\nPython, RAG, LLM"
+          },
+          "jd": {
+            "company": "Example RAG Co",
+            "job_title": "AI Application Engineer",
+            "location": "Remote",
+            "raw_text": "Build RAG services with Python and LLM review."
+          }
+        },
+        "payload": {
+          "workflow_name": "job_application_preparation",
+          "create_application": false,
+          "use_rag": false
+        }
+      },
+      "expected": {
+        "expected_status": "completed",
+        "expected_steps_should_include": ["validate_inputs", "load_resume_version", "load_job_profile", "run_match_report", "generate_interview_questions", "generate_study_plan", "build_final_summary"],
+        "expected_missing_slots": []
+      }
+    }
+  ]
+}
