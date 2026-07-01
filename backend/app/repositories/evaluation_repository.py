@@ -5,7 +5,9 @@ from uuid import uuid4
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.crypto import decrypt_text, encrypt_text
 from app.core.errors import AppError
+from app.core.privacy import redact_mapping, redact_text
 from app.core.tenant import (
     current_user_id,
     current_workspace_id,
@@ -40,7 +42,32 @@ def _next_model_id(db: Session, model, prefix: str) -> str:
 
 
 def _to_bad_case_record(bad_case: BadCase) -> BadCaseRecord:
-    return BadCaseRecord.model_validate(bad_case)
+    def optional_text(value: str | None) -> str | None:
+        return decrypt_text(value) if value is not None else None
+
+    return BadCaseRecord(
+        id=bad_case.id,
+        user_id=bad_case.user_id,
+        source_type=bad_case.source_type,
+        source_id=bad_case.source_id,
+        category=bad_case.category,
+        severity=bad_case.severity,
+        title=bad_case.title,
+        description=decrypt_text(bad_case.description),
+        expected_behavior=optional_text(bad_case.expected_behavior),
+        actual_behavior=optional_text(bad_case.actual_behavior),
+        suggested_fix=optional_text(bad_case.suggested_fix),
+        root_cause=optional_text(bad_case.root_cause),
+        fix_strategy=optional_text(bad_case.fix_strategy),
+        tags=list(bad_case.tags or []),
+        added_to_eval_set=bad_case.added_to_eval_set,
+        status=bad_case.status,
+        created_at=bad_case.created_at,
+        resolved_at=bad_case.resolved_at,
+        verified_at=bad_case.verified_at,
+        regression_evaluation_run_id=bad_case.regression_evaluation_run_id,
+        regression_evaluation_case_id=bad_case.regression_evaluation_case_id,
+    )
 
 
 def _to_run_record(run: EvaluationRun) -> EvaluationRunRecord:
@@ -80,12 +107,12 @@ def create_bad_case(
         category=category,
         severity=severity,
         title=title,
-        description=description,
-        expected_behavior=expected_behavior,
-        actual_behavior=actual_behavior,
-        suggested_fix=suggested_fix,
-        root_cause=root_cause,
-        fix_strategy=fix_strategy,
+        description=encrypt_text(description) or "",
+        expected_behavior=encrypt_text(expected_behavior),
+        actual_behavior=encrypt_text(actual_behavior),
+        suggested_fix=encrypt_text(suggested_fix),
+        root_cause=encrypt_text(root_cause),
+        fix_strategy=encrypt_text(fix_strategy),
         tags=tags or [],
     )
     try:
@@ -166,19 +193,19 @@ def update_bad_case(
     if title is not None:
         bad_case.title = title
     if description is not None:
-        bad_case.description = description
+        bad_case.description = encrypt_text(description) or ""
     if expected_behavior is not None:
-        bad_case.expected_behavior = expected_behavior
+        bad_case.expected_behavior = encrypt_text(expected_behavior)
     if actual_behavior is not None:
-        bad_case.actual_behavior = actual_behavior
+        bad_case.actual_behavior = encrypt_text(actual_behavior)
     if suggested_fix is not None:
-        bad_case.suggested_fix = suggested_fix
+        bad_case.suggested_fix = encrypt_text(suggested_fix)
     if category is not None:
         bad_case.category = category
     if root_cause is not None:
-        bad_case.root_cause = root_cause
+        bad_case.root_cause = encrypt_text(root_cause)
     if fix_strategy is not None:
-        bad_case.fix_strategy = fix_strategy
+        bad_case.fix_strategy = encrypt_text(fix_strategy)
     if tags is not None:
         bad_case.tags = tags
     if added_to_eval_set is not None:
@@ -312,8 +339,8 @@ def create_evaluation_case(
         module=module,
         dataset_name=dataset_name,
         case_name=case_name,
-        input_payload=input_payload,
-        expected_output=expected_output,
+        input_payload=redact_mapping(input_payload),
+        expected_output=redact_mapping(expected_output),
         tags=tags,
         source_type=source_type,
         bad_case_id=bad_case_id,
@@ -423,11 +450,11 @@ def create_evaluation_result(
         case_id=case_id,
         module=module,
         status=status,
-        actual_output=actual_output,
-        expected_output=expected_output,
+        actual_output=redact_mapping(actual_output),
+        expected_output=redact_mapping(expected_output),
         passed=passed,
         score=score,
-        error=error,
+        error=redact_text(error) if error else None,
     )
     try:
         db.add(result)

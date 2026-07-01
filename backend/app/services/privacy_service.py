@@ -1,11 +1,13 @@
 from uuid import uuid4
+from datetime import datetime, timezone
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.core.crypto import decrypt_text
 from app.core.privacy import safe_preview
-from app.core.tenant import current_user_id, current_workspace_id, owner_filter
-from app.models.auth import AuditLog
+from app.core.tenant import current_user_id, current_workspace_id, owner_filter, require_permission
+from app.models.auth import AuditLog, User, WorkspaceMembership
 from app.models.agent import AgentRun, AgentStep
 from app.models.application import Application, ApplicationStatusHistory
 from app.models.evaluation import BadCase, EvaluationCase, EvaluationResult, EvaluationRun
@@ -38,6 +40,13 @@ def _scoped_counts(db: Session) -> dict[str, int]:
     eval_run_ids = select(EvaluationRun.id).where(*owner_filter(EvaluationRun))
     eval_case_ids = select(EvaluationCase.id).where(*owner_filter(EvaluationCase))
     return {
+        "users": _count_where(db, User, User.id == current_user_id()),
+        "workspace_memberships": _count_where(
+            db,
+            WorkspaceMembership,
+            WorkspaceMembership.user_id == current_user_id(),
+            WorkspaceMembership.workspace_id == current_workspace_id(),
+        ),
         "profiles": _count(db, Profile),
         "resumes": _count(db, Resume),
         "resume_versions": _count_where(db, ResumeVersion, ResumeVersion.resume_id.in_(resume_ids)),
@@ -68,6 +77,7 @@ def _scoped_counts(db: Session) -> dict[str, int]:
 
 
 def deletion_summary_current_user_data(db: Session) -> dict[str, object]:
+    require_permission("privacy_delete")
     counts = _scoped_counts(db)
     return {
         "status": "summary",
@@ -79,6 +89,7 @@ def deletion_summary_current_user_data(db: Session) -> dict[str, object]:
             "This summary covers active database rows in the current workspace. "
             "It is not proof of backup purge or external retention deletion."
         ),
+        "backup_purge_status": "not_implemented",
     }
 
 
@@ -110,7 +121,7 @@ def export_current_user_data(db: Session) -> dict[str, object]:
                 "id": item.id,
                 "company": item.company,
                 "job_title": item.job_title,
-                "raw_text_preview": safe_preview(item.raw_text),
+                "raw_text_preview": safe_preview(decrypt_text(item.raw_text)),
             }
             for item in jobs
         ],
@@ -127,12 +138,12 @@ def export_current_user_data(db: Session) -> dict[str, object]:
                 "id": item.id,
                 "title": item.title,
                 "source_type": item.source_type,
-                "raw_text_preview": safe_preview(item.raw_text),
+                "raw_text_preview": safe_preview(decrypt_text(item.raw_text)),
             }
             for item in rag_documents
         ],
         "rag_answer_runs": [
-            {"id": item.id, "question_preview": safe_preview(item.question)}
+            {"id": item.id, "question_preview": safe_preview(decrypt_text(item.question))}
             for item in db.scalars(select(RagAnswerRun).where(*owner_filter(RagAnswerRun))).all()
         ],
         "agent_runs": [
@@ -160,11 +171,92 @@ def export_current_user_data(db: Session) -> dict[str, object]:
     }
 
 
-def delete_current_user_data(db: Session) -> dict[str, object]:
+def _now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _build_retained_records() -> list[dict[str, object]]:
+    return [
+        {
+            "resource_type": "audit_logs",
+            "retention_reason": "redacted audit tombstone retained for governance trail",
+        },
+        {
+            "resource_type": "users",
+            "retention_reason": "auth account retained; v3.0 deletes workspace data, not identity account",
+        },
+        {
+            "resource_type": "workspace_memberships",
+            "retention_reason": "current membership retained to preserve access to deletion proof and audit trail",
+        },
+    ]
+
+
+def _proof_payload(
+    *,
+    status: str,
+    proof_id: str,
+    started_at: datetime,
+    finished_at: datetime,
+    counts: dict[str, int],
+    audit_event_id: str | None,
+) -> dict[str, object]:
+    deleted_counts = {
+        key: (0 if status == "dry_run" or key in {"users", "workspace_memberships"} else value)
+        for key, value in counts.items()
+    }
+    return {
+        "status": status,
+        "deletion_proof_id": proof_id,
+        "user_id": current_user_id(),
+        "workspace_id": current_workspace_id(),
+        "requested_by": current_user_id(),
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "resource_counts_before": counts,
+        "deleted_counts": deleted_counts,
+        "retained_records": _build_retained_records(),
+        "retention_reason": (
+            "Workspace business data is deleted; account, membership and redacted audit tombstone are retained."
+        ),
+        "retention_note": (
+            "Database rows are scoped to the current workspace. This proof does not purge backups, logs, exports, or external systems."
+        ),
+        "backup_purge_status": "not_implemented",
+        "backup_purge_note": (
+            "v3.0 does not operate managed backups. Production backup purge remains a v3.1 operations gate."
+        ),
+        "audit_event_id": audit_event_id,
+        "verification_status": "dry_run_not_deleted" if status == "dry_run" else "database_rows_deleted",
+    }
+
+
+def delete_current_user_data(db: Session, *, dry_run: bool = False) -> dict[str, object]:
+    require_permission("privacy_delete")
     user_id = current_user_id()
-    workspace_id = current_workspace_id()
     counts = _scoped_counts(db)
     proof_id = f"deletion_{uuid4().hex[:12]}"
+    started_at = _now()
+    action = "privacy.delete_dry_run" if dry_run else "privacy.delete_execute"
+
+    if dry_run:
+        audit = record_audit_event(
+            db,
+            action=action,
+            resource_type="privacy",
+            resource_id=user_id,
+            metadata={"deletion_proof_id": proof_id, "resource_counts_before": counts},
+        )
+        db.commit()
+        finished_at = _now()
+        return _proof_payload(
+            status="dry_run",
+            proof_id=proof_id,
+            started_at=started_at,
+            finished_at=finished_at,
+            counts=counts,
+            audit_event_id=audit.id,
+        )
 
     resume_ids = select(Resume.id).where(*owner_filter(Resume))
     job_ids = select(JobDescription.id).where(*owner_filter(JobDescription))
@@ -201,31 +293,35 @@ def delete_current_user_data(db: Session) -> dict[str, object]:
         db.execute(delete(Profile).where(*owner_filter(Profile)))
         db.execute(delete(ResumeVersion).where(ResumeVersion.resume_id.in_(resume_ids)))
         db.execute(delete(Resume).where(*owner_filter(Resume)))
-        record_audit_event(
+        audit = record_audit_event(
             db,
-            action="privacy.delete_all",
+            action=action,
             resource_type="privacy",
             resource_id=current_user_id(),
-            metadata={"deletion_proof_id": proof_id, "deleted_counts": counts},
+            metadata={
+                "deletion_proof_id": proof_id,
+                "resource_counts_before": counts,
+                "deleted_counts": {
+                    key: value for key, value in counts.items() if key not in {"users", "workspace_memberships"}
+                },
+            },
         )
         db.commit()
     except Exception:
         db.rollback()
         raise
-    return {
-        "status": "deleted",
-        "deletion_proof_id": proof_id,
-        "user_id": user_id,
-        "workspace_id": workspace_id,
-        "deleted_counts": counts,
-        "retention_note": (
-            "Database rows were deleted for the current workspace. This does not "
-            "purge backups, logs, exports, or external systems."
-        ),
-    }
+    return _proof_payload(
+        status="deleted",
+        proof_id=proof_id,
+        started_at=started_at,
+        finished_at=_now(),
+        counts=counts,
+        audit_event_id=audit.id,
+    )
 
 
 def list_audit_logs(db: Session) -> list[dict[str, object]]:
+    require_permission("view_audit_logs")
     logs = db.scalars(
         select(AuditLog)
         .where(AuditLog.user_id == current_user_id())

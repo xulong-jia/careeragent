@@ -1,12 +1,13 @@
 import re
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.core.security import create_access_token, hash_password, verify_password
-from app.models.auth import User, Workspace, WorkspaceMembership
+from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
+from app.models.auth import RevokedToken, User, Workspace, WorkspaceMembership
 from app.schemas.auth import (
     AuthLoginRequest,
     AuthMeResponse,
@@ -180,3 +181,49 @@ def login_user(db: Session, payload: AuthLoginRequest) -> AuthTokenResponse:
 def build_me_response(db: Session, user: User) -> AuthMeResponse:
     workspace, role = _get_default_workspace(db, user.id)
     return AuthMeResponse(user=_to_user(user), workspace=_to_workspace(workspace, role))
+
+
+def logout_user(db: Session, *, token: str, user: User) -> dict[str, object]:
+    payload = decode_access_token(token)
+    token_jti = str(payload.get("jti") or "")
+    workspace_id = str(payload.get("workspace_id") or "")
+    if not token_jti:
+        raise AppError(
+            code="token_missing_jti",
+            message="Authentication token cannot be revoked.",
+            status_code=401,
+            details={},
+        )
+    expires_at = datetime.fromtimestamp(int(payload.get("exp", 0)), tz=timezone.utc).replace(
+        tzinfo=None
+    )
+    if db.get(RevokedToken, token_jti) is None:
+        db.add(
+            RevokedToken(
+                token_jti=token_jti,
+                user_id=user.id,
+                workspace_id=workspace_id,
+                expires_at=expires_at,
+                reason="logout",
+            )
+        )
+    record_audit_event(
+        db,
+        action="auth.logout",
+        resource_type="user",
+        resource_id=user.id,
+        user_id=user.id,
+        workspace_id=workspace_id,
+        metadata={"token_jti": token_jti, "expires_at": expires_at},
+    )
+    record_audit_event(
+        db,
+        action="auth.token_revoke",
+        resource_type="token",
+        resource_id=token_jti,
+        user_id=user.id,
+        workspace_id=workspace_id,
+        metadata={"reason": "logout", "expires_at": expires_at},
+    )
+    db.commit()
+    return {"status": "logged_out", "token_revoked": True, "token_jti": token_jti}

@@ -1,6 +1,7 @@
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.core.crypto import decrypt_json, decrypt_text, encrypt_json, encrypt_text
 from app.core.errors import AppError
 from app.core.privacy import safe_preview
 from app.core.tenant import (
@@ -40,12 +41,13 @@ def _preview(text: str) -> str:
 
 
 def _to_document_record(document: RagDocument) -> RagDocumentRecord:
+    raw_text = decrypt_text(document.raw_text)
     return RagDocumentRecord(
         doc_id=document.id,
         title=document.title,
         source_type=document.source_type,
         source_uri=document.source_uri,
-        raw_text_preview=_preview(document.raw_text),
+        raw_text_preview=_preview(raw_text),
         metadata=dict(document.metadata_json or {}),
         index_status=document.index_status,
         chunk_count=document.chunk_count,
@@ -55,12 +57,13 @@ def _to_document_record(document: RagDocument) -> RagDocumentRecord:
 
 
 def _to_chunk_record(chunk: RagChunk) -> RagChunkRecord:
+    text = decrypt_text(chunk.text)
     return RagChunkRecord(
         chunk_id=chunk.id,
         doc_id=chunk.document_id,
         chunk_index=chunk.chunk_index,
         section=chunk.section,
-        text_preview=_preview(chunk.text),
+        text_preview=_preview(text),
         token_count=chunk.token_count,
         metadata=dict(chunk.metadata_json or {}),
         embedding_id=chunk.embedding_id,
@@ -74,19 +77,22 @@ def _to_chunk_record(chunk: RagChunk) -> RagChunkRecord:
 
 
 def _to_answer_run_record(answer_run: RagAnswerRun) -> RagAnswerRunRecord:
+    evidence_summary = decrypt_json(answer_run.evidence_summary or [])
+    citations = decrypt_json(answer_run.citations_json or [])
+    source_refs = decrypt_json(answer_run.source_refs_json or [])
     return RagAnswerRunRecord(
         answer_run_id=answer_run.id,
-        question=answer_run.question,
+        question=decrypt_text(answer_run.question),
         filters=dict(answer_run.filters_json or {}),
         top_k=answer_run.top_k,
         retrieval_mode=answer_run.retrieval_mode,
-        answer=answer_run.answer,
+        answer=decrypt_text(answer_run.answer),
         answer_type=answer_run.answer_type,
         grounded=answer_run.grounded,
         uncertainty=answer_run.uncertainty,
-        evidence_summary=list(answer_run.evidence_summary or []),
-        citations=list(answer_run.citations_json or []),
-        source_refs=list(answer_run.source_refs_json or []),
+        evidence_summary=list(evidence_summary or []),
+        citations=list(citations or []),
+        source_refs=list(source_refs or []),
         retrieval_debug=dict(answer_run.retrieval_debug_json or {}),
         created_at=answer_run.created_at,
         updated_at=answer_run.updated_at,
@@ -109,7 +115,7 @@ def create_document(
         title=title,
         source_type=source_type,
         source_uri=source_uri,
-        raw_text=raw_text,
+        raw_text=encrypt_text(raw_text),
         metadata_json=metadata,
         index_status="pending",
         chunk_count=0,
@@ -193,7 +199,7 @@ def replace_chunks_for_document(
                 document_id=document.id,
                 chunk_index=chunk_index,
                 section=chunk.get("section") if isinstance(chunk.get("section"), str) else None,
-                text=str(chunk["text"]),
+                text=encrypt_text(str(chunk["text"])),
                 token_count=int(chunk["token_count"]),
                 metadata_json=dict(chunk.get("metadata") or {}),
                 embedding_id=str(chunk["embedding_id"]) if chunk.get("embedding_id") else None,
@@ -278,7 +284,7 @@ def list_indexed_chunks_for_search(
             "title": document.title,
             "source_type": document.source_type,
             "section": chunk.section,
-            "text": chunk.text,
+            "text": decrypt_text(chunk.text),
             "metadata": dict(document.metadata_json or {}) | dict(chunk.metadata_json or {}),
             "embedding_vector": list(chunk.embedding_vector or []),
             "embedding_provider": chunk.embedding_provider,
@@ -337,17 +343,17 @@ def create_answer_run(
         id=_next_answer_run_id(db),
         user_id=current_user_id(),
         workspace_id=current_workspace_id(),
-        question=question,
+        question=encrypt_text(question),
         filters_json=filters,
         top_k=top_k,
         retrieval_mode=retrieval_mode,
-        answer=answer,
+        answer=encrypt_text(answer),
         answer_type=answer_type,
         grounded=grounded,
         uncertainty=uncertainty,
-        evidence_summary=evidence_summary,
-        citations_json=citations,
-        source_refs_json=source_refs,
+        evidence_summary=encrypt_json(evidence_summary),
+        citations_json=encrypt_json(citations),
+        source_refs_json=encrypt_json(source_refs),
         retrieval_debug_json=retrieval_debug,
     )
     try:
@@ -449,7 +455,7 @@ def get_stats(db: Session) -> RagStatsResponse:
         ungrounded_answer_runs=total_answer_runs - grounded_answer_runs,
         latest_answer_run_id=latest_answer_run.id if latest_answer_run else None,
         latest_answer_question_preview=(
-            _preview(latest_answer_run.question) if latest_answer_run else None
+            _preview(decrypt_text(latest_answer_run.question)) if latest_answer_run else None
         ),
         latest_answer_uncertainty=(
             latest_answer_run.uncertainty if latest_answer_run else None

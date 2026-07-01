@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.crypto import decrypt_text, encrypt_text
 from app.core.errors import AppError
 from app.core.tenant import (
     current_user_id,
@@ -45,6 +46,10 @@ def _next_status_history_id(db: Session) -> str:
     )
 
 
+def _decrypt_optional(value: str | None) -> str | None:
+    return decrypt_text(value) if value is not None else None
+
+
 def _to_status_history_record(
     history: ApplicationStatusHistory,
 ) -> ApplicationStatusHistoryRecord:
@@ -55,7 +60,7 @@ def _to_status_history_record(
         to_status=history.to_status,
         changed_at=history.changed_at,
         reason=history.reason,
-        note=history.note,
+        note=_decrypt_optional(history.note),
         created_at=history.created_at,
     )
 
@@ -81,9 +86,9 @@ def _to_application_record(
         source_url=application.source_url,
         location=application.location,
         priority=application.priority,
-        notes=application.notes,
-        interview_notes=application.interview_notes,
-        reflection=application.reflection,
+        notes=_decrypt_optional(application.notes),
+        interview_notes=_decrypt_optional(application.interview_notes),
+        reflection=_decrypt_optional(application.reflection),
         interview_question_ids=list(application.interview_question_ids or []),
         last_contact_date=application.last_contact_date,
         tags=list(application.tags or []),
@@ -109,7 +114,7 @@ def _build_status_history(
         to_status=to_status,
         changed_at=_now_utc(),
         reason=reason,
-        note=note,
+        note=encrypt_text(note) if note is not None else None,
     )
 
 
@@ -154,9 +159,9 @@ def create_application(
         source_url=source_url,
         location=location,
         priority=priority,
-        notes=notes,
-        interview_notes=interview_notes,
-        reflection=reflection,
+        notes=encrypt_text(notes) if notes is not None else None,
+        interview_notes=encrypt_text(interview_notes) if interview_notes is not None else None,
+        reflection=encrypt_text(reflection) if reflection is not None else None,
         interview_question_ids=interview_question_ids,
         last_contact_date=last_contact_date,
         tags=tags,
@@ -359,15 +364,15 @@ def update_application(
     if clear_notes:
         application.notes = None
     elif notes is not None:
-        application.notes = notes
+        application.notes = encrypt_text(notes)
     if clear_interview_notes:
         application.interview_notes = None
     elif interview_notes is not None:
-        application.interview_notes = interview_notes
+        application.interview_notes = encrypt_text(interview_notes)
     if clear_reflection:
         application.reflection = None
     elif reflection is not None:
-        application.reflection = reflection
+        application.reflection = encrypt_text(reflection)
     if interview_question_ids is not None:
         application.interview_question_ids = interview_question_ids
     if clear_last_contact_date:

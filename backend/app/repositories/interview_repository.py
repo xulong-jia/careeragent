@@ -4,6 +4,7 @@ from collections import Counter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.crypto import encrypt_text
 from app.core.errors import AppError
 from app.core.tenant import (
     current_user_id,
@@ -125,7 +126,7 @@ def create_answer(
         question_id=question_id,
         user_id=current_user_id(),
         workspace_id=current_workspace_id(),
-        answer_text=answer_text,
+        answer_text=encrypt_text(answer_text),
         answer_text_preview=answer_text_preview,
         scores={},
         feedback=None,

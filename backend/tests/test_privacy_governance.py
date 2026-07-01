@@ -2,6 +2,9 @@ import json
 import io
 import logging
 
+from sqlalchemy import select
+
+from app.core.crypto import decrypt_json, decrypt_text, is_encrypted_text
 from app.core.logging import LOGGER_NAME, log_event
 from app.core.privacy import (
     mask_email,
@@ -18,6 +21,12 @@ from app.core.versioning import (
     RETRIEVAL_VERSION,
     SCHEMA_VERSION,
 )
+from app.models.application import Application, ApplicationStatusHistory
+from app.models.evaluation import BadCase, EvaluationCase
+from app.models.interview import InterviewAnswer
+from app.models.job import JobDescription
+from app.models.rag import RagAnswerRun, RagChunk, RagDocument
+from app.models.resume import ResumeVersion
 from conftest import get_data, get_error, make_client
 
 
@@ -36,6 +45,16 @@ PRIVATE_RAG_TEXT = (
     "PRIVATE_RAG_FULL_CHUNK_TEXT FastAPI interview prep and source-backed answers. "
     + "rag-private-filler " * 80
     + "RAG_PRIVATE_UNIQUE_TAIL"
+)
+PRIVATE_INTERVIEW_TEXT = (
+    "PRIVATE_INTERVIEW_ANSWER_FULL_TEXT I handled FastAPI testing and incident review. "
+    + "answer-private-filler " * 80
+    + "INTERVIEW_PRIVATE_UNIQUE_TAIL"
+)
+PRIVATE_BAD_CASE_TEXT = (
+    "PRIVATE_BAD_CASE_FULL_TEXT A raw user answer leaked into a review note. "
+    + "bad-case-private-filler " * 80
+    + "BAD_CASE_PRIVATE_UNIQUE_TAIL"
 )
 
 
@@ -99,6 +118,28 @@ def _create_rag_document(client):
     )
     assert index_response.status_code == 200
     return document
+
+
+def _create_interview_answer(client, *, jd_id: str, resume_version_id: str):
+    questions_response = client.post(
+        "/api/interviews/questions/generate",
+        json={
+            "jd_id": jd_id,
+            "resume_version_id": resume_version_id,
+            "max_questions": 1,
+        },
+    )
+    assert questions_response.status_code == 201
+    question = get_data(questions_response)["questions"][0]
+    answer_response = client.post(
+        "/api/interviews/answers",
+        json={
+            "question_id": question["id"],
+            "answer_text": PRIVATE_INTERVIEW_TEXT,
+        },
+    )
+    assert answer_response.status_code == 201
+    return get_data(answer_response)
 
 
 def test_redaction_helpers_mask_sensitive_values():
@@ -202,6 +243,144 @@ def test_default_api_responses_do_not_expose_full_private_text():
         assert "RESUME_PRIVATE_UNIQUE_TAIL" not in body
         assert "JD_PRIVATE_UNIQUE_TAIL" not in body
         assert "RAG_PRIVATE_UNIQUE_TAIL" not in body
+
+
+def test_sensitive_write_paths_encrypt_or_redact_at_rest(db_session):
+    client = make_client()
+    resume, resume_version_id = _create_resume(client)
+    job = _create_job(client)
+    application = _create_application(
+        client,
+        jd_id=job["jd_id"],
+        resume_version_id=resume_version_id,
+    )
+    document = _create_rag_document(client)
+    rag_answer = get_data(
+        client.post(
+            "/api/rag/answer",
+            json={
+                "question": "How should PRIVATE_RAG_FULL_CHUNK_TEXT prepare for FastAPI?",
+                "top_k": 3,
+            },
+        )
+    )
+    interview_answer = _create_interview_answer(
+        client,
+        jd_id=job["jd_id"],
+        resume_version_id=resume_version_id,
+    )
+    bad_case = get_data(
+        client.post(
+            "/api/evaluations/bad-cases",
+            json={
+                "source_type": "rag_answer",
+                "source_id": rag_answer["answer_run_id"],
+                "category": "privacy_risk",
+                "severity": "high",
+                "title": "Private text leak",
+                "description": PRIVATE_BAD_CASE_TEXT,
+                "expected_behavior": "Expected private text to stay encrypted.",
+                "actual_behavior": PRIVATE_RAG_TEXT,
+                "suggested_fix": "Keep only refs and redacted summaries in eval payloads.",
+            },
+        )
+    )
+    evaluation_case = get_data(
+        client.post(
+            "/api/evaluations/cases",
+            json={
+                "module": "rag",
+                "dataset_name": "privacy_redaction",
+                "case_name": "Redact arbitrary long private summaries",
+                "input_payload": {"summary": PRIVATE_RESUME_TEXT},
+                "expected_output": {"summary": PRIVATE_JD_TEXT},
+                "tags": ["privacy"],
+                "source_type": "manual",
+            },
+        )
+    )
+
+    db_session.expire_all()
+
+    resume_version = db_session.get(ResumeVersion, resume_version_id)
+    assert resume_version is not None
+    assert is_encrypted_text(resume_version.raw_text)
+    assert "RESUME_PRIVATE_UNIQUE_TAIL" not in resume_version.raw_text
+    assert decrypt_text(resume_version.raw_text) == PRIVATE_RESUME_TEXT
+
+    job_model = db_session.get(JobDescription, job["jd_id"])
+    assert job_model is not None
+    assert is_encrypted_text(job_model.raw_text)
+    assert "JD_PRIVATE_UNIQUE_TAIL" not in job_model.raw_text
+    assert decrypt_text(job_model.raw_text) == PRIVATE_JD_TEXT
+
+    rag_document = db_session.get(RagDocument, document["doc_id"])
+    assert rag_document is not None
+    assert is_encrypted_text(rag_document.raw_text)
+    assert "RAG_PRIVATE_UNIQUE_TAIL" not in rag_document.raw_text
+    assert decrypt_text(rag_document.raw_text) == PRIVATE_RAG_TEXT
+
+    chunks = db_session.scalars(
+        select(RagChunk).where(RagChunk.document_id == document["doc_id"])
+    ).all()
+    assert chunks
+    assert all(is_encrypted_text(chunk.text) for chunk in chunks)
+    assert "RAG_PRIVATE_UNIQUE_TAIL" not in json.dumps([chunk.text for chunk in chunks])
+
+    answer_run = db_session.get(RagAnswerRun, rag_answer["answer_run_id"])
+    assert answer_run is not None
+    assert is_encrypted_text(answer_run.question)
+    assert is_encrypted_text(answer_run.answer)
+    assert "PRIVATE_RAG_FULL_CHUNK_TEXT" not in answer_run.question
+    assert isinstance(decrypt_json(answer_run.evidence_summary), list)
+    assert isinstance(decrypt_json(answer_run.citations_json), list)
+    assert isinstance(decrypt_json(answer_run.source_refs_json), list)
+    assert "RAG_PRIVATE_UNIQUE_TAIL" not in json.dumps(
+        {
+            "evidence_summary": answer_run.evidence_summary,
+            "citations": answer_run.citations_json,
+            "source_refs": answer_run.source_refs_json,
+        }
+    )
+
+    interview_model = db_session.get(InterviewAnswer, interview_answer["id"])
+    assert interview_model is not None
+    assert is_encrypted_text(interview_model.answer_text)
+    assert "INTERVIEW_PRIVATE_UNIQUE_TAIL" not in interview_model.answer_text
+    assert decrypt_text(interview_model.answer_text) == PRIVATE_INTERVIEW_TEXT
+
+    application_model = db_session.get(Application, application["application_id"])
+    assert application_model is not None
+    assert is_encrypted_text(application_model.notes)
+    assert is_encrypted_text(application_model.interview_notes)
+    assert is_encrypted_text(application_model.reflection)
+    history = db_session.scalars(
+        select(ApplicationStatusHistory).where(
+            ApplicationStatusHistory.application_id == application["application_id"]
+        )
+    ).first()
+    assert history is not None
+    assert is_encrypted_text(history.note)
+
+    bad_case_model = db_session.get(BadCase, bad_case["id"])
+    assert bad_case_model is not None
+    assert is_encrypted_text(bad_case_model.description)
+    assert is_encrypted_text(bad_case_model.actual_behavior)
+    assert "BAD_CASE_PRIVATE_UNIQUE_TAIL" not in bad_case_model.description
+    assert "RAG_PRIVATE_UNIQUE_TAIL" not in bad_case_model.actual_behavior
+    assert decrypt_text(bad_case_model.description) == PRIVATE_BAD_CASE_TEXT
+
+    case_model = db_session.get(EvaluationCase, evaluation_case["id"])
+    assert case_model is not None
+    stored_case_payload = json.dumps(
+        {
+            "input_payload": case_model.input_payload,
+            "expected_output": case_model.expected_output,
+        }
+    )
+    assert "RESUME_PRIVATE_UNIQUE_TAIL" not in stored_case_payload
+    assert "JD_PRIVATE_UNIQUE_TAIL" not in stored_case_payload
+    assert "redacted" in stored_case_payload
 
 
 def test_delete_resume_soft_deletes_and_keeps_linked_application_safe():

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import _extract_bearer_token, get_current_user
 from app.db.session import get_db
 from app.models.auth import User
 from app.schemas.auth import (
@@ -55,6 +55,12 @@ async def me(
 async def logout(
     request: Request,
     user: User = Depends(get_current_user),
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    del user
-    return {"data": {"status": "logged_out"}, "request_id": request.state.request_id}
+    result = auth_service.logout_user(
+        db,
+        token=_extract_bearer_token(authorization),
+        user=user,
+    )
+    return {"data": result, "request_id": request.state.request_id}

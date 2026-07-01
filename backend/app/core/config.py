@@ -12,6 +12,7 @@ FORBIDDEN_PRODUCTION_SECRET_MARKERS = (
     "placeholder",
 )
 ALLOWED_APP_ENVS = {"development", "test", "production"}
+LOCAL_DEV_DATA_ENCRYPTION_KEY = "MKlKIfl6Htn3qasq6OmUZrAptCgKZk_unRl07h5u6Ew="
 
 
 def _bool_env(name: str, default: bool) -> bool:
@@ -54,6 +55,8 @@ class Settings:
     rag_retrieval_mode: str
     enable_real_llm: bool
     enable_real_embedding: bool
+    data_encryption_key: str
+    data_encryption_key_id: str
 
 
 def is_sqlite_database_url(database_url: str) -> bool:
@@ -78,11 +81,25 @@ def _is_placeholder_secret(value: str) -> bool:
     return any(marker in lowered for marker in FORBIDDEN_PRODUCTION_SECRET_MARKERS)
 
 
+def _is_valid_fernet_key(value: str) -> bool:
+    if not value:
+        return False
+    try:
+        from cryptography.fernet import Fernet
+
+        Fernet(value.encode("utf-8"))
+    except Exception:
+        return False
+    return True
+
+
 def validate_runtime_settings(settings: Settings) -> None:
     if settings.app_env not in ALLOWED_APP_ENVS:
         raise RuntimeError("APP_ENV must be one of development, test, or production.")
     if _database_driver_name(settings.database_url) == "invalid":
         raise RuntimeError("DATABASE_URL is invalid.")
+    if settings.data_encryption_key and not _is_valid_fernet_key(settings.data_encryption_key):
+        raise RuntimeError("DATA_ENCRYPTION_KEY must be a valid Fernet key.")
 
     if settings.app_env != "production":
         return
@@ -98,6 +115,16 @@ def validate_runtime_settings(settings: Settings) -> None:
         raise RuntimeError("SQLite DATABASE_URL is not allowed in production.")
     if "*" in settings.cors_origins:
         raise RuntimeError("BACKEND_CORS_ORIGINS must not contain * in production.")
+    data_key = settings.data_encryption_key.strip()
+    if not data_key:
+        raise RuntimeError("DATA_ENCRYPTION_KEY is required in production.")
+    if _is_placeholder_secret(data_key) or data_key == LOCAL_DEV_DATA_ENCRYPTION_KEY:
+        raise RuntimeError("DATA_ENCRYPTION_KEY must not be a placeholder in production.")
+    key_id = settings.data_encryption_key_id.strip()
+    if not key_id:
+        raise RuntimeError("DATA_ENCRYPTION_KEY_ID is required in production.")
+    if _is_placeholder_secret(key_id):
+        raise RuntimeError("DATA_ENCRYPTION_KEY_ID must not be a placeholder in production.")
 
 
 def settings_summary(settings: Settings) -> dict[str, object]:
@@ -121,6 +148,8 @@ def settings_summary(settings: Settings) -> dict[str, object]:
         "rag_retrieval_mode": settings.rag_retrieval_mode,
         "enable_real_llm": settings.enable_real_llm,
         "enable_real_embedding": settings.enable_real_embedding,
+        "data_encryption_key": _mask_config_value(settings.data_encryption_key),
+        "data_encryption_key_id": settings.data_encryption_key_id,
     }
 
 
@@ -152,4 +181,6 @@ def get_settings() -> Settings:
         rag_retrieval_mode=os.getenv("RAG_RETRIEVAL_MODE", "lexical").strip().lower(),
         enable_real_llm=_bool_env("ENABLE_REAL_LLM", False),
         enable_real_embedding=_bool_env("ENABLE_REAL_EMBEDDING", False),
+        data_encryption_key=os.getenv("DATA_ENCRYPTION_KEY", "").strip(),
+        data_encryption_key_id=os.getenv("DATA_ENCRYPTION_KEY_ID", "local-dev-v1").strip(),
     )

@@ -4,6 +4,7 @@ import fitz
 from docx import Document
 
 from conftest import get_data, get_error, make_client
+from app.core.crypto import decrypt_text, is_encrypted_text
 from app.models.resume import Resume, ResumeVersion
 
 
@@ -277,4 +278,6 @@ def test_resume_upload_persists_resume_and_initial_version(db_session):
     assert resume.original_filename == "candidate.md"
     assert len(versions) == 1
     assert versions[0].version_number == 1
-    assert "Python FastAPI" in versions[0].raw_text
+    assert is_encrypted_text(versions[0].raw_text)
+    assert "Python FastAPI" not in versions[0].raw_text
+    assert "Python FastAPI" in decrypt_text(versions[0].raw_text)

@@ -51,6 +51,63 @@ def owner_filter(model):
     )
 
 
+ROLE_PERMISSIONS = {
+    "owner": {
+        "read_workspace_data",
+        "workspace_write",
+        "create_update_resume",
+        "create_update_jd",
+        "run_match",
+        "run_agent",
+        "run_eval",
+        "create_bad_case",
+        "privacy_delete",
+        "manage_members",
+        "view_audit_logs",
+    },
+    "admin": {
+        "read_workspace_data",
+        "workspace_write",
+        "create_update_resume",
+        "create_update_jd",
+        "run_match",
+        "run_agent",
+        "run_eval",
+        "create_bad_case",
+        "privacy_delete",
+        "manage_members",
+        "view_audit_logs",
+    },
+    "member": {
+        "read_workspace_data",
+        "workspace_write",
+        "create_update_resume",
+        "create_update_jd",
+        "run_match",
+        "run_agent",
+        "run_eval",
+        "create_bad_case",
+    },
+    "viewer": {"read_workspace_data"},
+}
+
+
+def has_permission(role: str, permission: str) -> bool:
+    return permission in ROLE_PERMISSIONS.get(role, set())
+
+
+def require_permission(permission: str) -> None:
+    context = get_auth_context()
+    role = context.role if context else ""
+    if not has_permission(role, permission):
+        raise AppError(
+            code="workspace_permission_denied",
+            message="Current workspace role cannot perform this action.",
+            status_code=403,
+            details={"permission": permission, "role": role},
+        )
+
+
 def is_owned(record: object) -> bool:
     return (
         getattr(record, "user_id", DEFAULT_USER_ID) == current_user_id()

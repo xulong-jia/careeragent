@@ -38,14 +38,14 @@
 Authorization: Bearer <access_token>
 ```
 
-Token payload 包含当前 `user_id` 和 `workspace_id`。P1 后业务数据按当前 user/workspace scope 读写；跨用户或跨 workspace 访问应返回 404/401，而不是泄露目标对象存在性。P1 是基础认证和隔离 checkpoint，不等于完整 production-ready RBAC/SSO/MFA/refresh-token 体系。
+Token payload 包含当前 `user_id`、`workspace_id` 和 access-token `jti`。P1 后业务数据按当前 user/workspace scope 读写；v3.0 后 logout 会 revoke 当前 token `jti`，workspace membership role 会经过 route-level RBAC gate。跨用户或跨 workspace 访问应返回 404/401，而不是泄露目标对象存在性。v3.0 仍不是完整 production-ready RBAC/SSO/MFA/refresh-token/session/device 体系。
 
 | Method | Path | 说明 |
 | --- | --- | --- |
 | POST | `/api/auth/register` | 注册 user，创建默认 workspace/membership，并返回 bearer token |
 | POST | `/api/auth/login` | 使用 email/password 登录并返回 bearer token |
 | GET | `/api/auth/me` | 查询当前 user/workspace；需要 bearer token |
-| POST | `/api/auth/logout` | stateless logout success；需要 bearer token，前端负责清理本地 token |
+| POST | `/api/auth/logout` | revoke 当前 access token `jti`；需要 bearer token，前端随后清理本地 token |
 
 Auth response 关键字段：
 
@@ -57,6 +57,12 @@ Auth response 关键字段：
 - `workspace.id`
 - `workspace.name`
 - `workspace.role`
+
+`POST /api/auth/logout` response 关键字段：
+
+- `status`
+- `token_revoked`
+- `token_jti`
 
 ## Health / DB
 
@@ -800,13 +806,14 @@ Application 仍是手动 tracking record。v1.3 允许 Agent Workflow 创建 dra
 
 ## Privacy APIs
 
-P1 privacy endpoints 只作用于当前 authenticated user/workspace，并使用现有 preview/ref/summary 边界；它们是本地 prototype 的数据治理 baseline，不等于生产级不可恢复删除证明或备份擦除流程。
+v3.0 privacy endpoints 只作用于当前 authenticated user/workspace，并使用现有 preview/ref/summary 边界；它们包含 dry-run/execute proof 和 redacted audit trail，但仍不等于生产级不可恢复删除证明、备份擦除流程或 legal compliance。
 
 | Method | Path | 说明 |
 | --- | --- | --- |
 | GET | `/api/privacy/export` | 导出当前 user/workspace 的数据摘要和 refs，不返回 secret 或大段 raw payload |
-| GET | `/api/privacy/delete-summary` | 返回当前 user/workspace 将被 delete-all 覆盖的 resource counts、total_records 和 retention note |
-| DELETE | `/api/privacy/delete-all` | 删除/归档当前 user/workspace 的业务数据，并写入 audit log |
+| GET | `/api/privacy/delete-summary` | 返回当前 user/workspace 将被 delete-all 覆盖的 resource counts、total_records、retention note 和 backup purge status |
+| DELETE | `/api/privacy/delete-all?dry_run=true` | 只生成 dry-run proof 和 audit event，不删除业务数据 |
+| DELETE | `/api/privacy/delete-all` | 删除/归档当前 user/workspace 的业务数据，并写入 execute audit event |
 | GET | `/api/privacy/audit-log` | 查询当前 user/workspace 的 audit log |
 
 `GET /api/privacy/export` response 关键字段：
@@ -820,10 +827,15 @@ P1 privacy endpoints 只作用于当前 authenticated user/workspace，并使用
 
 - `status`
 - `deletion_proof_id`
+- `resource_counts_before`
 - `deleted_counts`
+- `retained_records`
+- `audit_event_id`
+- `verification_status`
+- `backup_purge_status`
 - `retention_note`
 
-`deletion_proof_id` 是应用层证明 ID，不是法律删除证书；备份、日志、导出文件和外部系统保留仍需生产策略。
+`deletion_proof_id` 是应用层证明 ID，不是法律删除证书；备份、日志、导出文件和外部系统保留仍需生产策略。`backup_purge_status=not_implemented` 表示 v3.1 operations gate 仍需补 backup purge/restore runbook。
 
 ## Bad Case APIs
 

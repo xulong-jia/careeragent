@@ -1,6 +1,6 @@
 # Safety and Privacy Checklist
 
-本清单用于本地开发、演示和提交前自查。CareerAgent 当前是本地 prototype，不适合直接处理真实敏感求职材料。
+本清单用于本地开发、演示和提交前自查。v3.0 已补应用层敏感字段加密、token revoke、RBAC gate 和 deletion proof foundation，但仍不是 production-ready；没有生产 secret manager/KMS、备份擦除、集中审计和运维 runbook 前，不应处理真实生产用户数据。
 
 ## Git 与文件
 
@@ -25,6 +25,8 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 
 - [ ] `.env.example` 只保留空 API key placeholder 和明确 dev-only auth placeholder。
 - [ ] `AUTH_JWT_SECRET` 在 `.env.example` 中只能是 dev-only placeholder；production 必须通过 secret manager 或部署环境注入足够长的强随机真实 secret。
+- [ ] `DATA_ENCRYPTION_KEY` 在 `.env.example` 中只能是 dev-only Fernet key；production 必须通过 secret manager/KMS 等可信环境注入生产 key。
+- [ ] `DATA_ENCRYPTION_KEY_ID` 必须能标识当前生产 key；rotation/backfill 未完成前不得随意切换。
 - [ ] `APP_ENV=production` 不允许使用 dev-only、replace-me 或 change-me placeholder secret。
 - [ ] `APP_ENV=production` 不允许使用 SQLite `DATABASE_URL` 或 `BACKEND_CORS_ORIGINS=*`。
 - [ ] `LLM_API_KEY`、`EMBEDDING_API_KEY` 和 `OPENAI_API_KEY` 当前默认不需要填写。
@@ -42,7 +44,7 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] RAG search 先过滤当前 owner 的 documents/chunks，再做 ranking。
 - [ ] Agent steps、Applications、Bad Cases、Evaluation runs/cases/results 只允许当前 owner 读取。
 - [ ] 前端未登录时不加载工作台数据；401 会清理 local token 并回到登录态。
-- [ ] P1 是基础 token auth + workspace isolation，不声明完整 production RBAC/SSO/MFA/refresh-token/SIEM。
+- [ ] v3.0 已有基础 token auth、workspace isolation、logout revoke 和 route-level RBAC gate；仍不声明完整 SSO/MFA/refresh-token/session/device/SIEM/DB RLS。
 
 ## Provider / Vector Readiness
 
@@ -59,6 +61,8 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] 不上传真实简历、真实 JD、真实邮件、手机号、地址、证件号或薪资记录。
 - [ ] 不把完整 `raw_text` 输出到日志。
 - [ ] Resume / JD 默认 API response 不返回完整 raw_text，只返回 `raw_text_preview`。
+- [ ] v3.0 后 Resume raw_text、JD raw_text、RAG raw_text/chunk/answer run、Interview answer、Application notes/reflection/status note 和 Bad Case free text 通过 repository/service 写入路径保存为 Fernet envelope。
+- [ ] legacy plaintext rows 可读但不会自动 backfill；正式迁移真实数据前必须设计 rotation/backfill runbook。
 - [ ] `raw_text_preview` / `text_preview` 使用短 preview，并经过 email、phone、secret masking。
 - [ ] 如需日志输出 payload，先使用 `app.core.privacy.redact_mapping`。
 - [ ] Interview Center 后续开发继续使用 preview / refs，不把完整 raw_text 作为默认 payload 透传给前端。
@@ -94,19 +98,18 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] `DELETE /api/privacy/delete-all` 只删除当前 user/workspace 的业务数据，并写入 audit log counts，返回 `deletion_proof_id` 和 retention note。
 - [ ] `GET /api/privacy/audit-log` 只返回当前 user/workspace 的 audit events。
 
-当前 delete/export/delete-summary/audit-log 能力是 2.6 foundation，不等于生产级 retention、backup erasure proof、audit compliance 或 legal hold 策略。
+当前 delete/export/delete-summary/audit-log 能力是 v3.0 foundation，不等于生产级 retention、backup erasure proof、audit compliance 或 legal hold 策略。
 
 ## Production Blockers
 
-- [ ] Resume / JD / RAG `raw_text` 当前仍以明文保存在本地 DB 或本地数据路径中，属于 production blocker。
-- [ ] 当前没有生产级 encryption-at-rest、key rotation、backup retention、backup erasure proof 或 audit log pipeline。
+- [ ] v3.0 已补主要敏感字段应用层 encryption-at-rest foundation，但没有 KMS、multi-key decrypt、rotation backfill、backup retention、backup erasure proof 或 audit log pipeline。
 - [ ] SQLite 仍是默认本地路径；2.6 已在 `APP_ENV=production` 拒绝 SQLite，但仓库不提供 managed PostgreSQL provisioning。
 - [ ] 2.6 已补 structured request logging 和 readiness foundation；集中 observability、metrics、alerts、tracing 和 SIEM 仍未完成。
 
 ## Bad Case
 
 - [ ] Bad Case 只保存 `source_type` / `source_id` 和问题摘要。
-- [ ] 不在 description / expected / actual / suggested fix 中粘贴完整简历、JD、RAG chunk 或面试原文。
+- [ ] Bad Case free-text 字段写入时会加密；仍不建议在 description / expected / actual / suggested fix 中粘贴完整简历、JD、RAG chunk 或面试原文。
 - [ ] Bad Case API schema 不接受 `raw_text` 等额外敏感字段。
 
 ## Evaluation
@@ -115,6 +118,7 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] 不做 LLM judge。
 - [ ] 不做多模型对比。
 - [ ] Evaluation Case 不复制 `raw_text`。
+- [ ] Evaluation Case / Result JSON 写入前必须 redaction；Bad Case 派生 evaluation case 只能保存 refs 和 redacted summaries。
 - [ ] `evals/datasets/service_level/` 只能使用脱敏/自造 JD、简历、RAG 文档和 workflow case，不放真实手机号、真实邮箱、真实招聘链接、真实简历或真实隐私材料。
 - [ ] 从 Bad Case 创建 evaluation case 时只保存 refs 和短摘要。
 - [ ] Evaluation `run_config` 只记录 prompt/schema/retrieval/model/code/evaluation version，不记录 secret。

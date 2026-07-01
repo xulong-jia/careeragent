@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -30,9 +30,10 @@ async def get_privacy_delete_summary(
 @router.delete("/delete-all", response_model=ApiResponse[dict[str, object]])
 async def delete_all_privacy_data(
     request: Request,
+    dry_run: bool = Query(default=False),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    data = privacy_service.delete_current_user_data(db)
+    data = privacy_service.delete_current_user_data(db, dry_run=dry_run)
     return {"data": data, "request_id": request.state.request_id}
 
 

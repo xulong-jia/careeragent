@@ -86,6 +86,6 @@ RAG metrics include:
 - No reranker.
 - No LLM grounded generation.
 - Benchmark remains small.
-- `raw_text` and chunk `text` remain plaintext DB fields; Final Production Readiness Audit must address encryption, retention, backup purge, legal hold, and centralized audit hardening.
+- v3.0 encrypts RAG document `raw_text`, chunk `text` and persisted answer-run private fields at the repository write path, but KMS, key rotation backfill, retention, backup purge, legal hold and centralized audit hardening remain production blockers.
 
-Phase 2.6 Security / Privacy / Deployment Hardening is now completed as production foundation. Next phase should be Final Production Readiness Audit. Match Scoring and Project Rewrite remain deterministic and not production-ready.
+v3.0 Security / Privacy / Data Governance is completed as production foundation candidate. Next phase should be v3.1 Production Deployment, Database & Operations Foundation. Match Scoring and Project Rewrite remain deterministic and not production-ready.

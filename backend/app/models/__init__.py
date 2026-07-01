@@ -1,6 +1,6 @@
 from app.models.agent import AgentRun, AgentStep
 from app.models.application import Application, ApplicationStatusHistory
-from app.models.auth import AuditLog, User, Workspace, WorkspaceMembership
+from app.models.auth import AuditLog, RevokedToken, User, Workspace, WorkspaceMembership
 from app.models.evaluation import BadCase, EvaluationCase, EvaluationResult, EvaluationRun
 from app.models.interview import InterviewAnswer, InterviewQuestion
 from app.models.job import JobDescription, JobProfile
@@ -33,6 +33,7 @@ __all__ = [
     "RagAnswerRun",
     "RagChunk",
     "RagDocument",
+    "RevokedToken",
     "Resume",
     "ResumeVersion",
     "StudyPlan",

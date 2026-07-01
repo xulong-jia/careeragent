@@ -78,6 +78,45 @@ def _create_application(client) -> str:
     return get_data(response)["application_id"]
 
 
+def _workspace_role_client(
+    db_session,
+    *,
+    user_id: str,
+    email: str,
+    workspace_id: str,
+    role: str,
+):
+    if db_session.get(User, user_id) is None:
+        db_session.add(
+            User(
+                id=user_id,
+                email=email,
+                password_hash=hash_password("Password123!"),
+                display_name="Role User",
+                role="user",
+                is_active=True,
+            )
+        )
+    if db_session.get(WorkspaceMembership, (workspace_id, user_id)) is None:
+        db_session.add(
+            WorkspaceMembership(
+                workspace_id=workspace_id,
+                user_id=user_id,
+                role=role,
+            )
+        )
+    db_session.commit()
+    token, _ = create_access_token(
+        subject=user_id,
+        email=email,
+        role="user",
+        workspace_id=workspace_id,
+    )
+    client = make_client(authenticated=False)
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    return client
+
+
 def test_auth_register_login_me_and_invalid_tokens(db_session):
     client = make_client(authenticated=False)
 
@@ -169,6 +208,33 @@ def test_auth_register_login_me_and_invalid_tokens(db_session):
     assert inactive_login.status_code == 401
 
 
+def test_logout_revokes_current_access_token():
+    client = make_client(authenticated=False)
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "email": "logout-user@example.com",
+            "password": "Password123!",
+            "display_name": "Logout User",
+        },
+    )
+    token = get_data(register)["access_token"]
+
+    logout = client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert logout.status_code == 200
+    logout_data = get_data(logout)
+    assert logout_data["status"] == "logged_out"
+    assert logout_data["token_revoked"] is True
+    assert logout_data["token_jti"]
+
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 401
+    assert get_error(me)["code"] == "token_revoked"
+
+
 def test_core_business_routes_require_authentication():
     client = make_client(authenticated=False)
     endpoints = [
@@ -188,6 +254,42 @@ def test_core_business_routes_require_authentication():
         response = client.request(method, path)
         assert response.status_code == 401, path
         assert get_error(response)["code"] == "not_authenticated"
+
+
+def test_workspace_viewer_role_cannot_mutate_or_view_audit_logs(db_session):
+    owner_client = _client_for("rbac_owner", "rbac-owner@example.com")
+    workspace_id = "workspace_rbac_owner"
+    _create_job(owner_client)
+    viewer_client = _workspace_role_client(
+        db_session,
+        user_id="rbac_viewer",
+        email="rbac-viewer@example.com",
+        workspace_id=workspace_id,
+        role="viewer",
+    )
+
+    readable = viewer_client.get("/api/jobs")
+    assert readable.status_code == 200
+    assert "total" in get_data(readable)
+
+    write_denied = viewer_client.post(
+        "/api/jobs",
+        json={
+            "company": "Denied Co",
+            "job_title": "Denied Role",
+            "raw_text": "Should not be created by viewer.",
+        },
+    )
+    assert write_denied.status_code == 403
+    assert get_error(write_denied)["code"] == "workspace_permission_denied"
+
+    audit_denied = viewer_client.get("/api/privacy/audit-log")
+    assert audit_denied.status_code == 403
+    assert get_error(audit_denied)["code"] == "workspace_permission_denied"
+
+    privacy_denied = viewer_client.delete("/api/privacy/delete-all")
+    assert privacy_denied.status_code == 403
+    assert get_error(privacy_denied)["code"] == "workspace_permission_denied"
 
 
 def test_tenant_isolation_for_core_records_and_rag_search():
@@ -273,12 +375,25 @@ def test_privacy_export_delete_all_and_audit_are_tenant_scoped():
     summary_data = get_data(summary)
     assert summary_data["resources"]["job_descriptions"] == 1
     assert summary_data["total_records"] >= 1
+    assert summary_data["backup_purge_status"] == "not_implemented"
+
+    dry_run = user_a.delete("/api/privacy/delete-all", params={"dry_run": "true"})
+    assert dry_run.status_code == 200
+    dry_run_data = get_data(dry_run)
+    assert dry_run_data["status"] == "dry_run"
+    assert dry_run_data["verification_status"] == "dry_run_not_deleted"
+    assert dry_run_data["deleted_counts"]["job_descriptions"] == 0
+    assert user_a.get(f"/api/jobs/{a_job_id}").status_code == 200
 
     deleted = user_a.delete("/api/privacy/delete-all")
     assert deleted.status_code == 200
     deleted_data = get_data(deleted)
+    assert deleted_data["status"] == "deleted"
     assert deleted_data["deleted_counts"]["job_descriptions"] == 1
     assert deleted_data["deletion_proof_id"].startswith("deletion_")
+    assert deleted_data["verification_status"] == "database_rows_deleted"
+    assert deleted_data["backup_purge_status"] == "not_implemented"
+    assert deleted_data["retained_records"]
     assert "backup" in deleted_data["retention_note"].lower()
     assert get_data(user_a.get("/api/jobs"))["total"] == 0
     assert user_a.get(f"/api/jobs/{a_job_id}").status_code == 404
@@ -288,7 +403,9 @@ def test_privacy_export_delete_all_and_audit_are_tenant_scoped():
     assert audit.status_code == 200
     audit_items = get_data(audit)["items"]
     assert audit_items
-    assert audit_items[0]["action"] == "privacy.delete_all"
+    audit_actions = {item["action"] for item in audit_items}
+    assert "privacy.delete_execute" in audit_actions
+    assert "privacy.delete_dry_run" in audit_actions
     audit_text = str(audit_items).lower()
     assert "raw_text" not in audit_text
     assert "secret" not in audit_text

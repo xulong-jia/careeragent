@@ -19,7 +19,7 @@
 | Secret scan | `rg -n "sk-[A-Za-z0-9_-]{12,}|BEGIN (RSA|OPENSSH|PRIVATE)|AUTH_JWT_SECRET=|API_KEY=" --hidden -g '!frontend/node_modules/**' -g '!backend/.venv/**' .` | 查找明显 secret/private key/placeholder 命中 | `.env.example` 和测试 fake key 需要人工确认 |
 | Synthetic eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset synthetic --output-dir /tmp/careeragent-evals-synthetic-26` | synthetic contract runner 仍可执行 | 只防 contract fixture 破坏 |
 | Service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --output-dir /tmp/careeragent-evals-service-26` | runner 真实调用当前 service/retriever/parser/agent/match/rewrite 路径并输出 metrics/failed cases | foundation，不是 production benchmark |
-| Readiness/redaction/privacy tests | `PYTHONPATH=backend backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_auth_secret_config.py backend/tests/test_health.py backend/tests/test_privacy_governance.py backend/tests/test_p1_auth_workspace_isolation.py` | 覆盖 production config rejection、masked config summary、readiness、redacted logging/errors、delete-summary/proof | 不证明完整合规体系 |
+| Readiness/redaction/privacy tests | `PYTHONPATH=backend backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_auth_secret_config.py backend/tests/test_data_encryption_governance.py backend/tests/test_health.py backend/tests/test_privacy_governance.py backend/tests/test_p1_auth_workspace_isolation.py` | 覆盖 production config rejection、masked config summary、readiness、encryption envelope、redacted logging/errors、delete-summary/proof、token revoke、RBAC gate | 不证明完整合规体系 |
 | Parser service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module jd_parser --output-dir /tmp/careeragent-evals-jd-parser && backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module resume_parser --output-dir /tmp/careeragent-evals-resume-parser` | JD/Resume parser foundation cases 通过并输出 evidence/confidence/warnings metrics | parser foundation，不是 full production parser |
 | RAG service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module rag --output-dir /tmp/careeragent-evals-rag` | RAG lexical/vector/hybrid/no-evidence cases 通过并输出 vector metrics | local vector foundation，不是 full production RAG |
 | Match service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module match --output-dir /tmp/careeragent-evals-match` | Match 六维评分、风险扣分、compare case 和 evidence metrics 通过 | trustworthy foundation，不是生产级求职判断 |
@@ -44,6 +44,16 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 - Validation error responses must redact sensitive input values.
 - Privacy delete-all must return resource-level `deleted_counts`, `deletion_proof_id`, and retention/backup limitation note.
 - Audit metadata must remain refs/counts/config-safe only; no resume/JD/RAG raw payload.
+
+## v3.0 Security / Privacy / Data Governance Gates
+
+- Sensitive repository/service write paths must store Fernet envelopes for Resume/JD/RAG/Interview/Application/Bad Case private text fields.
+- Legacy plaintext rows must remain readable so rollout does not break existing local/dev data.
+- `APP_ENV=production` must reject missing/invalid/local-dev `DATA_ENCRYPTION_KEY`.
+- `POST /api/auth/logout` must revoke current access token `jti`; revoked tokens must return `token_revoked`.
+- Viewer/member/owner route permissions must be enforced before mutating protected APIs.
+- Privacy delete-all must support `dry_run=true` and execute proof with retained-record and backup-purge limitation fields.
+- Evaluation case/result payloads and audit metadata must remain redacted and JSON-serializable.
 
 ## Evaluation Boundary
 

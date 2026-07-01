@@ -1,28 +1,31 @@
-# CareerAgent Phase 2.6 Security / Privacy / Deployment Hardening
+# CareerAgent v3.0 Security / Privacy / Data Governance
 
-阶段 2.6 把 CareerAgent 从前序 production foundation 推进到 security / privacy / deployment production foundation。它仍不是 production-ready，也不代表可以直接处理真实敏感求职材料。
+v3.0 在 2.6 security/privacy/deployment foundation 之上，补齐应用层敏感数据加密、token revoke、RBAC role gate、删除 proof dry-run/execute 和更严格 audit/redaction。当前状态是 security/privacy/data-governance production foundation candidate，不是 production-ready，也不是合规删除或企业级安全认证。
 
 ## Scope
 
-已补齐的 hardening foundation：
+已完成的 v3.0 foundation：
 
-- Config validation：`APP_ENV=production` 启动时拒绝空、过短或 dev-only / replace-me / change-me / placeholder `AUTH_JWT_SECRET`，拒绝 SQLite production database URL，并拒绝 `*` CORS。
-- Config summary：readiness 只返回 masked secret/provider config、database driver、token expiry 和 feature flags，不返回 secret value。
-- Health/readiness：`GET /health` 继续作为 alive check；`GET /ready` 和 `GET /api/ready` 检查 DB reachability 与 runtime config validity。
-- Structured logging：新增 `careeragent` JSON log event，request middleware 记录 request_id、method、path、status_code 和 duration_ms，不记录 body。
-- Redaction：集中 masking email、phone、JWT、API key、secret/token 字段和长 raw text；统一错误响应 details 经过 redaction。
-- Data deletion summary/proof：`GET /api/privacy/delete-summary` 预览当前 user/workspace 可删除资源计数；`DELETE /api/privacy/delete-all` 返回 `deletion_proof_id`、resource-level counts 和 backup/retention limitation note。
-- Audit foundation：register/login、Agent run create/resume/retry/cancel、Evaluation run、Bad Case create 和 privacy delete-all 写入 privacy-safe `audit_logs` metadata。
-- PostgreSQL production boundary：SQLite 明确只允许 local dev/test；production runtime validation 要求 PostgreSQL-compatible `DATABASE_URL`。
+- Application-layer encryption-at-rest：新增 `app.core.crypto` Fernet envelope，写入时保存 `{v,key_id,alg,ciphertext}`，读取时兼容 legacy plaintext。
+- Sensitive DB fields：Resume `raw_text`、JD `raw_text`、RAG document/chunk/answer run、Interview answer、Application notes/interview_notes/reflection/status note、Bad Case free text 写入加密字段。
+- Evaluation privacy：Evaluation case/result JSON payload 写入前 redaction；Bad Case 派生 eval 的 summary 类字段也走 redaction。
+- Key foundation：新增 `DATA_ENCRYPTION_KEY` / `DATA_ENCRYPTION_KEY_ID`；production runtime 拒绝缺失、无效或本地 dev key。
+- Token/session foundation：access token 增加 `jti`；`POST /api/auth/logout` 写入 `revoked_tokens`，被 revoke 的 token 返回 `token_revoked`。
+- RBAC foundation：workspace membership role 驱动 route permission gate；viewer 只读，member 可写基础业务，owner/admin 可执行 privacy delete 和 audit log 查看。
+- Audit foundation：mutating protected API 写入 action/ref/count metadata，不记录 request body；audit metadata 会转 JSON-safe 并 redaction。
+- Privacy delete proof：`DELETE /api/privacy/delete-all?dry_run=true` 返回 dry-run proof；execute 返回 `deletion_proof_id`、before counts、deleted counts、retained records、audit event id、backup purge limitation。
+- Runtime hardening：沿用 2.6 production validation、masked config summary、structured request logging、redacted errors、readiness checks 和 production SQLite rejection。
 
 ## Runtime Config Rules
 
 Local development may use `.env.example`:
 
 ```bash
-AUTH_JWT_SECRET=dev-only-change-me-careeragent-local-auth-secret-32chars
-DATABASE_URL=sqlite:///./local_data/careeragent.db
 APP_ENV=development
+AUTH_JWT_SECRET=dev-only-change-me-careeragent-local-auth-secret-32chars
+DATA_ENCRYPTION_KEY=<dev-only Fernet key from .env.example>
+DATA_ENCRYPTION_KEY_ID=local-dev-v1
+DATABASE_URL=sqlite:///./local_data/careeragent.db
 ```
 
 Production must inject runtime config from a trusted environment or secret manager:
@@ -30,36 +33,35 @@ Production must inject runtime config from a trusted environment or secret manag
 ```bash
 APP_ENV=production
 AUTH_JWT_SECRET=<strong random secret, at least 32 chars>
+DATA_ENCRYPTION_KEY=<strong Fernet key generated for production>
+DATA_ENCRYPTION_KEY_ID=<stable production key id, e.g. prod-2026-07-v1>
 DATABASE_URL=postgresql+psycopg://...
 BACKEND_CORS_ORIGINS=https://your-frontend.example
 ```
 
-Do not store real DB credentials, provider keys, JWT secrets, resumes, JDs, RAG documents, application records, interview notes or evaluation outputs in committed files.
+Do not store real DB credentials, provider keys, JWT secrets, encryption keys, resumes, JDs, RAG documents, application records, interview notes or evaluation outputs in committed files.
+
+## Encryption Boundary
+
+v3.0 protects the main sensitive application fields at the repository/service write path. It does not claim complete enterprise key management:
+
+- Existing legacy plaintext rows are readable for compatibility, but v3.0 does not include an automatic backfill migration that rewrites historical rows.
+- Only the active configured Fernet key can decrypt current envelopes; multi-key decrypt, KMS integration and automated rotation jobs are future hardening.
+- Database/filesystem/cloud provider encryption, managed backup encryption and object-store encryption remain deployment responsibilities.
+- Evaluation payloads are redacted rather than encrypted so test result contracts remain inspectable without raw private text.
 
 ## Privacy Boundary
 
-The current system reduces accidental exposure but does not provide full compliance:
+The system reduces accidental exposure but is not a legal compliance product:
 
-- Resume/JD/RAG `raw_text` can still be stored in plaintext database columns.
-- There is no production encryption-at-rest implementation, key management, key rotation or legal hold workflow.
-- Deletion proof covers active database rows in the current workspace only.
-- Backup purge, log retention, exported artifacts and external provider deletion are documented gaps.
-- API responses should continue using preview/ref/summary shapes, not full raw payloads.
-
-## Observability Boundary
-
-Structured logs are request-level foundation:
-
-- Include request_id for correlation.
-- Include event name, HTTP path/status/duration and sanitized metadata.
-- Exclude request/response body, Authorization headers, raw_text, full answer text, chunk text and provider payloads.
-- `/ready` exposes masked config summary and DB/config status.
-
-This is not centralized observability, SIEM, alerting, tracing, metrics SLO, or audit pipeline.
+- Default Resume/JD/RAG responses still expose short masked previews only, not full raw payloads.
+- Application and Bad Case detail APIs return decrypted values to the authorized current user/workspace context; UI-level privacy-safe display is a v3.3 productization requirement.
+- Deletion proof covers active database rows in the current app database scope. It does not purge backups, logs, exported files, local screenshots, provider traces or external systems.
+- Audit logs retain redacted tombstones for governance trail.
 
 ## Data Deletion / Retention Boundary
 
-The privacy delete-all flow covers the current user/workspace business objects:
+The privacy delete-all flow covers current scoped business objects:
 
 - profiles, resumes, resume_versions
 - job_descriptions, job_profiles
@@ -73,17 +75,25 @@ The privacy delete-all flow covers the current user/workspace business objects:
 
 The returned `deletion_proof_id` is an application-level proof identifier, not a legal deletion certificate. Backups, logs, manually exported files, external AI provider traces and deployment-platform retention still need a production policy.
 
-## Quality Gates
+## Observability Boundary
 
-Phase 2.6 gates are listed in `docs/quality-gates.md`. Required checks include backend tests, synthetic/service-level eval, frontend build, Docker config positive/negative secret checks, Alembic upgrade, diff hygiene, ignore/artifact scan, secret scan, readiness tests, redaction tests and privacy deletion tests.
+Structured logs are request-level foundation:
+
+- Include request_id for correlation.
+- Include event name, HTTP path/status/duration and sanitized metadata.
+- Exclude request/response body, Authorization headers, raw_text, full answer text, chunk text and provider payloads.
+- `/ready` exposes masked config summary and DB/config status.
+
+This is not centralized observability, SIEM, alerting, tracing, metrics SLO, or audit pipeline.
 
 ## Remaining Gaps
 
-- Raw text encryption interface / encryption-at-rest is still missing.
-- PostgreSQL deployment is enforced for production config but not provisioned by this repository.
-- RBAC remains role foundation only; no full policy engine, SSO, MFA, refresh-token rotation or session/device management.
-- Observability remains structured local logs and readiness endpoints; no centralized log pipeline or alerts.
-- Frontend still lacks full lint/minimal UI test coverage and object selector replacement for every ID-driven workflow.
-- Backup, restore, retention, legal hold and backup erasure proof remain future production-readiness work.
+- No KMS/HSM integration, no multi-key decrypt set, no online key rotation/backfill job.
+- No refresh token rotation, session/device management, SSO or MFA.
+- RBAC is route-level role foundation, not a full policy engine or database RLS.
+- Backup purge, restore, legal hold and deletion attestation remain v3.1 operations work.
+- Audit logs are DB-local redacted records, not centralized immutable audit/SIEM.
+- Frontend privacy-safe display, selectors and E2E coverage remain v3.3 work.
+- Production AI quality, semantic provider, large benchmark and human review remain v3.2 work.
 
-阶段完成标准：Security / Privacy / Deployment 达到 production foundation，不得称为 production-ready。
+阶段完成标准：v3.0 达到 Security / Privacy / Data Governance production foundation candidate；不得称为 production-ready。

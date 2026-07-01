@@ -17,8 +17,11 @@ JWT_PATTERN = re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b
 SENSITIVE_KEY_PARTS = {
     "api_key",
     "apikey",
+    "actual_behavior_summary",
     "answer_text",
     "chunk_text",
+    "description_summary",
+    "expected_behavior_summary",
     "full_text",
     "interview_notes",
     "jd_raw_text",
@@ -26,7 +29,10 @@ SENSITIVE_KEY_PARTS = {
     "raw_text",
     "reflection",
     "resume_text",
+    "root_cause_summary",
     "secret",
+    "fix_strategy_summary",
+    "suggested_fix_summary",
     "token",
 }
 

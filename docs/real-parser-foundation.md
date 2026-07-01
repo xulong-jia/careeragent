@@ -97,7 +97,7 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset servi
 - Not large benchmark: current cases are de-identified foundation fixtures, not broad production quality measurement.
 - Not default production LLM parser: real provider path is opt-in and must be calibrated separately.
 - Complex bilingual PDFs, tables, unusual layouts, and noisy resumes still need larger evaluation.
-- `raw_text` remains plaintext and is still a production privacy/security blocker.
+- v3.0 encrypts parser source `raw_text` at the repository write path, but KMS, rotation backfill, backup purge and legal audit remain production blockers.
 - Match scoring and Project Rewrite have 2.4 trustworthy foundation, and Agent Workflow has 2.5 production foundation, but all still require larger validation and production hardening.
 
-Next phase: Final Production Readiness Audit.
+Next phase: v3.1 Production Deployment, Database & Operations Foundation.

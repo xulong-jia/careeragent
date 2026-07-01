@@ -5,6 +5,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import uuid4
 
 from app.core.config import (
     FORBIDDEN_PRODUCTION_SECRET_MARKERS,
@@ -114,6 +115,8 @@ def create_access_token(
         "email": email,
         "role": role,
         "workspace_id": workspace_id,
+        "jti": uuid4().hex,
+        "typ": "access",
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
     }

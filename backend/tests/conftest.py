@@ -2,6 +2,11 @@ import os
 
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("AUTH_JWT_SECRET", "test-auth-secret-for-careeragent-p1")
+os.environ.setdefault(
+    "DATA_ENCRYPTION_KEY",
+    "MKlKIfl6Htn3qasq6OmUZrAptCgKZk_unRl07h5u6Ew=",
+)
+os.environ.setdefault("DATA_ENCRYPTION_KEY_ID", "test-v1")
 
 from fastapi.testclient import TestClient
 import pytest

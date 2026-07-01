@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.crypto import decrypt_text
 from app.core.errors import AppError
 from app.core.privacy import safe_preview
 from app.repositories import resume_repository
@@ -129,7 +130,7 @@ def parse_resume(
     source = resume_repository.get_source_resume_version(
         db, resume_id, request.resume_version_id
     )
-    raw_text = source.raw_text.strip()
+    raw_text = decrypt_text(source.raw_text).strip()
     if not raw_text:
         raise AppError(
             code="resume_raw_text_empty",

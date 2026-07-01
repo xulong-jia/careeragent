@@ -79,6 +79,40 @@ def test_production_runtime_validation_rejects_sqlite(monkeypatch):
         get_settings.cache_clear()
 
 
+def test_production_runtime_validation_requires_data_encryption_key(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "prod-secret-value-with-more-than-32-chars")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://user:pass@db/careeragent")
+    monkeypatch.setenv("BACKEND_CORS_ORIGINS", "https://careeragent.example.com")
+    monkeypatch.delenv("DATA_ENCRYPTION_KEY", raising=False)
+
+    try:
+        with pytest.raises(RuntimeError, match="DATA_ENCRYPTION_KEY"):
+            validate_runtime_settings(get_settings())
+    finally:
+        get_settings.cache_clear()
+
+
+def test_production_runtime_validation_rejects_dev_data_encryption_key(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "prod-secret-value-with-more-than-32-chars")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://user:pass@db/careeragent")
+    monkeypatch.setenv("BACKEND_CORS_ORIGINS", "https://careeragent.example.com")
+    monkeypatch.setenv(
+        "DATA_ENCRYPTION_KEY",
+        "MKlKIfl6Htn3qasq6OmUZrAptCgKZk_unRl07h5u6Ew=",
+    )
+    monkeypatch.setenv("DATA_ENCRYPTION_KEY_ID", "local-dev-v1")
+
+    try:
+        with pytest.raises(RuntimeError, match="DATA_ENCRYPTION_KEY"):
+            validate_runtime_settings(get_settings())
+    finally:
+        get_settings.cache_clear()
+
+
 def test_config_summary_masks_secret_values(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("APP_ENV", "development")
@@ -93,5 +127,7 @@ def test_config_summary_masks_secret_values(monkeypatch):
         assert "sk-testsecret" not in dumped
         assert "embedding-secret" not in dumped
         assert summary["auth_jwt_secret"] == "[set length=20]"
+        assert summary["data_encryption_key"] != get_settings().data_encryption_key
+        assert summary["data_encryption_key_id"]
     finally:
         get_settings.cache_clear()

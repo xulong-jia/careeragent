@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.crypto import decrypt_text, encrypt_text
 from app.core.errors import AppError
 from app.core.tenant import (
     current_user_id,
@@ -119,7 +120,7 @@ def create_resume_with_initial_version(
         version_name="Initial version",
         version_number=1,
         target_role=None,
-        raw_text=raw_text,
+        raw_text=encrypt_text(raw_text),
         raw_text_preview=raw_text_preview,
         structured_resume=structured_resume.model_dump(),
         extraction_status=extraction_status,
@@ -270,7 +271,7 @@ def clone_resume_version(
         version_name=version_name or default_version_name,
         version_number=next_version_number,
         target_role=target_role if target_role is not None else source.target_role,
-        raw_text=source.raw_text,
+        raw_text=encrypt_text(decrypt_text(source.raw_text)),
         raw_text_preview=source.raw_text_preview,
         structured_resume=source.structured_resume,
         extraction_status=source.extraction_status,
@@ -436,7 +437,7 @@ def create_confirmed_resume_version(
         version_name=version_name,
         version_number=next_version_number,
         target_role=target_role,
-        raw_text=source.raw_text,
+        raw_text=encrypt_text(decrypt_text(source.raw_text)),
         raw_text_preview=source.raw_text_preview,
         structured_resume=structured_resume.model_dump(),
         extraction_status=source.extraction_status,

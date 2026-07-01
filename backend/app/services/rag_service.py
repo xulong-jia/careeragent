@@ -7,6 +7,7 @@ from app.ai.embedding_provider import (
     build_embedding_provider,
     embedding_id_for_text,
 )
+from app.core.crypto import decrypt_text
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.versioning import MODEL_VERSION, RETRIEVAL_VERSION, SCHEMA_VERSION
@@ -186,7 +187,7 @@ def index_document(
     document = rag_repository.get_document_model(db, doc_id)
     try:
         chunks = chunk_document_text(
-            document.raw_text,
+            decrypt_text(document.raw_text),
             source_type=document.source_type,
             metadata=document.metadata_json,
             max_chars=payload.max_chars,

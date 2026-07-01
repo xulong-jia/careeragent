@@ -15,6 +15,8 @@ services:
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET is required. Copy .env.example to .env for local dev and replace it with a strong random secret for production.}
       AUTH_TOKEN_EXPIRE_MINUTES: ${AUTH_TOKEN_EXPIRE_MINUTES:-60}
       API_RATE_LIMIT_PER_MINUTE: ${API_RATE_LIMIT_PER_MINUTE:-0}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-MKlKIfl6Htn3qasq6OmUZrAptCgKZk_unRl07h5u6Ew=}
+      DATA_ENCRYPTION_KEY_ID: ${DATA_ENCRYPTION_KEY_ID:-local-dev-v1}
       DATABASE_URL: ${DATABASE_URL:-sqlite:////app/backend/local_data/careeragent.db}
       AI_PROVIDER_MODE: ${AI_PROVIDER_MODE:-deterministic}
       LLM_PROVIDER: ${LLM_PROVIDER:-deterministic}

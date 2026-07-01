@@ -1,8 +1,8 @@
 # CareerAgent Database Schema
 
-当前数据库是 SQLite + SQLAlchemy + Alembic local foundation。P1 已新增 Auth / Workspace / Data Isolation schema，并补 PostgreSQL driver readiness；2.6 后 `APP_ENV=production` 会拒绝 SQLite `DATABASE_URL`，production 必须使用 PostgreSQL-compatible URL。表结构以 `backend/app/models/` 和 `backend/alembic/versions/` 为准。
+当前数据库是 SQLite + SQLAlchemy + Alembic local foundation。P1 已新增 Auth / Workspace / Data Isolation schema，并补 PostgreSQL driver readiness；2.6 后 `APP_ENV=production` 会拒绝 SQLite `DATABASE_URL`，production 必须使用 PostgreSQL-compatible URL。v3.0 新增应用层 Fernet envelope 加密、token revoke 表和 route-level RBAC gate。表结构以 `backend/app/models/` 和 `backend/alembic/versions/` 为准。
 
-## P1 ownership model
+## Ownership / RBAC model
 
 P1 使用 `users`、`workspaces`、`workspace_memberships` 表表达当前账号和 workspace scope。核心业务表新增或补齐 owner 字段，repository/service 通过当前认证上下文过滤：
 
@@ -10,6 +10,8 @@ P1 使用 `users`、`workspaces`、`workspace_memberships` 表表达当前账号
 - `workspace_id`：业务数据所属 workspace。
 
 Owned tables 包括 `resumes`、`resume_versions`、`profiles`、`projects`、`project_rewrites`、`interview_questions`、`interview_answers`、`study_plans`、`job_descriptions`、`match_reports`、`rag_documents`、`rag_answer_runs`、`agent_runs`、`applications`、`bad_cases`、`evaluation_runs`、`evaluation_cases`、`evaluation_results`。P1 migration 对历史本地数据使用默认 owner/workspace 补值，便于原型库继续升级；production 数据迁移需要单独设计真实用户映射。
+
+v3.0 route-level RBAC 使用 `workspace_memberships.role` 进行 permission gate：viewer 只读，member 可执行常规业务写入，owner/admin 可执行 privacy delete 和 audit log 查看。这不是数据库 RLS，也不是完整企业 policy engine。
 
 ## users
 
@@ -53,7 +55,7 @@ Owned tables 包括 `resumes`、`resume_versions`、`profiles`、`projects`、`p
 
 ## audit_logs
 
-用途：记录 P1 privacy delete-all 和 2.6 auth/agent/evaluation/bad-case/privacy 基础审计事件。
+用途：记录 P1 privacy delete-all、2.6 auth/agent/evaluation/bad-case/privacy 和 v3.0 mutating API/token revoke/privacy proof 基础审计事件。
 
 关键字段：
 
@@ -65,6 +67,21 @@ Owned tables 包括 `resumes`、`resume_versions`、`profiles`、`projects`、`p
 - `created_at`
 
 隐私说明：audit metadata 只保存 action、counts、refs 和 config-safe metadata，不保存 raw resume/JD/RAG/interview/application payload。写入前应通过 redaction helpers 处理。
+
+## revoked_tokens
+
+用途：记录已撤销的 access token `jti`，用于 logout/revoke foundation。
+
+关键字段：
+
+- `token_jti`
+- `user_id`
+- `workspace_id`
+- `revoked_at`
+- `expires_at`
+- `reason`
+
+隐私说明：不保存完整 token，只保存 token `jti`、scope 和过期时间。production 仍缺 refresh token rotation、device/session management 和自动清理策略。
 
 ## resumes
 
@@ -107,7 +124,7 @@ Owned tables 包括 `resumes`、`resume_versions`、`profiles`、`projects`、`p
 - `created_at`
 - `archived_at`
 
-隐私说明：`raw_text` 是本地 prototype 数据，不应提交真实简历或输出到日志。前端 Resume Center 只展示 preview；生产化前需要继续收敛 raw_text 返回策略。
+隐私说明：v3.0 repository 写入路径会把 `raw_text` 保存为 Fernet envelope；legacy plaintext rows 仍可读。前端 Resume Center 只展示 preview，不返回完整 raw_text。KMS、multi-key decrypt 和 rotation backfill 仍是后续缺口。
 
 2.3 parser 说明：`structured_resume` JSON 内包含 parser foundation 字段 `risk_flags`、`parse_confidence`、`evidence`、`warnings` 和 `parser_metadata`；不是 full production parser 证明。
 
@@ -211,7 +228,7 @@ JSON 字段说明：
 - `status`
 - `created_at`
 
-隐私说明：`raw_text` 可能包含非公开 JD 或用户备注，当前仅用于本地 prototype。
+隐私说明：v3.0 repository 写入路径会把 `raw_text` 保存为 Fernet envelope；legacy plaintext rows 仍可读。API 默认只返回 masked preview。KMS、multi-key decrypt 和 rotation backfill 仍是后续缺口。
 
 ## job_profiles
 
@@ -321,7 +338,7 @@ JSON 字段说明：
 - `scores`：deterministic scoring 结果，包含 `structure`、`technical_depth`、`business_understanding`、`evidence`、`clarity`、`risk_control` 和 `overall_average`。
 - `weakness_tags`：规则生成的薄弱项标签，例如 `weak_structure`、`shallow_technical_depth`、`missing_evidence`、`overclaim_risk`。
 
-隐私说明：`answer_text` 可能包含个人经历或面试复盘，仅保存在本地 DB 用于 deterministic scoring；默认 API response、列表、Dashboard 和 stats 不暴露完整回答原文。Dashboard stats 只读取聚合计数、`scores.overall_average` 和 `weakness_tags`，不读取或展示完整 `answer_text`。Scoring 不读取 Resume/JD full raw_text，不调用真实 LLM judge，也不自动写入 Study Plan。
+隐私说明：v3.0 repository 写入路径会把 `answer_text` 保存为 Fernet envelope；legacy plaintext rows 仍可读。默认 API response、列表、Dashboard 和 stats 不暴露完整回答原文。Dashboard stats 只读取聚合计数、`scores.overall_average` 和 `weakness_tags`，不读取或展示完整 `answer_text`。Scoring 不调用真实 LLM judge，也不自动写入 Study Plan。
 
 ## study_plans
 
@@ -369,7 +386,7 @@ JSON 字段说明：
 - `index_status`
 - `chunk_count`
 
-隐私说明：API response 默认返回 `raw_text_preview`，不默认返回完整 `raw_text`。
+隐私说明：v3.0 repository 写入路径会把 `rag_documents.raw_text` 和 `rag_chunks.text` 保存为 Fernet envelope；API response 默认返回 `raw_text_preview` / `text_preview`，不默认返回完整 `raw_text` 或 chunk text。
 
 ## rag_chunks
 
@@ -422,7 +439,7 @@ JSON 字段说明：
 
 `POST /api/rag/answer` 默认 `persist=true`，会写入 `rag_answer_runs` 并返回 `answer_run_id`。如果 request 设置 `persist=false`，则只返回即时 answer contract，不写入该表。
 
-隐私说明：`rag_documents.raw_text` 和 `rag_chunks.text` 仅保存在本地 DB 用于 deterministic chunking/search/answer。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`rag_answer_runs.citations_json` 只保存短 snippet 和 metadata preview，`source_refs_json` 只保存短 preview，`retrieval_debug_json` 只允许保存 retrieval_mode、embedding_model、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters、score_threshold 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。12D stats 只返回聚合计数、latest question preview 和 uncertainty，不返回 citations/source_refs/retrieval_debug。v1.6 local vector/hybrid retrieval 不接真实外部 embedding/vector DB，不自动修改 Interview / Study Plan / Resume / Project / Application。
+隐私说明：v3.0 repository 写入路径会把 `rag_answer_runs.question`、`answer`、`evidence_summary`、`citations_json` 和 `source_refs_json` 保存为 encrypted envelope。默认 API response 使用 `raw_text_preview`、`text_preview`、`snippet`、`citations.snippet` 和 `source_refs.preview`，不返回完整 raw text 或完整 chunk text。`retrieval_debug_json` 只允许保存 retrieval_mode、embedding_model、query_tokens、candidate_count、selected_chunk_ids、scores、top_k、filters、score_threshold 和 insufficient_reason，不包含 full raw_text、chunk text、Resume/JD raw_text 或完整 `answer_text`。12D stats 只返回聚合计数、latest question preview 和 uncertainty，不返回 citations/source_refs/retrieval_debug。v1.6 local vector/hybrid retrieval 不接真实外部 embedding/vector DB，不自动修改 Interview / Study Plan / Resume / Project / Application。
 
 ## agent_runs
 
@@ -525,7 +542,7 @@ JSON 字段说明：
 
 状态说明：`status` 支持 `saved`、`ready_to_apply`、`applied`、`written_test`、`first_interview`、`second_interview`、`hr_interview`、`offer`、`rejected`、`withdrawn`、`archived`。`priority` 支持 `low`、`medium`、`high`。
 
-隐私说明：不复制 resume raw_text、JD raw_text、match 源对象全文、Agent step payload 或投递材料全文。`notes`、`interview_notes` 和 `reflection` 应保存摘要，不粘贴真实投递材料、完整面试复盘或隐私原文。Agent Workflow 只会创建/绑定 draft tracking record，不做自动投递或状态流转。
+隐私说明：不复制 resume raw_text、JD raw_text、match 源对象全文、Agent step payload 或投递材料全文。v3.0 repository 写入路径会把 `notes`、`interview_notes`、`reflection` 和 status history `note` 保存为 Fernet envelope；API detail 会向授权用户返回解密后的运营摘要。Agent Workflow 只会创建/绑定 draft tracking record，不做自动投递或状态流转。
 
 ## application_status_history
 
@@ -578,7 +595,7 @@ JSON 字段说明：
 
 状态说明：`status` 支持 `open`、`reviewing`、`fixed`、`verified`、`wont_fix`。`added_to_eval_set` 和 regression refs 用于追踪 bad case 是否已进入 deterministic regression evaluation。
 
-隐私说明：只保存 source refs、短摘要、root cause / fix strategy summary 和 tags，不粘贴大段隐私原文。
+隐私说明：只保存 source refs、短摘要、root cause / fix strategy summary 和 tags，不粘贴大段隐私原文。v3.0 repository 写入路径会把 description、expected/actual behavior、suggested fix、root cause 和 fix strategy 保存为 Fernet envelope；API detail 会向授权用户返回解密后的复盘摘要。
 
 ## evaluation_runs
 
@@ -620,7 +637,7 @@ JSON 字段说明：
 
 `module` 当前支持 `jd_parser`、`resume_parser`、`match`、`rag`、`agent`、`application`、`bad_case`。`source_type` 支持 `synthetic`、`bad_case`、`manual`。
 
-隐私说明：manual case 会拒绝 `raw_text` / `jd_raw_text` / `chunk_text` / `full_text` / `resume_text` / `job_text` 等明显隐私字段；从 Bad Case 创建 case 时只保存 refs 和摘要。
+隐私说明：manual case 会拒绝 `raw_text` / `jd_raw_text` / `chunk_text` / `full_text` / `resume_text` / `job_text` 等明显隐私字段；v3.0 起 manual payload 和 result payload 写入前会 redaction；从 Bad Case 创建 case 时只保存 refs 和 redacted summaries。
 
 ## evaluation_results
 
@@ -659,4 +676,4 @@ v1.5C 没有新增数据库表或 migration，复用现有 schema 实现本地 p
 
 P1 migration `20260630_0018_add_auth_workspace_isolation` 新增 auth/workspace/audit 表，并为 owned business tables 补 owner columns 和 indexes。后端当前用 application-level repository/service filters 实现隔离；这已经覆盖 P1 checkpoint 的基础 data isolation tests，但还不是数据库 RLS、完整 RBAC、SSO、MFA、refresh token rotation、centralized audit/SIEM、retention policy、backup erasure 或 irreversible deletion workflow。
 
-2.6 privacy delete-all 会清理当前 user/workspace 的业务数据并保留 audit log counts、`deletion_proof_id` 和 retention note；它不声明生产级合规删除证明、backup purge、external provider deletion 或 legal hold 流程。
+v3.0 privacy delete-all 支持 dry-run/execute proof，会清理当前 user/workspace 的业务数据并保留 redacted audit tombstone、`deletion_proof_id`、before counts、deleted counts、retained records、verification status 和 backup purge limitation；它不声明生产级合规删除证明、backup purge、external provider deletion 或 legal hold 流程。

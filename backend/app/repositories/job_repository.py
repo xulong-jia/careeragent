@@ -1,6 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.crypto import decrypt_text, encrypt_text
 from app.core.errors import AppError
 from app.core.privacy import safe_preview
 from app.core.tenant import (
@@ -55,7 +56,7 @@ def _to_job_record(job: JobDescription, profile: JobProfileModel) -> JobRecord:
         company=job.company,
         job_title=job.job_title,
         location=job.location,
-        raw_text_preview=safe_preview(job.raw_text, RAW_TEXT_PREVIEW_CHARS),
+        raw_text_preview=safe_preview(decrypt_text(job.raw_text), RAW_TEXT_PREVIEW_CHARS),
         source_url=job.source_url,
         job_profile=_to_job_profile(profile, job),
     )
@@ -86,7 +87,7 @@ def create_job_with_profile(
         job_title=payload.job_title,
         location=payload.location,
         source_url=str(payload.source_url) if payload.source_url else None,
-        raw_text=payload.raw_text,
+        raw_text=encrypt_text(payload.raw_text),
         status="active",
     )
     job_profile = JobProfileModel(

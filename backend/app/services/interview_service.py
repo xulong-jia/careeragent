@@ -2,6 +2,7 @@ from collections.abc import Iterable
 
 from sqlalchemy.orm import Session
 
+from app.core.crypto import decrypt_text
 from app.core.errors import AppError
 from app.core.tenant import require_owned
 from app.models.interview import InterviewQuestion
@@ -339,7 +340,7 @@ def score_answer(
             details={"question_id": answer.question_id},
         )
 
-    scores = _score_answer_text(answer.answer_text, question)
+    scores = _score_answer_text(decrypt_text(answer.answer_text), question)
     weakness_tags = _weakness_tags(scores)
     feedback = _feedback_for_scores(scores, weakness_tags)
     return interview_repository.update_answer_score(

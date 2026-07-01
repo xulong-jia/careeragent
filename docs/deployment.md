@@ -1,4 +1,4 @@
-# CareerAgent Phase 2.6 Deployment Baseline
+# CareerAgent Deployment Baseline
 
 This is a security/privacy/deployment production foundation for local development and repeatable checks. It is not a production SaaS runbook and does not make CareerAgent production-ready.
 
@@ -110,6 +110,6 @@ The smoke eval is synthetic contract regression only. Phase 2.1 adds `service_le
 
 ## Production Limits
 
-Current 2.6 has token auth, workspace scope, privacy export/delete/delete-summary/audit baseline, structured request logging, readiness checks, production config validation, and PostgreSQL runtime requirement for production. It still does not include production SSO, MFA, full RBAC, cloud deployment scripts, Kubernetes, centralized monitoring, automatic backup, retention policy, backup erasure proof, recruitment scraping, or auto-apply.
+Current v3.0 has token auth, workspace scope, token revoke, route-level RBAC gate, privacy export/delete/delete-summary/audit baseline, sensitive field envelope encryption, structured request logging, readiness checks, production config validation, data encryption key validation, and PostgreSQL runtime requirement for production. It still does not include production SSO, MFA, refresh-token rotation, DB RLS, cloud deployment scripts, Kubernetes, centralized monitoring, automatic backup, retention policy, backup erasure proof, recruitment scraping, or auto-apply.
 
-Current deployment status is `security/privacy/deployment production foundation`, not `production-ready`. The next phase should be Final Production Readiness Audit.
+Current deployment status is `security/privacy/data-governance production foundation candidate`, not `production-ready`. The next phase should be v3.1 Production Deployment, Database & Operations Foundation.

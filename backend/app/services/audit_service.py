@@ -1,3 +1,4 @@
+from datetime import date, datetime
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -13,6 +14,18 @@ def _next_audit_id(db: Session) -> str:
         if db.get(AuditLog, candidate) is None:
             return candidate
     return f"audit_{uuid4().hex}"
+
+
+def _jsonable(value: object) -> object:
+    if isinstance(value, dict):
+        return {str(key): _jsonable(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_jsonable(child) for child in value]
+    if isinstance(value, tuple):
+        return [_jsonable(child) for child in value]
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    return value
 
 
 def record_audit_event(
@@ -32,7 +45,7 @@ def record_audit_event(
         action=action,
         resource_type=resource_type,
         resource_id=resource_id,
-        metadata_json=redact_mapping(metadata or {}),
+        metadata_json=redact_mapping(_jsonable(metadata or {})),
         message="Audit event recorded.",
     )
     db.add(log)
