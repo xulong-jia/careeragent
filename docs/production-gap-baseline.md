@@ -1,10 +1,10 @@
 # CareerAgent Production Gap Baseline
 
-阶段 2.5 后，当前仓库是 production hardening + real evaluation + real RAG + real parser + trustworthy match/project rewrite + agent workflow production foundation。本文档不声明 production-ready。
+阶段 2.6 后，当前仓库是 production hardening + real evaluation + real RAG + real parser + trustworthy match/project rewrite + agent workflow + security/privacy/deployment production foundation。本文档不声明 production-ready。
 
 ## 1. 当前总体判断
 
-当前版本可以作为 production hardening + real evaluation + real RAG + real parser + trustworthy match/project rewrite + agent workflow production foundation，因为主业务对象已经有持久化、Auth/Workspace 基础隔离、隐私 preview 收敛、Docker 本地骨架、Alembic migration、后端测试、前端 build、synthetic smoke regression、service-level evaluation runner、RAG local vector embedding persistence、JD/Resume parser evidence/confidence/warnings baseline、Match 六维评分、风险扣分、compare API、Project Rewrite 反编造字段，以及 Agent run lifecycle、attempt-aware step timeline、resume/retry/cancel API、多 workflow 和失败 Bad Case draft。
+当前版本可以作为 production hardening + real evaluation + real RAG + real parser + trustworthy match/project rewrite + agent workflow + security/privacy/deployment production foundation，因为主业务对象已经有持久化、Auth/Workspace 基础隔离、隐私 preview 收敛、Docker 本地骨架、Alembic migration、后端测试、前端 build、synthetic smoke regression、service-level evaluation runner、RAG local vector embedding persistence、JD/Resume parser evidence/confidence/warnings baseline、Match 六维评分、风险扣分、compare API、Project Rewrite 反编造字段、Agent run lifecycle、attempt-aware step timeline、resume/retry/cancel API、多 workflow 和失败 Bad Case draft，以及 2.6 runtime config validation、structured request logging、readiness check、privacy deletion proof/audit foundation。
 
 当前版本不是 production-ready，原因是核心 AI 能力仍大量依赖 deterministic、synthetic 或本地 foundation 路径：RAG 已有 local vector path 和 DB-persisted chunk vectors，但没有最终 semantic embedding、reranker 或 production-scale vector DB；JD/Resume parser 已有 production foundation 字段和 optional LLM path，但默认仍是 deterministic local parser，未接 OCR、未做大规模真实 benchmark；Match/Rewrite 已有六维评分、证据绑定、风险扣分和防编造字段，但仍是 deterministic foundation，未经过大规模 human agreement / ranking stability 校准；Agent 已有 production foundation 状态机和恢复 API，但仍是同步 local runner，不是 durable queue/worker/LLM tool-calling agent；Evaluation 仍只是 foundation benchmark，raw_text 仍明文保存，生产 DB、observability、retention、backup、RBAC 和部署策略不足。
 
@@ -28,10 +28,10 @@
 | Bad Case | PARTIAL | 人工 bad case、root cause、regression linkage、Agent step failure auto draft | 真实失败样例 triage、owner/priority SLA、自动 eval DB 闭环不足 | 2.1, 2.5, 2.6 | 问题沉淀仍需运营流程 |
 | Evaluation | PARTIAL | `synthetic_smoke_v1`、service-level de-identified dataset、fileized runner、metrics/failed cases/actual outputs/run_config；Agent workflow 8 cases 覆盖 resume/retry/cancel/bad-case payload | 仍不是 production benchmark；当前不自动写 DB | 2.1 foundation, 2.2-2.6 持续 | service-level pass/fail 可能被误读为生产质量 |
 | Auth / Workspace | PRODUCTION_FOUNDATION | register/login/me/logout、bearer token、workspace owner filtering、basic audit | 无 SSO/MFA/refresh token/full RBAC/session 管理/SIEM | 2.6 | 多租户和认证强度不足 |
-| Database | RISKY | Alembic、SQLite default、PostgreSQL driver readiness | PostgreSQL 不是生产默认，无 backup/restore/retention/erasure proof | 2.6 | 本地 DB 路径不可作为生产数据层 |
+| Database | FOUNDATION | Alembic、SQLite local default、PostgreSQL driver readiness、production runtime rejects SQLite | 仍缺 managed PostgreSQL provisioning、backup/restore/retention/erasure proof | 2.6 foundation / final audit | 本地 DB 路径不可作为生产数据层 |
 | Frontend | PARTIAL | React workbench、多页面业务流、auth token client | 缺 lint/minimal tests/object selectors，主流程仍有手填 ID | 2.6 | 生产操作易错且回归难发现 |
-| Docker / Deployment | PARTIAL | Docker Compose 本地骨架，阶段 2.0 要求 non-empty auth secret | 无云部署 runbook、secret manager、readiness、backup、managed DB | 2.6 | 新环境可启动但不是生产部署 |
-| Security / Privacy | RISKY | preview/redaction、ignore hygiene、privacy export/delete/audit baseline | raw_text 明文、无 encryption-at-rest/retention/backup erasure/legal audit | 2.6 | 真实隐私数据不可直接处理 |
+| Docker / Deployment | FOUNDATION | Docker Compose 本地骨架、non-empty auth secret、production fail-fast config、readiness endpoint | 无云部署 runbook、secret manager integration、backup、managed DB provisioning | 2.6 foundation / final audit | 新环境可启动但不是生产部署 |
+| Security / Privacy | FOUNDATION | preview/redaction、ignore hygiene、privacy export/delete/audit baseline、redacted errors/logging、delete-summary/proof id | raw_text 明文、无 encryption-at-rest/retention/backup erasure/legal audit | 2.6 foundation / final audit | 真实隐私数据仍不可直接处理 |
 | Documentation | PARTIAL | README、architecture、deployment、evaluation、安全和阶段文档 | 历史文档多，需持续防止 production-ready 误表述 | 2.0 持续, 2.6 | 文档口径造成错误验收 |
 
 ## 3. Production Blockers
@@ -49,7 +49,7 @@
 - Agent 已有 2.5 foundation 状态机，但仍缺 durable queue/worker、heartbeat、true async cancellation token、workflow lease 和 production observability。
 - 前端大量流程仍依赖手填 ID，缺少对象选择器、主流程防错和 minimal UI tests。
 - PostgreSQL 不是生产默认，SQLite/local_data 仅适合 local dev。
-- Observability 不足：缺 structured logging、request_id trace、readiness check、eval trace、audit pipeline。
+- Observability 仍是 foundation：已有 structured request logging、request_id 和 readiness check，但缺集中日志、metrics、tracing、alerting、eval trace pipeline 和 SIEM。
 - Auth/Workspace 仍缺 full RBAC、SSO/MFA、refresh token、token rotation 和 session/device controls。
 
 ### P2
@@ -65,4 +65,4 @@
 - 2.3 Real JD Parser + Resume Parser：已补 parser schema validation、evidence、confidence、warnings、risk flags、service-level parser eval、optional LLM provider path、timeout/retry/fallback/prompt/model metadata。默认仍是 deterministic local parser foundation，不是 full production parser。
 - 2.4 Trustworthy Match Scoring + Project Rewrite：已建立六维评分、证据绑定、风险扣分、多 JD/多简历对比、Project Rewrite 反编造字段和 service-level metrics。仍只是 trustworthy foundation。
 - 2.5 Agent Workflow Productionization：已补 pending/running/completed/failed/need_more_info/cancelled/retrying、step refs、resume/retry/cancel API、失败 Bad Case draft、多 workflow、Agent service-level eval 和前端兼容。仍只是 production foundation。
-- 2.6 Security / Privacy / Deployment Hardening：补 encryption/retention/audit/observability、PostgreSQL production default、RBAC、secret handling、frontend lint/tests/selectors 和可复现部署。
+- 2.6 Security / Privacy / Deployment Hardening：已补 runtime config validation、redaction/logging、readiness、privacy delete-summary/proof、audit foundation 和 production SQLite rejection。raw_text encryption、retention/backup erasure、full RBAC/SSO/MFA、centralized observability、frontend lint/tests/selectors 和 cloud deployment runbook 仍需 Final Production Readiness Audit。

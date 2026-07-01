@@ -1,6 +1,16 @@
 import json
+import io
+import logging
 
-from app.core.privacy import redact_mapping, redact_text, safe_preview
+from app.core.logging import LOGGER_NAME, log_event
+from app.core.privacy import (
+    mask_email,
+    mask_phone,
+    mask_secret,
+    redact_mapping,
+    redact_text,
+    safe_preview,
+)
 from app.core.versioning import (
     EVALUATION_VERSION,
     MODEL_VERSION,
@@ -95,6 +105,9 @@ def test_redaction_helpers_mask_sensitive_values():
     secret = "api_key: sk-testsecret123 alice@example.com +1 415 555 1212"
     assert "alice@example.com" not in safe_preview(secret)
     assert "sk-testsecret" not in safe_preview(secret)
+    assert mask_email("contact alice@example.com") == "contact [redacted-email]"
+    assert "[redacted-phone]" in mask_phone("+1 415 555 1212")
+    assert "sk-testsecret" not in mask_secret(secret)
 
     redacted_text = redact_text(secret)
     assert "length=" in redacted_text
@@ -114,6 +127,57 @@ def test_redaction_helpers_mask_sensitive_values():
     assert "sk-nestedsecret" not in redacted_dump
     assert "alice@example.com" not in redacted_dump
     assert "redacted" in redacted_dump
+
+
+def test_log_event_redacts_sensitive_payload():
+    stream = io.StringIO()
+    logger = logging.getLogger(LOGGER_NAME)
+    previous_disabled = logger.disabled
+    previous_manager_disable = logging.root.manager.disable
+    logger.disabled = False
+    logging.disable(logging.NOTSET)
+    logger.handlers.clear()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+    try:
+        log_event(
+            "privacy_test",
+            request_id="req_1",
+            raw_text=PRIVATE_RESUME_TEXT,
+            token="eyJabc.def.ghi",
+            contact="alice@example.com +1 415 555 1212",
+        )
+    finally:
+        logger.handlers.clear()
+        logger.disabled = previous_disabled
+        logging.disable(previous_manager_disable)
+
+    captured = stream.getvalue()
+    assert "privacy_test" in captured
+    assert "RESUME_PRIVATE_UNIQUE_TAIL" not in captured
+    assert "alice@example.com" not in captured
+    assert "+1 415 555 1212" not in captured
+    assert "eyJabc.def.ghi" not in captured
+
+
+def test_validation_error_response_redacts_sensitive_input():
+    client = make_client()
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "company": "",
+            "job_title": "Privacy Role",
+            "raw_text": PRIVATE_JD_TEXT + " api_key: sk-validationsecret123",
+        },
+    )
+
+    assert response.status_code == 422
+    body = response.text
+    assert "validation_error" in body
+    assert "JD_PRIVATE_UNIQUE_TAIL" not in body
+    assert "sk-validationsecret" not in body
 
 
 def test_default_api_responses_do_not_expose_full_private_text():

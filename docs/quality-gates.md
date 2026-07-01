@@ -9,16 +9,17 @@
 | Git state | `git status -sb` | 确认当前分支和未提交变更范围 | 不替代 code review |
 | Revision | `git rev-parse HEAD` | 记录验证起点 | 不代表 release tag |
 | Backend tests | `PYTHONPATH=backend backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests` | 后端 contract、API、migration-adjacent tests 通过 | 主要是 deterministic/local tests |
-| Frontend build | `cd frontend && npm run build > /tmp/careeragent-frontend-build-25 2>&1` | TypeScript/Vite build 通过 | 不包含完整 UI regression |
+| Frontend build | `cd frontend && npm run build -- --outDir /tmp/careeragent-frontend-build-26` | TypeScript/Vite build 通过 | 不包含完整 UI regression |
 | Docker Compose config | `docker compose config` | Compose 文件可解析，前提是 `.env` 或环境中提供 `AUTH_JWT_SECRET` | 不是 container build/push/deploy 证明 |
 | Docker missing-secret negative check | `COMPOSE_DISABLE_ENV_FILE=1 env -u AUTH_JWT_SECRET docker compose config` | 在没有 `.env`/env secret 时应明确失败 | 验证 Compose 不接受空 secret |
-| Alembic migration check | `DATABASE_URL=sqlite:////tmp/careeragent_phase25_alembic.db backend/.venv/bin/alembic -c backend/alembic.ini upgrade head` | 空临时 DB 可升级到 head | 不证明生产数据迁移策略 |
+| Alembic migration check | `DATABASE_URL=sqlite:////tmp/careeragent_phase26_alembic.db backend/.venv/bin/alembic -c backend/alembic.ini upgrade head` | 空临时 DB 可升级到 head | 不证明生产数据迁移策略 |
 | Whitespace diff | `git diff --check` | 无 trailing whitespace 等 patch 问题 | 不证明逻辑正确 |
 | Ignore hygiene | `git check-ignore -v .env local_data/careeragent.db backend/local_data/careeragent.db frontend/dist/index.html frontend/node_modules/react/package.json evals/results/smoke/summary.md` | 本地 secret/data/build artifacts 被 ignore | 不证明历史仓库无敏感数据 |
 | Tracked artifact scan | `git ls-files local_data backend/local_data frontend/dist frontend/node_modules .pytest_cache backend/.venv` | 不应返回被跟踪 artifact | 仍需人工判断其他路径 |
 | Secret scan | `rg -n "sk-[A-Za-z0-9_-]{12,}|BEGIN (RSA|OPENSSH|PRIVATE)|AUTH_JWT_SECRET=|API_KEY=" --hidden -g '!frontend/node_modules/**' -g '!backend/.venv/**' .` | 查找明显 secret/private key/placeholder 命中 | `.env.example` 和测试 fake key 需要人工确认 |
-| Synthetic eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset synthetic --output-dir /tmp/careeragent-evals-synthetic-25` | synthetic contract runner 仍可执行 | 只防 contract fixture 破坏 |
-| Service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --output-dir /tmp/careeragent-evals-service-25` | runner 真实调用当前 service/retriever/parser/agent/match/rewrite 路径并输出 metrics/failed cases | foundation，不是 production benchmark |
+| Synthetic eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset synthetic --output-dir /tmp/careeragent-evals-synthetic-26` | synthetic contract runner 仍可执行 | 只防 contract fixture 破坏 |
+| Service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --output-dir /tmp/careeragent-evals-service-26` | runner 真实调用当前 service/retriever/parser/agent/match/rewrite 路径并输出 metrics/failed cases | foundation，不是 production benchmark |
+| Readiness/redaction/privacy tests | `PYTHONPATH=backend backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_auth_secret_config.py backend/tests/test_health.py backend/tests/test_privacy_governance.py backend/tests/test_p1_auth_workspace_isolation.py` | 覆盖 production config rejection、masked config summary、readiness、redacted logging/errors、delete-summary/proof | 不证明完整合规体系 |
 | Parser service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module jd_parser --output-dir /tmp/careeragent-evals-jd-parser && backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module resume_parser --output-dir /tmp/careeragent-evals-resume-parser` | JD/Resume parser foundation cases 通过并输出 evidence/confidence/warnings metrics | parser foundation，不是 full production parser |
 | RAG service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module rag --output-dir /tmp/careeragent-evals-rag` | RAG lexical/vector/hybrid/no-evidence cases 通过并输出 vector metrics | local vector foundation，不是 full production RAG |
 | Match service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module match --output-dir /tmp/careeragent-evals-match` | Match 六维评分、风险扣分、compare case 和 evidence metrics 通过 | trustworthy foundation，不是生产级求职判断 |
@@ -34,6 +35,15 @@ AUTH_JWT_SECRET=dev-only-change-me-careeragent-local-auth-secret-32chars docker 
 ```
 
 Production 必须使用 secret manager 或部署环境注入强随机值。`APP_ENV=production` 会拒绝短 secret 和 dev-only / replace-me / change-me placeholder。
+
+## Phase 2.6 Security / Privacy / Deployment Gates
+
+- `GET /ready` / `GET /api/ready` must return DB/config readiness with masked config summary only.
+- `APP_ENV=production` must reject SQLite `DATABASE_URL`, weak/placeholder `AUTH_JWT_SECRET`, and wildcard CORS.
+- Request logs must include request_id/path/status/duration and must not include body, raw_text, Authorization, token or API key.
+- Validation error responses must redact sensitive input values.
+- Privacy delete-all must return resource-level `deleted_counts`, `deletion_proof_id`, and retention/backup limitation note.
+- Audit metadata must remain refs/counts/config-safe only; no resume/JD/RAG raw payload.
 
 ## Evaluation Boundary
 

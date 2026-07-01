@@ -18,6 +18,15 @@ async def export_privacy_data(
     return {"data": data, "request_id": request.state.request_id}
 
 
+@router.get("/delete-summary", response_model=ApiResponse[dict[str, object]])
+async def get_privacy_delete_summary(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    data = privacy_service.deletion_summary_current_user_data(db)
+    return {"data": data, "request_id": request.state.request_id}
+
+
 @router.delete("/delete-all", response_model=ApiResponse[dict[str, object]])
 async def delete_all_privacy_data(
     request: Request,

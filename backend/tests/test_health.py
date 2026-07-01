@@ -46,6 +46,30 @@ def test_health_returns_success_envelope(monkeypatch):
     get_settings.cache_clear()
 
 
+def test_readiness_checks_db_and_masks_config(monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("AUTH_JWT_SECRET", "test-auth-secret-for-careeragent-p1")
+    monkeypatch.setenv("LLM_API_KEY", "readiness-api-key-placeholder")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "embedding-readiness-secret")
+    get_settings.cache_clear()
+
+    response = get_client().get("/ready", headers={"X-Request-ID": "ready-test-id"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["request_id"] == "ready-test-id"
+    assert payload["data"]["status"] == "ok"
+    assert payload["data"]["database_reachable"] is True
+    assert payload["data"]["config_valid"] is True
+    dumped = str(payload["data"])
+    assert "readiness-api-key-placeholder" not in dumped
+    assert "embedding-readiness-secret" not in dumped
+    assert "test-auth-secret" not in dumped
+    assert payload["data"]["config"]["llm_api_key"].startswith("[set length=")
+    get_settings.cache_clear()
+
+
 def test_unknown_route_returns_error_envelope():
     response = get_client().get("/missing")
 

@@ -6,6 +6,7 @@ from app.core.errors import AppError
 from app.models.agent import AgentRun
 from app.repositories import agent_repository
 from app.schemas.agents import AgentRunRecord, AgentStepRecord
+from app.services.audit_service import record_audit_event
 
 
 def create_run_for_workflow(db: Session, payload: dict[str, object]) -> AgentRun:
@@ -18,7 +19,16 @@ def create_run_for_workflow(db: Session, payload: dict[str, object]) -> AgentRun
             status_code=400,
             details={"workflow_name": workflow_name},
         )
-    return runner.run_workflow(db, workflow=workflow, payload=payload)
+    run = runner.run_workflow(db, workflow=workflow, payload=payload)
+    record_audit_event(
+        db,
+        action="agent.run.create",
+        resource_type="agent_run",
+        resource_id=run.id,
+        metadata={"workflow_name": run.workflow_name, "status": run.status},
+    )
+    db.commit()
+    return run
 
 
 def _get_run_model_or_404(db: Session, run_id: str) -> AgentRun:
@@ -70,7 +80,7 @@ def resume_run(
         )
     workflow = _workflow_for_run(run)
     attempt = int(run.retry_attempt or 1) + 1
-    return runner.run_workflow(
+    resumed = runner.run_workflow(
         db,
         workflow=workflow,
         payload=_payload_from_run(run, payload),
@@ -78,6 +88,15 @@ def resume_run(
         attempt=attempt,
         start_status=state.RUN_STATUS_RUNNING,
     )
+    record_audit_event(
+        db,
+        action="agent.run.resume",
+        resource_type="agent_run",
+        resource_id=resumed.id,
+        metadata={"workflow_name": resumed.workflow_name, "status": resumed.status},
+    )
+    db.commit()
+    return resumed
 
 
 def retry_run(db: Session, run_id: str) -> AgentRun:
@@ -91,7 +110,7 @@ def retry_run(db: Session, run_id: str) -> AgentRun:
         )
     workflow = _workflow_for_run(run)
     attempt = int(run.retry_attempt or 1) + 1
-    return runner.run_workflow(
+    retried = runner.run_workflow(
         db,
         workflow=workflow,
         payload=_payload_from_run(run),
@@ -99,6 +118,15 @@ def retry_run(db: Session, run_id: str) -> AgentRun:
         attempt=attempt,
         start_status=state.RUN_STATUS_RETRYING,
     )
+    record_audit_event(
+        db,
+        action="agent.run.retry",
+        resource_type="agent_run",
+        resource_id=retried.id,
+        metadata={"workflow_name": retried.workflow_name, "status": retried.status},
+    )
+    db.commit()
+    return retried
 
 
 def cancel_run(db: Session, run_id: str) -> AgentRun:
@@ -120,11 +148,20 @@ def cancel_run(db: Session, run_id: str) -> AgentRun:
         "cancelled": True,
         "cancel_reason": "cancel_requested",
     }
-    return agent_repository.update_run_status(
+    cancelled = agent_repository.update_run_status(
         db,
         run,
         status=state.RUN_STATUS_CANCELLED,
     )
+    record_audit_event(
+        db,
+        action="agent.run.cancel",
+        resource_type="agent_run",
+        resource_id=cancelled.id,
+        metadata={"workflow_name": cancelled.workflow_name, "status": cancelled.status},
+    )
+    db.commit()
+    return cancelled
 
 
 def list_runs(

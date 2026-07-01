@@ -1,4 +1,5 @@
 from uuid import uuid4
+import time
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -23,7 +24,7 @@ from app.api.rag import router as rag_router
 from app.api.resume_versions import router as resume_versions_router
 from app.api.resumes import router as resumes_router
 from app.api.study_plans import router as study_plans_router
-from app.core.config import get_settings
+from app.core.config import get_settings, validate_runtime_settings
 from app.core.errors import (
     AppError,
     app_error_handler,
@@ -31,16 +32,17 @@ from app.core.errors import (
     unhandled_error_handler,
     validation_error_handler,
 )
+from app.core.logging import configure_logging, log_event
 
 
 def _validate_startup_security(settings) -> None:
-    if settings.app_env == "production" and "*" in settings.cors_origins:
-        raise RuntimeError("BACKEND_CORS_ORIGINS must not contain * in production.")
+    validate_runtime_settings(settings)
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     _validate_startup_security(settings)
+    configure_logging()
     app = FastAPI(title=settings.app_name)
 
     app.add_middleware(
@@ -55,8 +57,17 @@ def create_app() -> FastAPI:
     async def add_request_id(request: Request, call_next):
         request_id = request.headers.get("X-Request-ID") or str(uuid4())
         request.state.request_id = request_id
+        started = time.perf_counter()
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
+        log_event(
+            "http_request",
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=round((time.perf_counter() - started) * 1000),
+        )
         return response
 
     # ponytail: in-memory per-process limiter; replace with Redis/WAF when scaling.

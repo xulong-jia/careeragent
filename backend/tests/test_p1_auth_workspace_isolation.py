@@ -268,9 +268,18 @@ def test_privacy_export_delete_all_and_audit_are_tenant_scoped():
     exported = get_data(export)
     assert {item["id"] for item in exported["jobs"]} == {a_job_id}
 
+    summary = user_a.get("/api/privacy/delete-summary")
+    assert summary.status_code == 200
+    summary_data = get_data(summary)
+    assert summary_data["resources"]["job_descriptions"] == 1
+    assert summary_data["total_records"] >= 1
+
     deleted = user_a.delete("/api/privacy/delete-all")
     assert deleted.status_code == 200
-    assert get_data(deleted)["deleted_counts"]["jobs"] == 1
+    deleted_data = get_data(deleted)
+    assert deleted_data["deleted_counts"]["job_descriptions"] == 1
+    assert deleted_data["deletion_proof_id"].startswith("deletion_")
+    assert "backup" in deleted_data["retention_note"].lower()
     assert get_data(user_a.get("/api/jobs"))["total"] == 0
     assert user_a.get(f"/api/jobs/{a_job_id}").status_code == 404
     assert user_b.get(f"/api/jobs/{b_job_id}").status_code == 200

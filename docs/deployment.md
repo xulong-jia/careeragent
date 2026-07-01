@@ -1,6 +1,6 @@
-# CareerAgent Phase 2.0 Deployment Baseline
+# CareerAgent Phase 2.6 Deployment Baseline
 
-This is a production hardening baseline for local development and repeatable checks. It is not a production SaaS runbook and does not make CareerAgent production-ready.
+This is a security/privacy/deployment production foundation for local development and repeatable checks. It is not a production SaaS runbook and does not make CareerAgent production-ready.
 
 ## Local Docker Compose
 
@@ -45,16 +45,41 @@ AUTH_JWT_SECRET=dev-only-change-me-careeragent-local-auth-secret-32chars docker 
 
 ```bash
 curl http://localhost:8000/health
+curl http://localhost:8000/ready
 ```
 
-The health response exposes provider modes and feature flags, but not API keys or database credentials.
+The health response exposes provider modes and feature flags, but not API keys or database credentials. The readiness response checks DB reachability and runtime config validity, and returns only masked config summary.
 
 ## Auth Secret Rules
 
 - Local dev may use the `.env.example` dev-only secret.
 - Production must inject a strong random `AUTH_JWT_SECRET` through a secret manager or deployment environment.
-- `APP_ENV=production` rejects short secrets and dev-only / replace-me / change-me placeholder secrets.
+- `APP_ENV=production` rejects short secrets and dev-only / replace-me / change-me / placeholder secrets.
 - Missing `AUTH_JWT_SECRET` must fail loudly instead of creating a silently unusable auth path.
+
+## Production Database Rule
+
+SQLite is local development only. With `APP_ENV=production`, startup rejects SQLite-style `DATABASE_URL` values such as:
+
+```bash
+DATABASE_URL=sqlite:///./local_data/careeragent.db
+```
+
+Production must use a PostgreSQL-compatible URL injected by the deployment environment:
+
+```bash
+DATABASE_URL=postgresql+psycopg://...
+```
+
+This repository does not provision managed PostgreSQL, backups, restore jobs or retention policies.
+
+## Logging and Readiness
+
+- Request logs are JSON events from the `careeragent` logger.
+- Request logs include request_id, method, path, status_code and duration_ms.
+- Request logs do not include request body, Authorization header, raw_text, chunk text, answer text or provider payloads.
+- Error responses redact sensitive details before returning them.
+- `/ready` and `/api/ready` are public readiness endpoints for deployment checks.
 
 ## Real Provider Opt-In
 
@@ -85,6 +110,6 @@ The smoke eval is synthetic contract regression only. Phase 2.1 adds `service_le
 
 ## Production Limits
 
-Current P1 has token auth, workspace scope, privacy export/delete/audit baseline, and PostgreSQL driver readiness. It still does not include production SSO, MFA, full RBAC, cloud deployment scripts, Kubernetes, monitoring, automatic backup, retention policy, backup erasure proof, recruitment scraping, or auto-apply.
+Current 2.6 has token auth, workspace scope, privacy export/delete/delete-summary/audit baseline, structured request logging, readiness checks, production config validation, and PostgreSQL runtime requirement for production. It still does not include production SSO, MFA, full RBAC, cloud deployment scripts, Kubernetes, centralized monitoring, automatic backup, retention policy, backup erasure proof, recruitment scraping, or auto-apply.
 
-Current deployment status is `production hardening + real evaluation + real RAG + real parser + trustworthy match/project rewrite + agent workflow production foundation`, not `production-ready`. The next phase is 2.6 Security / Privacy / Deployment Hardening.
+Current deployment status is `security/privacy/deployment production foundation`, not `production-ready`. The next phase should be Final Production Readiness Audit.

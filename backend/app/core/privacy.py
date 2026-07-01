@@ -12,6 +12,7 @@ SECRET_PATTERN = re.compile(
     r"(?i)\b(?:OPENAI_API_KEY|api[_-]?key|token|secret|password)\b\s*[:=]\s*['\"]?[^'\"\s]+"
 )
 OPENAI_KEY_PATTERN = re.compile(r"\bsk-[A-Za-z0-9_-]{12,}\b")
+JWT_PATTERN = re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
 
 SENSITIVE_KEY_PARTS = {
     "api_key",
@@ -38,7 +39,20 @@ def _mask_inline_secrets(value: str) -> str:
     masked = EMAIL_PATTERN.sub("[redacted-email]", value)
     masked = PHONE_PATTERN.sub("[redacted-phone]", masked)
     masked = SECRET_PATTERN.sub("[redacted-secret]", masked)
-    return OPENAI_KEY_PATTERN.sub("[redacted-secret]", masked)
+    masked = OPENAI_KEY_PATTERN.sub("[redacted-secret]", masked)
+    return JWT_PATTERN.sub("[redacted-token]", masked)
+
+
+def mask_email(value: object) -> str:
+    return EMAIL_PATTERN.sub("[redacted-email]", str(value or ""))
+
+
+def mask_phone(value: object) -> str:
+    return PHONE_PATTERN.sub("[redacted-phone]", str(value or ""))
+
+
+def mask_secret(value: object) -> str:
+    return _mask_inline_secrets(str(value or ""))
 
 
 def safe_preview(value: object, max_chars: int = 120) -> str:
@@ -69,6 +83,7 @@ def _needs_string_redaction(value: str) -> bool:
         or PHONE_PATTERN.search(value) is not None
         or SECRET_PATTERN.search(value) is not None
         or OPENAI_KEY_PATTERN.search(value) is not None
+        or JWT_PATTERN.search(value) is not None
     )
 
 

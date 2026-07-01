@@ -86,6 +86,6 @@ RAG metrics include:
 - No reranker.
 - No LLM grounded generation.
 - Benchmark remains small.
-- `raw_text` and chunk `text` remain plaintext DB fields; 2.6 must address encryption, retention, deletion proof, backup policy, and audit hardening.
+- `raw_text` and chunk `text` remain plaintext DB fields; Final Production Readiness Audit must address encryption, retention, backup purge, legal hold, and centralized audit hardening.
 
-Phase 2.5 Agent Workflow Productionization is now completed as production foundation. Next phase: 2.6 Security / Privacy / Deployment Hardening. Match Scoring and Project Rewrite remain deterministic and not production-ready.
+Phase 2.6 Security / Privacy / Deployment Hardening is now completed as production foundation. Next phase should be Final Production Readiness Audit. Match Scoring and Project Rewrite remain deterministic and not production-ready.

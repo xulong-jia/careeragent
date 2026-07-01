@@ -112,4 +112,4 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset servi
 - No calibrated LLM reviewer, no ranking stability benchmark across broad real samples.
 - Project Rewrite suggestions still require human confirmation before use.
 - Phase 2.5 Agent Workflow now orchestrates Match/Rewrite through resumable fixed workflows, but this does not change Match/Rewrite production-readiness status.
-- Security/privacy/deployment hardening remains Phase 2.6 scope.
+- Phase 2.6 adds redacted errors/logging, readiness, audit foundation and privacy deletion proof, but Match/Rewrite remain deterministic trustworthy foundation and still require human confirmation.

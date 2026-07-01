@@ -26,10 +26,12 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] `.env.example` 只保留空 API key placeholder 和明确 dev-only auth placeholder。
 - [ ] `AUTH_JWT_SECRET` 在 `.env.example` 中只能是 dev-only placeholder；production 必须通过 secret manager 或部署环境注入足够长的强随机真实 secret。
 - [ ] `APP_ENV=production` 不允许使用 dev-only、replace-me 或 change-me placeholder secret。
+- [ ] `APP_ENV=production` 不允许使用 SQLite `DATABASE_URL` 或 `BACKEND_CORS_ORIGINS=*`。
 - [ ] `LLM_API_KEY`、`EMBEDDING_API_KEY` 和 `OPENAI_API_KEY` 当前默认不需要填写。
 - [ ] 默认 deterministic MVP 不依赖任何真实 LLM 或外部 embedding provider。
 - [ ] 只有本地 `.env` 或部署平台 secret manager 注入真实 key；不把 key 写入 docs、tests、eval artifacts 或 Docker image。
 - [ ] `/health` 只返回 provider mode、model/store/mode 和 enable flags，不返回 API key、Authorization header 或 provider request payload。
+- [ ] `/ready` / `/api/ready` 只返回 masked config summary、DB/config status 和错误摘要，不返回 secret 或 DB credential。
 
 ## Auth / Workspace / Data Isolation
 
@@ -88,17 +90,18 @@ git ls-files | rg '(^|/)(\.env|local_data|node_modules|dist|\.venv|__pycache__|u
 - [ ] `DELETE /api/rag/documents/{doc_id}` 删除 document/chunks，answer history 只保留 safe refs。
 - [ ] 缺失记录返回明确 404 error code，不吞错、不伪造成功。
 - [ ] `GET /api/privacy/export` 只导出当前 user/workspace 的 preview/ref/summary，不返回 secret 或大段 raw payload。
-- [ ] `DELETE /api/privacy/delete-all` 只删除当前 user/workspace 的业务数据，并写入 audit log counts。
+- [ ] `GET /api/privacy/delete-summary` 只返回当前 user/workspace 的 resource counts、total_records 和 retention note。
+- [ ] `DELETE /api/privacy/delete-all` 只删除当前 user/workspace 的业务数据，并写入 audit log counts，返回 `deletion_proof_id` 和 retention note。
 - [ ] `GET /api/privacy/audit-log` 只返回当前 user/workspace 的 audit events。
 
-当前 delete/export/audit-log 能力是 P1 baseline，不等于生产级 retention、backup erasure proof、audit compliance 或 legal hold 策略。
+当前 delete/export/delete-summary/audit-log 能力是 2.6 foundation，不等于生产级 retention、backup erasure proof、audit compliance 或 legal hold 策略。
 
 ## Production Blockers
 
 - [ ] Resume / JD / RAG `raw_text` 当前仍以明文保存在本地 DB 或本地数据路径中，属于 production blocker。
-- [ ] 当前没有生产级 encryption-at-rest、key rotation、backup retention、backup erasure proof、audit log pipeline 或 observability。
-- [ ] SQLite 仍是默认本地路径；PostgreSQL 只处于 driver/readiness 状态，不是生产默认部署。
-- [ ] 阶段 2.6 必须补齐 encryption / retention / audit / observability / production DB / deployment hardening。
+- [ ] 当前没有生产级 encryption-at-rest、key rotation、backup retention、backup erasure proof 或 audit log pipeline。
+- [ ] SQLite 仍是默认本地路径；2.6 已在 `APP_ENV=production` 拒绝 SQLite，但仓库不提供 managed PostgreSQL provisioning。
+- [ ] 2.6 已补 structured request logging 和 readiness foundation；集中 observability、metrics、alerts、tracing 和 SIEM 仍未完成。
 
 ## Bad Case
 

@@ -27,6 +27,8 @@
 公开入口：
 
 - `GET /health`
+- `GET /ready`
+- `GET /api/ready`
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 
@@ -61,6 +63,8 @@ Auth response 关键字段：
 | Method | Path | 说明 |
 | --- | --- | --- |
 | GET | `/health` | API health check；v1.6 返回 provider/vector readiness metadata，不返回 API key 或 secret |
+| GET | `/ready` | 2.6 readiness check；检查 DB reachability 和 runtime config validity，返回 masked config summary |
+| GET | `/api/ready` | `/ready` alias，便于 API gateway / deployment probe 使用 |
 | GET | `/api/db/health` | DB reachability、database type、core table check |
 
 `GET /health` response 关键字段：
@@ -76,6 +80,16 @@ Auth response 关键字段：
 - `real_embedding_enabled`
 
 隐私边界：health response 只暴露 provider mode、store/mode 和 enable flags，不返回 `LLM_API_KEY`、`EMBEDDING_API_KEY`、Authorization header、base URL secret 或模型调用 payload。
+
+`GET /ready` response 关键字段：
+
+- `status`
+- `database_reachable`
+- `config_valid`
+- `config`
+- `errors`
+
+`config` 只包含 masked secret/provider config、database driver、token expiry 和 feature flags；不返回 raw secret、API key 或 DB password。
 
 ## Profile APIs
 
@@ -791,6 +805,7 @@ P1 privacy endpoints 只作用于当前 authenticated user/workspace，并使用
 | Method | Path | 说明 |
 | --- | --- | --- |
 | GET | `/api/privacy/export` | 导出当前 user/workspace 的数据摘要和 refs，不返回 secret 或大段 raw payload |
+| GET | `/api/privacy/delete-summary` | 返回当前 user/workspace 将被 delete-all 覆盖的 resource counts、total_records 和 retention note |
 | DELETE | `/api/privacy/delete-all` | 删除/归档当前 user/workspace 的业务数据，并写入 audit log |
 | GET | `/api/privacy/audit-log` | 查询当前 user/workspace 的 audit log |
 
@@ -804,8 +819,11 @@ P1 privacy endpoints 只作用于当前 authenticated user/workspace，并使用
 `DELETE /api/privacy/delete-all` response 关键字段：
 
 - `status`
+- `deletion_proof_id`
 - `deleted_counts`
-- `audit_log_id`
+- `retention_note`
+
+`deletion_proof_id` 是应用层证明 ID，不是法律删除证书；备份、日志、导出文件和外部系统保留仍需生产策略。
 
 ## Bad Case APIs
 

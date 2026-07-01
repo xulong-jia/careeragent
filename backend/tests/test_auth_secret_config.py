@@ -1,6 +1,6 @@
 import pytest
 
-from app.core.config import get_settings
+from app.core.config import get_settings, settings_summary, validate_runtime_settings
 from app.core.errors import AppError
 from app.core.security import create_access_token
 
@@ -45,5 +45,53 @@ def test_production_rejects_dev_only_auth_secret(monkeypatch):
                 settings=settings,
             )
         assert exc_info.value.code == "auth_secret_not_allowed"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_local_dev_accepts_dev_only_auth_secret(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv(
+        "AUTH_JWT_SECRET",
+        "dev-only-change-me-careeragent-local-auth-secret-32chars",
+    )
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./local_data/careeragent.db")
+
+    try:
+        settings = get_settings()
+        validate_runtime_settings(settings)
+        assert settings.app_env == "development"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_production_runtime_validation_rejects_sqlite(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "prod-secret-value-with-more-than-32-chars")
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./local_data/careeragent.db")
+
+    try:
+        with pytest.raises(RuntimeError, match="SQLite"):
+            validate_runtime_settings(get_settings())
+    finally:
+        get_settings.cache_clear()
+
+
+def test_config_summary_masks_secret_values(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "visible-secret-value")
+    monkeypatch.setenv("LLM_API_KEY", "sk-testsecret123456789")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "embedding-secret")
+
+    try:
+        summary = settings_summary(get_settings())
+        dumped = str(summary)
+        assert "visible-secret-value" not in dumped
+        assert "sk-testsecret" not in dumped
+        assert "embedding-secret" not in dumped
+        assert summary["auth_jwt_secret"] == "[set length=20]"
     finally:
         get_settings.cache_clear()

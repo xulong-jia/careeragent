@@ -1,6 +1,17 @@
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from sqlalchemy.engine import make_url
+
+
+FORBIDDEN_PRODUCTION_SECRET_MARKERS = (
+    "dev-only",
+    "local-dev-only",
+    "replace-me",
+    "change-me",
+    "placeholder",
+)
+ALLOWED_APP_ENVS = {"development", "test", "production"}
 
 
 def _bool_env(name: str, default: bool) -> bool:
@@ -43,6 +54,74 @@ class Settings:
     rag_retrieval_mode: str
     enable_real_llm: bool
     enable_real_embedding: bool
+
+
+def is_sqlite_database_url(database_url: str) -> bool:
+    return _database_driver_name(database_url).startswith("sqlite")
+
+
+def _database_driver_name(database_url: str) -> str:
+    try:
+        return make_url(database_url).drivername
+    except Exception:
+        return "invalid"
+
+
+def _mask_config_value(value: str) -> str:
+    if not value:
+        return ""
+    return f"[set length={len(value)}]"
+
+
+def _is_placeholder_secret(value: str) -> bool:
+    lowered = value.strip().lower()
+    return any(marker in lowered for marker in FORBIDDEN_PRODUCTION_SECRET_MARKERS)
+
+
+def validate_runtime_settings(settings: Settings) -> None:
+    if settings.app_env not in ALLOWED_APP_ENVS:
+        raise RuntimeError("APP_ENV must be one of development, test, or production.")
+    if _database_driver_name(settings.database_url) == "invalid":
+        raise RuntimeError("DATABASE_URL is invalid.")
+
+    if settings.app_env != "production":
+        return
+
+    secret = settings.auth_jwt_secret.strip()
+    if not secret:
+        raise RuntimeError("AUTH_JWT_SECRET is required in production.")
+    if len(secret) < 32:
+        raise RuntimeError("AUTH_JWT_SECRET must be at least 32 characters in production.")
+    if _is_placeholder_secret(secret):
+        raise RuntimeError("AUTH_JWT_SECRET must not be a placeholder in production.")
+    if is_sqlite_database_url(settings.database_url):
+        raise RuntimeError("SQLite DATABASE_URL is not allowed in production.")
+    if "*" in settings.cors_origins:
+        raise RuntimeError("BACKEND_CORS_ORIGINS must not contain * in production.")
+
+
+def settings_summary(settings: Settings) -> dict[str, object]:
+    return {
+        "app_name": settings.app_name,
+        "app_env": settings.app_env,
+        "database_driver": _database_driver_name(settings.database_url),
+        "database_is_sqlite": is_sqlite_database_url(settings.database_url),
+        "auth_jwt_secret": _mask_config_value(settings.auth_jwt_secret),
+        "auth_token_expire_minutes": settings.auth_token_expire_minutes,
+        "ai_provider_mode": settings.ai_provider_mode,
+        "llm_provider": settings.llm_provider,
+        "llm_api_base_url": _mask_config_value(settings.llm_api_base_url),
+        "llm_api_key": _mask_config_value(settings.llm_api_key),
+        "llm_model": settings.llm_model,
+        "embedding_provider": settings.embedding_provider,
+        "embedding_api_base_url": _mask_config_value(settings.embedding_api_base_url),
+        "embedding_api_key": _mask_config_value(settings.embedding_api_key),
+        "embedding_model": settings.embedding_model,
+        "vector_store": settings.vector_store,
+        "rag_retrieval_mode": settings.rag_retrieval_mode,
+        "enable_real_llm": settings.enable_real_llm,
+        "enable_real_embedding": settings.enable_real_embedding,
+    }
 
 
 @lru_cache

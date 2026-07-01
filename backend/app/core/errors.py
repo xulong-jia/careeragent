@@ -6,6 +6,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.privacy import redact_mapping, safe_preview
+
 
 class ErrorDetail(BaseModel):
     code: str
@@ -44,7 +46,11 @@ def build_error_response(
     details: dict[str, Any] | None = None,
 ) -> JSONResponse:
     payload = ErrorResponse(
-        error=ErrorDetail(code=code, message=message, details=details or {}),
+        error=ErrorDetail(
+            code=code,
+            message=safe_preview(message, max_chars=240),
+            details=redact_mapping(details or {}),
+        ),
         request_id=get_request_id(request),
     )
     return JSONResponse(status_code=status_code, content=payload.model_dump())

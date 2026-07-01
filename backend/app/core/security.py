@@ -6,13 +6,16 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app.core.config import Settings, get_settings
+from app.core.config import (
+    FORBIDDEN_PRODUCTION_SECRET_MARKERS,
+    Settings,
+    get_settings,
+)
 from app.core.errors import AppError
 
 
 HASH_NAME = "pbkdf2_sha256"
 HASH_ITERATIONS = 260_000
-FORBIDDEN_PRODUCTION_SECRET_MARKERS = ("dev-only", "replace-me", "change-me")
 
 
 def hash_password(password: str) -> str:

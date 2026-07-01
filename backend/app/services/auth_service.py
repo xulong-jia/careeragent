@@ -15,6 +15,7 @@ from app.schemas.auth import (
     AuthUser,
     AuthWorkspace,
 )
+from app.services.audit_service import record_audit_event
 
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -138,6 +139,15 @@ def register_user(db: Session, payload: AuthRegisterRequest) -> AuthTokenRespons
         db.add(user)
         db.add(workspace)
         db.add(membership)
+        record_audit_event(
+            db,
+            action="auth.register",
+            resource_type="user",
+            resource_id=user.id,
+            user_id=user.id,
+            workspace_id=workspace.id,
+            metadata={"workspace_id": workspace.id, "role": user.role},
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -153,6 +163,17 @@ def login_user(db: Session, payload: AuthLoginRequest) -> AuthTokenResponse:
         raise AUTH_FAILED
     if not user.is_active:
         raise AUTH_FAILED
+    workspace, _role = _get_default_workspace(db, user.id)
+    record_audit_event(
+        db,
+        action="auth.login",
+        resource_type="user",
+        resource_id=user.id,
+        user_id=user.id,
+        workspace_id=workspace.id,
+        metadata={},
+    )
+    db.commit()
     return _token_response(db, user)
 
 

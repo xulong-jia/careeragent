@@ -45,6 +45,8 @@ The current Match and Project Rewrite paths use deterministic trustworthy founda
 
 The current Agent Workflow path uses deterministic local services and a synchronous runner. Do not treat service-level pass rates as proof of durable production workflow execution or real LLM agent behavior.
 
+Phase 2.6 security/privacy/deployment checks add readiness, redaction and deletion-proof regression coverage, but they do not make evaluation outputs production compliance artifacts. Keep generated eval outputs in ignored `evals/results/` or `/tmp`, and do not commit real provider traces, raw private text, credentials or production logs.
+
 ## Boundaries
 
 Smoke fixtures use synthetic refs, summaries, and short signals only. Service-level fixtures may include de-identified JD/resume/RAG text so the current services can run; do not add real names, real employers, real contact details, credentials, private application materials, or committed eval run outputs.

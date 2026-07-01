@@ -24,6 +24,7 @@ from app.schemas.evaluations import (
     EvaluationRunSummary,
     EvaluationStats,
 )
+from app.services.audit_service import record_audit_event
 
 
 ALLOWED_SOURCE_TYPES = {
@@ -828,7 +829,7 @@ def create_bad_case(db: Session, payload: BadCaseCreateRequest) -> BadCaseRecord
     title = _normalize_required(payload.title, "title")
     description = _normalize_required(payload.description, "description")
 
-    return evaluation_repository.create_bad_case(
+    bad_case = evaluation_repository.create_bad_case(
         db,
         source_type=source_type,
         source_id=source_id,
@@ -843,6 +844,15 @@ def create_bad_case(db: Session, payload: BadCaseCreateRequest) -> BadCaseRecord
         fix_strategy=_normalize_optional(payload.fix_strategy),
         tags=_normalize_tags(payload.tags),
     )
+    record_audit_event(
+        db,
+        action="bad_case.create",
+        resource_type="bad_case",
+        resource_id=bad_case.id,
+        metadata={"source_type": source_type, "source_id": source_id, "category": category},
+    )
+    db.commit()
+    return bad_case
 
 
 def list_bad_cases(
@@ -1239,6 +1249,14 @@ def run_evaluation(
             status_code=404,
             details={"run_id": run_record.id},
         )
+    record_audit_event(
+        db,
+        action="evaluation.run",
+        resource_type="evaluation_run",
+        resource_id=run_record.id,
+        metadata={"module": module, "dataset_name": dataset_name, "case_count": len(cases)},
+    )
+    db.commit()
 
     results: list[EvaluationResultRecord] = []
     for evaluation_case in cases:

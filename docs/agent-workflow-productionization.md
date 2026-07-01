@@ -14,6 +14,7 @@
 - Retry 不覆盖旧 step；同一 run 下用 `attempt` 追加新 step timeline。
 - Step failure 自动创建 Bad Case draft；如果 Bad Case 写入失败，run 仍保存 `bad_case_payload`。
 - Frontend AgentRunsPage 支持 workflow 选择、resume/retry/cancel、missing slots/questions、run config、Bad Case payload 和 step privacy payload 展示。
+- Phase 2.6 对 Agent run create/resume/retry/cancel 写入 privacy-safe audit events，只保存 action、run id、workflow/status metadata，不保存 raw payload。
 
 ## Workflows
 
@@ -54,3 +55,5 @@ Agent service-level metrics 包含 `expected_status_match`、`expected_step_cove
 - Agent eval 是 foundation regression，不是生产级 workflow benchmark。
 
 阶段完成标准：Agent Workflow 达到 production foundation，不得称为 production-ready。
+
+Phase 2.6 security/privacy/deployment hardening does not change this status. Agent remains a deterministic synchronous foundation without durable queue/worker, heartbeat, full cancellation token or real LLM planning.

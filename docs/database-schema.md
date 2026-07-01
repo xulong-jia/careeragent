@@ -1,6 +1,6 @@
 # CareerAgent Database Schema
 
-当前数据库是 SQLite + SQLAlchemy + Alembic 原型。P1 已新增 Auth / Workspace / Data Isolation schema，并补 PostgreSQL driver readiness；默认本地运行仍使用 SQLite。表结构以 `backend/app/models/` 和 `backend/alembic/versions/` 为准。
+当前数据库是 SQLite + SQLAlchemy + Alembic local foundation。P1 已新增 Auth / Workspace / Data Isolation schema，并补 PostgreSQL driver readiness；2.6 后 `APP_ENV=production` 会拒绝 SQLite `DATABASE_URL`，production 必须使用 PostgreSQL-compatible URL。表结构以 `backend/app/models/` 和 `backend/alembic/versions/` 为准。
 
 ## P1 ownership model
 
@@ -53,7 +53,7 @@ Owned tables 包括 `resumes`、`resume_versions`、`profiles`、`projects`、`p
 
 ## audit_logs
 
-用途：记录 P1 privacy delete-all 等基础审计事件。
+用途：记录 P1 privacy delete-all 和 2.6 auth/agent/evaluation/bad-case/privacy 基础审计事件。
 
 关键字段：
 
@@ -64,7 +64,7 @@ Owned tables 包括 `resumes`、`resume_versions`、`profiles`、`projects`、`p
 - `metadata_json`
 - `created_at`
 
-隐私说明：audit metadata 只保存 action、counts 和 refs，不保存 raw resume/JD/RAG/interview/application payload。
+隐私说明：audit metadata 只保存 action、counts、refs 和 config-safe metadata，不保存 raw resume/JD/RAG/interview/application payload。写入前应通过 redaction helpers 处理。
 
 ## resumes
 
@@ -659,4 +659,4 @@ v1.5C 没有新增数据库表或 migration，复用现有 schema 实现本地 p
 
 P1 migration `20260630_0018_add_auth_workspace_isolation` 新增 auth/workspace/audit 表，并为 owned business tables 补 owner columns 和 indexes。后端当前用 application-level repository/service filters 实现隔离；这已经覆盖 P1 checkpoint 的基础 data isolation tests，但还不是数据库 RLS、完整 RBAC、SSO、MFA、refresh token rotation、centralized audit/SIEM、retention policy、backup erasure 或 irreversible deletion workflow。
 
-P1 privacy delete-all 会清理当前 user/workspace 的业务数据并保留 audit log counts；它不声明生产级合规删除证明。
+2.6 privacy delete-all 会清理当前 user/workspace 的业务数据并保留 audit log counts、`deletion_proof_id` 和 retention note；它不声明生产级合规删除证明、backup purge、external provider deletion 或 legal hold 流程。

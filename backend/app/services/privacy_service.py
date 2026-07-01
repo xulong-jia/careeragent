@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.core.privacy import safe_preview
 from app.core.tenant import current_user_id, current_workspace_id, owner_filter
+from app.models.auth import AuditLog
 from app.models.agent import AgentRun, AgentStep
 from app.models.application import Application, ApplicationStatusHistory
-from app.models.auth import AuditLog
 from app.models.evaluation import BadCase, EvaluationCase, EvaluationResult, EvaluationRun
 from app.models.interview import InterviewAnswer, InterviewQuestion
 from app.models.job import JobDescription, JobProfile
@@ -17,33 +17,69 @@ from app.models.project import Project, ProjectRewrite
 from app.models.rag import RagAnswerRun, RagChunk, RagDocument
 from app.models.resume import Resume, ResumeVersion
 from app.models.study_plan import StudyPlan
-
-
-def _next_audit_id(db: Session) -> str:
-    for _ in range(10):
-        candidate = f"audit_{uuid4().hex[:12]}"
-        if db.get(AuditLog, candidate) is None:
-            return candidate
-    return f"audit_{uuid4().hex}"
+from app.services.audit_service import record_audit_event
 
 
 def _count(db: Session, model) -> int:
     return db.scalar(select(func.count()).select_from(model).where(*owner_filter(model))) or 0
 
 
-def _audit(db: Session, action: str, metadata: dict[str, object]) -> AuditLog:
-    log = AuditLog(
-        id=_next_audit_id(db),
-        user_id=current_user_id(),
-        workspace_id=current_workspace_id(),
-        action=action,
-        resource_type="privacy",
-        resource_id=current_user_id(),
-        metadata_json=metadata,
-        message="Privacy operation completed.",
-    )
-    db.add(log)
-    return log
+def _count_where(db: Session, model, *where) -> int:
+    return db.scalar(select(func.count()).select_from(model).where(*where)) or 0
+
+
+def _scoped_counts(db: Session) -> dict[str, int]:
+    resume_ids = select(Resume.id).where(*owner_filter(Resume))
+    job_ids = select(JobDescription.id).where(*owner_filter(JobDescription))
+    application_ids = select(Application.id).where(*owner_filter(Application))
+    rag_doc_ids = select(RagDocument.id).where(*owner_filter(RagDocument))
+    agent_run_ids = select(AgentRun.id).where(*owner_filter(AgentRun))
+    question_ids = select(InterviewQuestion.id).where(*owner_filter(InterviewQuestion))
+    eval_run_ids = select(EvaluationRun.id).where(*owner_filter(EvaluationRun))
+    eval_case_ids = select(EvaluationCase.id).where(*owner_filter(EvaluationCase))
+    return {
+        "profiles": _count(db, Profile),
+        "resumes": _count(db, Resume),
+        "resume_versions": _count_where(db, ResumeVersion, ResumeVersion.resume_id.in_(resume_ids)),
+        "job_descriptions": _count(db, JobDescription),
+        "job_profiles": _count_where(db, JobProfile, JobProfile.jd_id.in_(job_ids)),
+        "match_reports": _count(db, MatchReport),
+        "projects": _count(db, Project),
+        "project_rewrites": _count(db, ProjectRewrite),
+        "interview_questions": _count(db, InterviewQuestion),
+        "interview_answers": _count(db, InterviewAnswer),
+        "study_plans": _count(db, StudyPlan),
+        "applications": _count(db, Application),
+        "application_status_history": _count_where(
+            db,
+            ApplicationStatusHistory,
+            ApplicationStatusHistory.application_id.in_(application_ids),
+        ),
+        "rag_documents": _count(db, RagDocument),
+        "rag_chunks": _count_where(db, RagChunk, RagChunk.document_id.in_(rag_doc_ids)),
+        "rag_answer_runs": _count(db, RagAnswerRun),
+        "agent_runs": _count(db, AgentRun),
+        "agent_steps": _count_where(db, AgentStep, AgentStep.run_id.in_(agent_run_ids)),
+        "bad_cases": _count(db, BadCase),
+        "evaluation_runs": _count(db, EvaluationRun),
+        "evaluation_cases": _count(db, EvaluationCase),
+        "evaluation_results": _count(db, EvaluationResult),
+    }
+
+
+def deletion_summary_current_user_data(db: Session) -> dict[str, object]:
+    counts = _scoped_counts(db)
+    return {
+        "status": "summary",
+        "user_id": current_user_id(),
+        "workspace_id": current_workspace_id(),
+        "resources": counts,
+        "total_records": sum(counts.values()),
+        "retention_note": (
+            "This summary covers active database rows in the current workspace. "
+            "It is not proof of backup purge or external retention deletion."
+        ),
+    }
 
 
 def export_current_user_data(db: Session) -> dict[str, object]:
@@ -127,18 +163,8 @@ def export_current_user_data(db: Session) -> dict[str, object]:
 def delete_current_user_data(db: Session) -> dict[str, object]:
     user_id = current_user_id()
     workspace_id = current_workspace_id()
-    counts = {
-        "profiles": _count(db, Profile),
-        "resumes": _count(db, Resume),
-        "jobs": _count(db, JobDescription),
-        "matches": _count(db, MatchReport),
-        "applications": _count(db, Application),
-        "rag_documents": _count(db, RagDocument),
-        "rag_answer_runs": _count(db, RagAnswerRun),
-        "agent_runs": _count(db, AgentRun),
-        "bad_cases": _count(db, BadCase),
-        "evaluation_runs": _count(db, EvaluationRun),
-    }
+    counts = _scoped_counts(db)
+    proof_id = f"deletion_{uuid4().hex[:12]}"
 
     resume_ids = select(Resume.id).where(*owner_filter(Resume))
     job_ids = select(JobDescription.id).where(*owner_filter(JobDescription))
@@ -175,16 +201,27 @@ def delete_current_user_data(db: Session) -> dict[str, object]:
         db.execute(delete(Profile).where(*owner_filter(Profile)))
         db.execute(delete(ResumeVersion).where(ResumeVersion.resume_id.in_(resume_ids)))
         db.execute(delete(Resume).where(*owner_filter(Resume)))
-        _audit(db, "privacy.delete_all", {"deleted_counts": counts})
+        record_audit_event(
+            db,
+            action="privacy.delete_all",
+            resource_type="privacy",
+            resource_id=current_user_id(),
+            metadata={"deletion_proof_id": proof_id, "deleted_counts": counts},
+        )
         db.commit()
     except Exception:
         db.rollback()
         raise
     return {
         "status": "deleted",
+        "deletion_proof_id": proof_id,
         "user_id": user_id,
         "workspace_id": workspace_id,
         "deleted_counts": counts,
+        "retention_note": (
+            "Database rows were deleted for the current workspace. This does not "
+            "purge backups, logs, exports, or external systems."
+        ),
     }
 
 
