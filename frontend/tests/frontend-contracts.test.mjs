@@ -71,3 +71,39 @@ test("privacy-sensitive displays stay preview-first", () => {
   assert.match(knowledgePage, /answer_mode/);
   assert.match(knowledgePage, /retrieval_mode/);
 });
+
+test("browser E2E certification is wired through Playwright", () => {
+  const packageJson = JSON.parse(read("package.json"));
+  const config = read("playwright.config.ts");
+  const spec = read("e2e-browser/workbench.spec.ts");
+  assert.equal(packageJson.scripts["test:e2e:browser"], "playwright test");
+  assert.match(config, /testDir: "\.\/e2e-browser"/);
+  assert.match(config, /Desktop Chrome/);
+  for (const scenario of [
+    "Run match",
+    "Compare",
+    "Run rewrite",
+    "Generate Questions",
+    "Submit Answer",
+    "Study Plan Center",
+    "Application Tracker",
+    "Knowledge Base",
+    "Agent Runs",
+    "Bad Case Review",
+    "Evaluation Center",
+  ]) {
+    assert.match(spec, new RegExp(scenario));
+  }
+});
+
+test("session list and revoke are exposed in the app shell", () => {
+  const authApi = read("src/api/auth.ts");
+  const app = read("src/App.tsx");
+  const shell = read("src/components/AppShell.tsx");
+  assert.match(authApi, /listSessions/);
+  assert.match(authApi, /revokeSession/);
+  assert.match(app, /refreshSessions/);
+  assert.match(app, /handleRevokeSession/);
+  assert.match(shell, /Sessions \(/);
+  assert.match(shell, /onRevokeSession/);
+});

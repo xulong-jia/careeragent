@@ -15,6 +15,34 @@ REQUIRED_HUMAN_REVIEW_FIELDS = {
     "reviewer_confidence",
 }
 
+REQUIRED_FORMAL_HUMAN_REVIEW_FIELDS = {
+    "reviewer_id",
+    "review_role",
+    "review_timestamp",
+    "rubric_version",
+    "module",
+    "case_id",
+    "human_score",
+    "human_label",
+    "confidence",
+    "accepted_output",
+    "rejected_output",
+    "correction_note",
+    "privacy_review_passed",
+}
+
+REQUIRED_LLM_JUDGE_FIELDS = {
+    "case_id",
+    "module",
+    "rubric_version",
+    "groundedness_score",
+    "factuality_score",
+    "completeness_score",
+    "hallucination_flag",
+    "evidence_alignment_score",
+    "evidence_refs",
+}
+
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return parse_jsonl_lines(path.read_text(encoding="utf-8").splitlines())
@@ -54,6 +82,134 @@ def parse_human_review_records(records: list[dict[str, Any]]) -> list[dict[str, 
             }
         )
     return parsed
+
+
+def parse_formal_human_review_records(
+    records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    parsed: list[dict[str, Any]] = []
+    for record in records:
+        missing = REQUIRED_FORMAL_HUMAN_REVIEW_FIELDS - set(record)
+        if missing:
+            raise ValueError(f"Formal human review record missing fields: {sorted(missing)}")
+        parsed.append(
+            {
+                "reviewer_id": str(record["reviewer_id"]),
+                "review_role": str(record["review_role"]),
+                "review_timestamp": str(record["review_timestamp"]),
+                "rubric_version": str(record["rubric_version"]),
+                "module": str(record["module"]),
+                "case_id": str(record["case_id"]),
+                "human_score": float(record["human_score"]),
+                "human_label": str(record["human_label"]),
+                "confidence": float(record["confidence"]),
+                "disagreement_reason": str(record.get("disagreement_reason") or ""),
+                "accepted_output": bool(record["accepted_output"]),
+                "rejected_output": bool(record["rejected_output"]),
+                "correction_note": str(record["correction_note"]),
+                "privacy_review_passed": bool(record["privacy_review_passed"]),
+                "adjudication_status": str(record.get("adjudication_status") or "pending"),
+            }
+        )
+    return parsed
+
+
+def compute_two_reviewer_agreement(records: list[dict[str, Any]]) -> dict[str, Any]:
+    by_case: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        by_case.setdefault(str(record["case_id"]), []).append(record)
+
+    comparable = [case_records for case_records in by_case.values() if len(case_records) >= 2]
+    agreements = 0
+    disagreements: list[dict[str, Any]] = []
+    for case_records in comparable:
+        first, second = case_records[0], case_records[1]
+        score_delta = abs(float(first["human_score"]) - float(second["human_score"]))
+        label_match = first["human_label"] == second["human_label"]
+        accepted_match = first["accepted_output"] == second["accepted_output"]
+        if score_delta <= 10 and label_match and accepted_match:
+            agreements += 1
+        else:
+            disagreements.append(
+                {
+                    "case_id": first["case_id"],
+                    "module": first["module"],
+                    "score_delta": round(score_delta, 4),
+                    "labels": [first["human_label"], second["human_label"]],
+                    "adjudication_status": first.get("adjudication_status", "pending"),
+                }
+            )
+
+    confidence_values = [float(record["confidence"]) for record in records]
+    privacy_failures = [
+        record["case_id"] for record in records if not record["privacy_review_passed"]
+    ]
+    return {
+        "reviewed_count": len(records),
+        "case_count": len(by_case),
+        "two_reviewer_case_count": len(comparable),
+        "agreement_rate": round(agreements / len(comparable), 4) if comparable else 0.0,
+        "disagreement_cases": disagreements,
+        "privacy_review_passed": not privacy_failures,
+        "privacy_failure_case_ids": privacy_failures,
+        "reviewer_confidence_average": round(mean(confidence_values), 4)
+        if confidence_values
+        else 0.0,
+    }
+
+
+def parse_llm_judge_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    parsed: list[dict[str, Any]] = []
+    for record in records:
+        missing = REQUIRED_LLM_JUDGE_FIELDS - set(record)
+        if missing:
+            raise ValueError(f"LLM judge record missing fields: {sorted(missing)}")
+        evidence_refs = [str(item) for item in record.get("evidence_refs") or []]
+        parsed.append(
+            {
+                "case_id": str(record["case_id"]),
+                "module": str(record["module"]),
+                "rubric_version": str(record["rubric_version"]),
+                "groundedness_score": float(record["groundedness_score"]),
+                "factuality_score": float(record["factuality_score"]),
+                "completeness_score": float(record["completeness_score"]),
+                "hallucination_flag": bool(record["hallucination_flag"]),
+                "evidence_alignment_score": float(record["evidence_alignment_score"])
+                if evidence_refs
+                else 0.0,
+                "evidence_refs": evidence_refs,
+                "judge_model": str(record.get("judge_model") or "unknown"),
+            }
+        )
+    return parsed
+
+
+def compute_llm_judge_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    if not records:
+        return {
+            "judged_count": 0,
+            "groundedness_score": 0.0,
+            "factuality_score": 0.0,
+            "completeness_score": 0.0,
+            "evidence_alignment_score": 0.0,
+            "hallucination_rate": 0.0,
+            "no_evidence_judgment_count": 0,
+        }
+    return {
+        "judged_count": len(records),
+        "groundedness_score": round(mean(item["groundedness_score"] for item in records), 4),
+        "factuality_score": round(mean(item["factuality_score"] for item in records), 4),
+        "completeness_score": round(mean(item["completeness_score"] for item in records), 4),
+        "evidence_alignment_score": round(
+            mean(item["evidence_alignment_score"] for item in records), 4
+        ),
+        "hallucination_rate": round(
+            sum(1 for item in records if item["hallucination_flag"]) / len(records), 4
+        ),
+        "no_evidence_judgment_count": sum(
+            1 for item in records if not item["evidence_refs"]
+        ),
+    }
 
 
 def compute_match_calibration(records: list[dict[str, Any]]) -> dict[str, Any]:

@@ -35,6 +35,7 @@ export type AuthSession = {
   access_token: string;
   token_type: "bearer";
   expires_at: string;
+  session_id: string;
   user: AuthUser;
   workspace: AuthWorkspace;
 };
@@ -42,6 +43,16 @@ export type AuthSession = {
 export type AuthMe = {
   user: AuthUser;
   workspace: AuthWorkspace;
+};
+
+export type AuthSessionRecord = {
+  session_id: string;
+  device_label: string;
+  issued_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  revoke_reason: string | null;
+  current: boolean;
 };
 
 export type StructuredResume = {

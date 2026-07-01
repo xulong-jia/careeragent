@@ -45,6 +45,7 @@ SERVICE_LEVEL_MODULE_ALIASES = {
     "agent": "agent_workflow",
 }
 BENCHMARK_DATASET = "benchmark"
+ANONYMIZED_BENCHMARK_DATASET = "anonymized_benchmark"
 BENCHMARK_MODULE_FILES = {
     "jd_parser": "jd_parser_benchmark.jsonl",
     "resume_parser": "resume_parser_benchmark.jsonl",
@@ -72,6 +73,15 @@ PRIVATE_TEXT_KEYS = {
     "full_text",
     "resume_text",
     "job_text",
+}
+ANONYMIZED_REQUIRED_FIELDS = {
+    "case_id",
+    "source_type",
+    "anonymization_note",
+    "expected_output",
+    "difficulty",
+    "reviewer_required",
+    "privacy_check_passed",
 }
 SYNTHETIC_DATASET_ALIASES = {"synthetic": "smoke"}
 SERVICE_LEVEL_DATASET = "service_level"
@@ -1354,7 +1364,20 @@ def _load_service_level_cases(module: str | None = None) -> list[tuple[str, dict
 
 
 def _load_benchmark_cases(module: str | None = None) -> list[tuple[str, dict[str, Any]]]:
-    dataset_dir = DATASET_ROOT / BENCHMARK_DATASET
+    return _load_quality_benchmark_cases(BENCHMARK_DATASET, module)
+
+
+def _load_anonymized_benchmark_cases(
+    module: str | None = None,
+) -> list[tuple[str, dict[str, Any]]]:
+    return _load_quality_benchmark_cases(ANONYMIZED_BENCHMARK_DATASET, module)
+
+
+def _load_quality_benchmark_cases(
+    dataset: str,
+    module: str | None = None,
+) -> list[tuple[str, dict[str, Any]]]:
+    dataset_dir = DATASET_ROOT / dataset
     cases: list[tuple[str, dict[str, Any]]] = []
     for current_module in _benchmark_module_names(module):
         path = dataset_dir / BENCHMARK_MODULE_FILES[current_module]
@@ -1391,6 +1414,18 @@ def _benchmark_result(
         "score": 1.0 if passed else _metric_score(metrics),
         "error": None if passed else error,
     }
+
+
+def _anonymized_case_validation_error(case: dict[str, Any]) -> str | None:
+    missing = ANONYMIZED_REQUIRED_FIELDS - set(case)
+    if missing:
+        return f"Anonymized benchmark case missing fields: {sorted(missing)}"
+    if case.get("privacy_check_passed") is not True:
+        return "Anonymized benchmark case did not pass privacy_check_passed."
+    note = str(case.get("anonymization_note") or "").strip().lower()
+    if not note or "synthetic only" in note:
+        return "Anonymized benchmark case needs a real-world-style anonymization note."
+    return None
 
 
 def _evaluate_benchmark_case(module: str, case: dict[str, Any]) -> dict[str, Any]:
@@ -1805,11 +1840,21 @@ def _write_outputs(
     metrics["bad_case_regression_trend"] = ai_quality.bad_case_regression_trend(
         failed_cases
     )
-    if dataset == BENCHMARK_DATASET:
-        human_review_summary = _benchmark_human_review_summary()
+    llm_judge_summary = None
+    if dataset in {BENCHMARK_DATASET, ANONYMIZED_BENCHMARK_DATASET}:
+        human_review_summary = _human_review_summary(dataset)
         metrics["human_review"] = human_review_summary
     else:
         human_review_summary = None
+    if dataset == ANONYMIZED_BENCHMARK_DATASET:
+        llm_judge_summary = _llm_judge_summary(dataset)
+        metrics["llm_judge"] = llm_judge_summary
+        metrics["production_quality_candidate"] = bool(
+            run_config.get("provider_verified")
+            and metrics["pass_rate"] >= 0.95
+            and human_review_summary.get("agreement_rate", 0.0) >= 0.8
+            and llm_judge_summary.get("hallucination_rate", 1.0) <= 0.05
+        )
     actual_outputs = [
         {
             "case_id": result.get("case_id"),
@@ -1847,6 +1892,11 @@ def _write_outputs(
             json.dumps(human_review_summary, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+    if llm_judge_summary is not None:
+        (output_dir / "llm_judge_summary.json").write_text(
+            json.dumps(llm_judge_summary, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     generated_at = datetime.now(timezone.utc).isoformat()
     lines = [
         f"# Evaluation Summary: {dataset}",
@@ -1855,7 +1905,7 @@ def _write_outputs(
         f"- module: {module or 'all'}",
         f"- dataset_kind: {run_config['dataset_kind']}",
         f"- service_level: {str(run_config['service_level']).lower()}",
-        "- production_quality: false",
+        f"- production_quality: {str(run_config.get('production_quality', False)).lower()}",
         f"- total_count: {metrics['total_count']}",
         f"- passed_count: {metrics['passed_count']}",
         f"- failed_count: {metrics['failed_count']}",
@@ -1865,7 +1915,7 @@ def _write_outputs(
         f"- retrieval_version: {run_config['retrieval_version']}",
         f"- model_version: {run_config['model_version']}",
         f"- evaluation_version: {run_config['evaluation_version']}",
-        "- llm_judge: false",
+        f"- llm_judge: {str(bool(run_config.get('llm_judge'))).lower()}",
         "- model_comparison: false",
         "",
         "## By Module",
@@ -1886,6 +1936,8 @@ def _write_outputs(
             "- Synthetic datasets are contract regression only.",
             "- Service-level datasets call current deterministic/mock services.",
             "- Benchmark datasets are synthetic large-sample foundations with human-review sample metrics.",
+            "- Anonymized benchmark datasets are manually curated real-world-style fixtures, not external production data proof.",
+            "- Provider validation proof must be supplied from runtime secrets and kept out of Git.",
             "- This is a real evaluation foundation, not a production-quality benchmark.",
         ]
     )
@@ -1900,16 +1952,31 @@ def _write_outputs(
     return metrics
 
 
-def _benchmark_human_review_summary() -> dict[str, Any]:
-    path = DATASET_ROOT / BENCHMARK_DATASET / "human_review_sample.jsonl"
+def _human_review_summary(dataset: str) -> dict[str, Any]:
+    path = DATASET_ROOT / dataset / "human_review_sample.jsonl"
     if not path.exists():
         return {
             "reviewed_count": 0,
             "human_agreement_rate": 0.0,
+            "agreement_rate": 0.0,
             "disagreement_rate": 0.0,
         }
-    records = ai_quality.parse_human_review_records(_load_jsonl(path))
-    return ai_quality.compute_match_calibration(records)
+    raw_records = _load_jsonl(path)
+    if dataset == ANONYMIZED_BENCHMARK_DATASET:
+        records = ai_quality.parse_formal_human_review_records(raw_records)
+        return ai_quality.compute_two_reviewer_agreement(records)
+    records = ai_quality.parse_human_review_records(raw_records)
+    summary = ai_quality.compute_match_calibration(records)
+    summary["agreement_rate"] = summary.get("human_agreement_rate", 0.0)
+    return summary
+
+
+def _llm_judge_summary(dataset: str) -> dict[str, Any]:
+    path = DATASET_ROOT / dataset / "llm_judge_sample.jsonl"
+    if not path.exists():
+        return ai_quality.compute_llm_judge_summary([])
+    records = ai_quality.parse_llm_judge_records(_load_jsonl(path))
+    return ai_quality.compute_llm_judge_summary(records)
 
 
 def _run_synthetic(dataset: str, module: str | None, output_dir: Path) -> int:
@@ -2070,7 +2137,85 @@ def _run_benchmark(module: str | None, output_dir: Path) -> int:
     return 0 if metrics["failed_count"] == 0 else 1
 
 
-def run(dataset: str, module: str | None, output_dir: Path) -> int:
+def _run_anonymized_benchmark(
+    module: str | None,
+    output_dir: Path,
+    *,
+    provider_verified: bool = False,
+) -> int:
+    cases = _load_anonymized_benchmark_cases(module)
+    results: list[dict[str, Any]] = []
+    for current_module, case in cases:
+        validation_error = _anonymized_case_validation_error(case)
+        if validation_error or _contains_private_key(case):
+            result = _benchmark_result(
+                case=case,
+                module=current_module,
+                actual={},
+                expected=dict(case.get("expected") or {}),
+                metrics={"case_pass": False, "privacy_check_passed": False},
+                passed=False,
+                error=validation_error or "Anonymized benchmark fixture contains private text keys.",
+            )
+        else:
+            result = _evaluate_benchmark_case(current_module, case)
+            result["case_type"] = "anonymized_benchmark"
+            result["metrics"] = {
+                **dict(result.get("metrics") or {}),
+                "privacy_check_passed": True,
+                "reviewer_required": bool(case.get("reviewer_required")),
+            }
+        results.append(result)
+
+    run_config = {
+        "requested_module": module or "all",
+        "dataset_name": ANONYMIZED_BENCHMARK_DATASET,
+        "dataset_kind": "anonymized_benchmark",
+        "service_level": False,
+        "production_quality": False,
+        **version_metadata(include_evaluation=True),
+        "deterministic": True,
+        "llm_judge": True,
+        "model_comparison": False,
+        "large_scale_foundation": True,
+        "case_count_target": 150,
+        "uses_real_private_data": False,
+        "uses_real_provider_network": provider_verified,
+        "provider_verified": provider_verified,
+        "benchmark_boundary": (
+            "Real-world-style manually curated anonymized fixtures. External provider "
+            "and external human review proofs must be supplied outside Git."
+        ),
+    }
+    metrics = _write_outputs(
+        dataset=ANONYMIZED_BENCHMARK_DATASET,
+        module=module,
+        output_dir=output_dir,
+        results=results,
+        run_config=run_config,
+    )
+    print(f"wrote {output_dir}")
+    print(
+        "total={total_count} passed={passed_count} failed={failed_count} pass_rate={pass_rate}".format(
+            **metrics
+        )
+    )
+    return 0 if metrics["failed_count"] == 0 else 1
+
+
+def run(
+    dataset: str,
+    module: str | None,
+    output_dir: Path,
+    *,
+    provider_verified: bool = False,
+) -> int:
+    if dataset == ANONYMIZED_BENCHMARK_DATASET:
+        return _run_anonymized_benchmark(
+            module,
+            output_dir,
+            provider_verified=provider_verified,
+        )
     if dataset == BENCHMARK_DATASET:
         return _run_benchmark(module, output_dir)
     if dataset == SERVICE_LEVEL_DATASET:
@@ -2083,9 +2228,19 @@ def main() -> int:
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--module", choices=sorted(MODULES))
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument(
+        "--provider-verified",
+        action="store_true",
+        help="Mark this run as paired with an external provider proof kept outside Git.",
+    )
     args = parser.parse_args()
     output_dir = args.output_dir or DEFAULT_OUTPUT_ROOT / args.dataset
-    return run(args.dataset, args.module, output_dir)
+    return run(
+        args.dataset,
+        args.module,
+        output_dir,
+        provider_verified=args.provider_verified,
+    )
 
 
 if __name__ == "__main__":

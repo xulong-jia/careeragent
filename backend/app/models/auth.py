@@ -81,6 +81,23 @@ class AuditLog(Base):
     )
 
 
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    token_jti: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    device_label: Mapped[str] = mapped_column(String(160), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    revoke_reason: Mapped[str | None] = mapped_column(String(160))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+
 class RevokedToken(Base):
     __tablename__ = "revoked_tokens"
 

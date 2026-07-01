@@ -29,6 +29,20 @@ docker compose --env-file .env.production -f docker-compose.prod-like.yml build
 docker compose --env-file .env.production -f docker-compose.prod-like.yml up -d
 ```
 
+For the local re-audit compose-config gate, the prod-like compose file now has
+local defaults for `POSTGRES_PASSWORD`, `BACKEND_CORS_ORIGINS` and
+`DATA_ENCRYPTION_KEY_ID`, while still requiring `AUTH_JWT_SECRET` and
+`DATA_ENCRYPTION_KEY`:
+
+```bash
+AUTH_JWT_SECRET=local-proof-secret-with-more-than-32-chars \
+DATA_ENCRYPTION_KEY=MKlKIfl6Htn3qasq6OmUZrAptCgKZk_unRl07h5u6Ew= \
+docker compose -f docker-compose.prod-like.yml config
+```
+
+Real production deployments must override those local defaults through a
+secret manager or deployment environment.
+
 服务：
 
 - `postgres`: `pgvector/pgvector:pg16`，为 v3.2 semantic/vector path 提供部署基础。
@@ -68,6 +82,39 @@ npm run build -- --outDir /tmp/careeragent-frontend-build-v33
 
 `test:e2e` is a mocked workflow smoke gate. A production deployment still needs real browser E2E against the deployed frontend/backend, auth/data seeding, accessibility checks and visual/layout verification.
 
+v3.4 rework adds the Chromium browser gate:
+
+```bash
+cd frontend
+npm run test:e2e:browser
+```
+
+Current matrix is Chromium only. Firefox/WebKit and deployed-backend browser E2E
+remain hardening items for stricter certification.
+
+## Deployment Proof Dry Run
+
+Run:
+
+```bash
+APP_ENV=production \
+AUTH_JWT_SECRET=local-proof-secret-with-more-than-32-chars \
+DATA_ENCRYPTION_KEY=MKlKIfl6Htn3qasq6OmUZrAptCgKZk_unRl07h5u6Ew= \
+DATA_ENCRYPTION_KEY_ID=prod-like-local-dev-v1 \
+BACKEND_CORS_ORIGINS=http://localhost:8080 \
+POSTGRES_PASSWORD=local-postgres-password-with-more-than-32-chars \
+PYTHONPATH=backend backend/.venv/bin/python scripts/validate_production_deployment.py \
+  --allow-local-placeholders \
+  --strict \
+  --output /tmp/careeragent-deployment-proof.json
+```
+
+The output masks secrets and validates required env, database URL shape,
+compose config and readiness/metrics runbook coverage. It is local evidence
+only; real cloud provider, managed DB, secret manager, KMS, TLS, backup and
+observability proof must be attached separately using
+`docs/production-evidence-templates.md`.
+
 ## Migration
 
 手动迁移入口：
@@ -96,6 +143,10 @@ v3.1 不提供自动 schema downgrade。生产回滚策略是：
 ## Production Boundaries
 
 - v3.1 compose 是 production-like profile，不是托管云部署证明。
+- v3.4 rework adds deployment proof templates and local validation scripts, but
+  template completion is not cloud proof.
 - PostgreSQL/pgvector deployment profile 已存在，但应用 RAG 默认仍是 local/database JSON vector foundation；semantic provider/pgvector query path 属于 v3.2。
 - v3.3 frontend selectors and mocked E2E improve operator UX but are not cloud/browser production certification.
+- v3.4 Playwright Chromium covers browser foundation; deployed backend E2E and
+  cross-browser matrix remain hardening.
 - secret manager、backup encryption、centralized logs/metrics/tracing/alerts 需要由目标云平台接入并按本 runbook 验证。

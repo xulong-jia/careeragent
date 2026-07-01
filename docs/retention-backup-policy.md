@@ -32,7 +32,25 @@ When a user deletion executes:
 4. Let marked backups expire at the next retention window, unless legal hold applies.
 5. Record purge/expiry evidence in the production audit system.
 
-v3.1 does not automate backup purge. The privacy API reports this limitation honestly.
+v3.4 rework adds a backup purge / legal deletion attestation template in
+`docs/production-evidence-templates.md`. The repository still does not automate
+managed backup purge. The privacy API and final audit must report this
+limitation honestly unless an external managed backup proof is attached.
+
+Required production attestation fields:
+
+- `deletion_proof_id`;
+- active DB deletion timestamp;
+- affected backup ids;
+- `backup_purge_status`;
+- legal hold status;
+- retention expiry;
+- restore block rule;
+- operator/auditor;
+- immutable audit artifact.
+
+Do not mark backup purge complete when the actual status is `not_implemented`,
+`pending_retention_expiry` or `legal_hold`.
 
 ## Restore Rules
 
@@ -58,4 +76,4 @@ Backups and dumps must not enter Git. `.gitignore` blocks:
 - `*.dump`
 - `*.backup`
 
-Status: policy foundation. Production certification still requires platform-level backup encryption, retention automation and purge evidence.
+Status: policy and attestation foundation. Production certification still requires platform-level backup encryption, retention automation and purge evidence.

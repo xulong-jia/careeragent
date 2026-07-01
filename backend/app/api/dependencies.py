@@ -6,7 +6,7 @@ from app.core.errors import AppError
 from app.core.security import decode_access_token
 from app.core.tenant import AuthContext, has_permission, reset_auth_context, set_auth_context
 from app.db.session import get_db
-from app.models.auth import RevokedToken, User, WorkspaceMembership
+from app.models.auth import AuthSession, RevokedToken, User, WorkspaceMembership
 from app.services.audit_service import record_audit_event
 
 
@@ -48,6 +48,25 @@ def get_current_user(
         raise AppError(
             code="invalid_token",
             message="Invalid or expired authentication token.",
+            status_code=401,
+            details={},
+        )
+    session_id = str(payload.get("sid") or "")
+    workspace_id = str(payload.get("workspace_id") or "")
+    session = db.get(AuthSession, session_id) if session_id else None
+    if session_id and (
+        session is None or session.user_id != user.id or session.workspace_id != workspace_id
+    ):
+        raise AppError(
+            code="session_invalid",
+            message="Authentication session is no longer valid.",
+            status_code=401,
+            details={},
+        )
+    if session and session.revoked_at is not None:
+        raise AppError(
+            code="session_revoked",
+            message="Authentication session has been revoked.",
             status_code=401,
             details={},
         )

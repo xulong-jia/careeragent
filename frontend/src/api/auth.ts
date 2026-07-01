@@ -1,5 +1,5 @@
 import { clearAuthToken, requestJson, setAuthToken } from "./client";
-import type { AuthMe, AuthSession } from "../types/api";
+import type { AuthMe, AuthSession, AuthSessionRecord, ListResponse } from "../types/api";
 
 export type AuthPayload = {
   email: string;
@@ -36,6 +36,16 @@ export async function register(payload: AuthPayload): Promise<AuthSession> {
 
 export function getMe(): Promise<AuthMe> {
   return requestJson<AuthMe>("/api/auth/me");
+}
+
+export function listSessions(): Promise<ListResponse<AuthSessionRecord>> {
+  return requestJson<ListResponse<AuthSessionRecord>>("/api/auth/sessions");
+}
+
+export function revokeSession(sessionId: string): Promise<Record<string, unknown>> {
+  return requestJson<Record<string, unknown>>(`/api/auth/sessions/${sessionId}/revoke`, {
+    method: "POST",
+  });
 }
 
 export async function logout(): Promise<void> {

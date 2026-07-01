@@ -7,11 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
-from app.models.auth import RevokedToken, User, Workspace, WorkspaceMembership
+from app.models.auth import AuthSession, RevokedToken, User, Workspace, WorkspaceMembership
 from app.schemas.auth import (
     AuthLoginRequest,
     AuthMeResponse,
     AuthRegisterRequest,
+    AuthSessionListResponse,
+    AuthSessionRecord,
     AuthTokenResponse,
     AuthUser,
     AuthWorkspace,
@@ -93,17 +95,37 @@ def _to_workspace(workspace: Workspace, role: str) -> AuthWorkspace:
     return AuthWorkspace(id=workspace.id, name=workspace.name, role=role)
 
 
+def _device_label() -> str:
+    return "web session"
+
+
 def _token_response(db: Session, user: User) -> AuthTokenResponse:
     workspace, workspace_role = _get_default_workspace(db, user.id)
+    session_id = f"session_{uuid4().hex[:16]}"
     access_token, expires_at = create_access_token(
         subject=user.id,
         email=user.email,
         role=user.role,
         workspace_id=workspace.id,
+        session_id=session_id,
     )
+    token_jti = str(decode_access_token(access_token).get("jti") or "")
+    db.add(
+        AuthSession(
+            session_id=session_id,
+            user_id=user.id,
+            workspace_id=workspace.id,
+            token_jti=token_jti,
+            device_label=_device_label(),
+            issued_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            expires_at=expires_at.replace(tzinfo=None),
+        )
+    )
+    db.commit()
     return AuthTokenResponse(
         access_token=access_token,
         expires_at=expires_at,
+        session_id=session_id,
         user=_to_user(user),
         workspace=_to_workspace(workspace, workspace_role),
     )
@@ -187,6 +209,7 @@ def logout_user(db: Session, *, token: str, user: User) -> dict[str, object]:
     payload = decode_access_token(token)
     token_jti = str(payload.get("jti") or "")
     workspace_id = str(payload.get("workspace_id") or "")
+    session_id = str(payload.get("sid") or "")
     if not token_jti:
         raise AppError(
             code="token_missing_jti",
@@ -207,6 +230,10 @@ def logout_user(db: Session, *, token: str, user: User) -> dict[str, object]:
                 reason="logout",
             )
         )
+    session = db.get(AuthSession, session_id) if session_id else None
+    if session and session.user_id == user.id:
+        session.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        session.revoke_reason = "logout"
     record_audit_event(
         db,
         action="auth.logout",
@@ -214,16 +241,95 @@ def logout_user(db: Session, *, token: str, user: User) -> dict[str, object]:
         resource_id=user.id,
         user_id=user.id,
         workspace_id=workspace_id,
-        metadata={"token_jti": token_jti, "expires_at": expires_at},
+        metadata={"token_jti": token_jti, "session_id": session_id, "expires_at": expires_at},
     )
     record_audit_event(
         db,
         action="auth.token_revoke",
         resource_type="token",
-        resource_id=token_jti,
+        resource_id=session_id or token_jti,
         user_id=user.id,
         workspace_id=workspace_id,
-        metadata={"reason": "logout", "expires_at": expires_at},
+        metadata={"reason": "logout", "session_id": session_id, "expires_at": expires_at},
     )
     db.commit()
-    return {"status": "logged_out", "token_revoked": True, "token_jti": token_jti}
+    return {
+        "status": "logged_out",
+        "token_revoked": True,
+        "token_jti": token_jti,
+        "session_id": session_id,
+    }
+
+
+def list_sessions(
+    db: Session,
+    *,
+    user: User,
+    workspace_id: str,
+    current_session_id: str | None = None,
+) -> AuthSessionListResponse:
+    sessions = db.scalars(
+        select(AuthSession)
+        .where(AuthSession.user_id == user.id)
+        .where(AuthSession.workspace_id == workspace_id)
+        .order_by(AuthSession.issued_at.desc(), AuthSession.session_id)
+    ).all()
+    records = [
+        AuthSessionRecord(
+            session_id=session.session_id,
+            device_label=session.device_label,
+            issued_at=session.issued_at,
+            expires_at=session.expires_at,
+            revoked_at=session.revoked_at,
+            revoke_reason=session.revoke_reason,
+            current=session.session_id == current_session_id,
+        )
+        for session in sessions
+    ]
+    return AuthSessionListResponse(items=records, total=len(records))
+
+
+def revoke_session(
+    db: Session,
+    *,
+    user: User,
+    workspace_id: str,
+    session_id: str,
+    reason: str = "manual_revoke",
+) -> dict[str, object]:
+    session = db.get(AuthSession, session_id)
+    if not session or session.user_id != user.id or session.workspace_id != workspace_id:
+        raise AppError(
+            code="session_not_found",
+            message="Session was not found.",
+            status_code=404,
+            details={"session_id": session_id},
+        )
+    revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    session.revoked_at = session.revoked_at or revoked_at
+    session.revoke_reason = session.revoke_reason or reason
+    if db.get(RevokedToken, session.token_jti) is None:
+        db.add(
+            RevokedToken(
+                token_jti=session.token_jti,
+                user_id=session.user_id,
+                workspace_id=session.workspace_id,
+                expires_at=session.expires_at,
+                reason=reason,
+            )
+        )
+    record_audit_event(
+        db,
+        action="auth.session_revoke",
+        resource_type="session",
+        resource_id=session.session_id,
+        user_id=user.id,
+        workspace_id=session.workspace_id,
+        metadata={"reason": reason, "session_id": session.session_id},
+    )
+    db.commit()
+    return {
+        "status": "session_revoked",
+        "session_id": session.session_id,
+        "revoked_at": session.revoked_at,
+    }

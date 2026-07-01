@@ -47,6 +47,11 @@ These are foundation metrics for visibility. Production should export them to a 
 
 - readiness not ready;
 - high 5xx rate;
+- auth failure spike;
+- session revoke anomaly;
+- agent failure rate;
+- eval benchmark regression;
+- RAG no-evidence spike;
 - failed migrations;
 - DB connection failures;
 - unexpected drop in Agent/Eval/RAG run counts;
@@ -70,6 +75,19 @@ v3.1 provides request_id correlation but not distributed tracing. Production sho
 5. For data privacy incidents, run privacy export/delete dry-run only with authorized owner/admin context.
 6. If rollback is required, follow `docs/database-operations.md`.
 
+## v3.4 Rework Evidence
+
+- `scripts/run_final_readiness_gates.sh` aggregates backend tests, evals,
+  Playwright Chromium browser E2E, compose checks, deployment proof validation,
+  Alembic temp DB and artifact/secret scans.
+- `scripts/validate_production_deployment.py` emits local production-like proof
+  JSON with masked secrets.
+- `docs/production-evidence-templates.md` defines cloud, managed DB, secret
+  manager/KMS, backup purge/legal deletion and observability proof fields.
+
+These are evidence foundations. They do not replace actual managed log drains,
+metrics dashboards, tracing, error reporting, alert delivery or incident drills.
+
 ## Status
 
-Current status after v3.1: production deployment/database/operations foundation candidate. It is not production-readiness certified until v3.4 final read-only audit passes all blockers.
+Current status after v3.4 blocker rework: production deployment/database/operations evidence foundation. It is not production-readiness certified until v3.4 final read-only audit passes all remaining external proof checks.

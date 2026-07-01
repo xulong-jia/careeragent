@@ -34,6 +34,17 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset bench
 PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset benchmark --module parser --output-dir /tmp/careeragent-evals-benchmark-parser-v32
 ```
 
+v3.4 blocker rework adds the anonymized benchmark and certification report:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset anonymized_benchmark --output-dir /tmp/careeragent-evals-anonymized
+PYTHONPATH=backend backend/.venv/bin/python scripts/validate_ai_providers.py --output /tmp/careeragent-provider-proof.json
+PYTHONPATH=backend backend/.venv/bin/python scripts/run_ai_quality_certification.py \
+  --eval-dir /tmp/careeragent-evals-anonymized \
+  --provider-proof /tmp/careeragent-provider-proof.json \
+  --output-dir /tmp/careeragent-ai-quality-report
+```
+
 The benchmark writes `summary.md`, `metrics.json`, `failed_cases.json`,
 `actual_outputs.json`, `run_config.json`, and `human_review_summary.json`.
 
@@ -74,8 +85,10 @@ eval outputs from private data.
 - `LocalSemanticEmbeddingProvider` and benchmark fixtures are synthetic
   foundations, not proof of real semantic quality.
 - No real anonymized production-sized JD/resume/RAG/match/agent dataset is
-  committed.
-- No LLM judge or formal human-review protocol is enabled as production gate.
+  committed; v3.4 adds a privacy-safe manually curated anonymized real-world-style
+  benchmark foundation.
+- Formal human-review and advisory LLM judge protocols now exist, but external
+  reviewer proof is still required for certification.
 - pgvector deployment exists from v3.1, but application-level pgvector semantic
   retrieval remains a production path to validate under real providers.
 - OCR remains unsupported; v3.2 only adds explicit OCR provider boundary and

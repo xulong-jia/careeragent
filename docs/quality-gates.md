@@ -15,6 +15,7 @@
 | Frontend typecheck | `cd frontend && npm run typecheck` | TS app 和 Vite config typecheck 通过 | 不证明运行时 UX 正确 |
 | Frontend unit contract tests | `cd frontend && npm run test` | Node 内置 source contract tests 通过 | 不是 React Testing Library 组件测试 |
 | Frontend mocked E2E smoke | `cd frontend && npm run test:e2e` | mock workflow 覆盖 selector/ref/privacy contract | 不是 Playwright/Cypress browser E2E |
+| Frontend browser E2E | `cd frontend && npm run test:e2e:browser` | Playwright Chromium 覆盖登录、Dashboard、selectors、resume/JD/match/compare、rewrite、interview、study plan、applications、KB citations、Agent actions、Bad Case、Evaluation、401 和 empty state | 仍是 synthetic API mock；deployed-backend E2E 和 Firefox/WebKit 是 hardening |
 | Docker Compose config | `docker compose config` | Compose 文件可解析，前提是 `.env` 或环境中提供 `AUTH_JWT_SECRET` | 不是 container build/push/deploy 证明 |
 | Docker missing-secret negative check | `COMPOSE_DISABLE_ENV_FILE=1 env -u AUTH_JWT_SECRET docker compose config` | 在没有 `.env`/env secret 时应明确失败 | 验证 Compose 不接受空 secret |
 | Alembic migration check | `DATABASE_URL=sqlite:////tmp/careeragent_phase26_alembic.db backend/.venv/bin/alembic -c backend/alembic.ini upgrade head` | 空临时 DB 可升级到 head | 不证明生产数据迁移策略 |
@@ -31,6 +32,11 @@
 | Match service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module match --output-dir /tmp/careeragent-evals-match` | Match 六维评分、风险扣分、compare case 和 evidence metrics 通过 | trustworthy foundation，不是生产级求职判断 |
 | Project Rewrite service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module project_rewrite --output-dir /tmp/careeragent-evals-project-rewrite` | before/after、evidence_required、forbidden_changes、risk_level、fabrication guard metrics 通过 | rewrite foundation，不是自动可用简历成稿 |
 | Agent Workflow service-level eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module agent_workflow --output-dir /tmp/careeragent-evals-agent-workflow` | 8 个 Agent cases 覆盖 success、need_more_info、resume、retry、cancel、Bad Case payload 和多 workflow | workflow foundation，不是 durable production engine |
+| Anonymized benchmark eval | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_evals.py --dataset anonymized_benchmark --output-dir /tmp/careeragent-evals-anonymized` | 155-case manually curated anonymized real-world-style benchmark 通过，并输出 human review / LLM judge summaries | 不是外部真实生产数据 proof |
+| AI provider validation | `PYTHONPATH=backend backend/.venv/bin/python scripts/validate_ai_providers.py --output /tmp/careeragent-provider-proof.json` | 验证 offline/provider_verified provider path，输出 masked proof | 无真实 key 时只能证明 offline path；真实 provider proof 不进 Git |
+| AI quality report | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_ai_quality_certification.py --eval-dir /tmp/careeragent-evals-anonymized --provider-proof /tmp/careeragent-provider-proof.json --output-dir /tmp/careeragent-ai-quality-report` | 汇总 provider mode、benchmark、human agreement、LLM judge 和 production_quality_candidate flag | `provider_mode=offline` 时不能声称 production-quality candidate |
+| Deployment proof validation | `PYTHONPATH=backend backend/.venv/bin/python scripts/validate_production_deployment.py --allow-local-placeholders --strict --output /tmp/careeragent-deployment-proof.json` | 验证 required env、DB URL shape、compose config、readiness docs、secret masking | 本地 proof，不是 cloud/managed KMS proof |
+| Final readiness gate script | `scripts/run_final_readiness_gates.sh` | 聚合 backend/eval/frontend/browser/compose/deployment/Alembic/scan gates | 通过后仍需 v3.4 只读审计决定是否可打 tag |
 
 ## Auth Secret Gate
 
@@ -93,7 +99,22 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 - Frontend pages must use centralized `frontend/src/api/*` clients; direct `fetch` remains isolated to `frontend/src/api/client.ts`.
 - Privacy-sensitive saved data must render as preview, snippet, citation, source ref or sanitized JSON by default.
 - `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:e2e` and `npm run build -- --outDir /tmp/careeragent-frontend-build-v33` must pass.
-- The current `test:e2e` gate is mocked. Production readiness still requires real browser E2E, auth/data seeding, accessibility and visual/layout checks.
+- The `test:e2e` gate is mocked. v3.4 adds Playwright Chromium through
+  `test:e2e:browser`; production certification may still require deployed
+  backend E2E, auth/data seeding, accessibility and visual/layout checks.
+
+## v3.4 Blocker Rework Gates
+
+- `npm run test:e2e:browser` must pass in Chromium.
+- `scripts/run_evals.py --dataset anonymized_benchmark` must pass with at
+  least 150 privacy-safe cases.
+- `scripts/validate_ai_providers.py` must produce a masked provider proof.
+- `scripts/run_ai_quality_certification.py` must produce JSON/Markdown reports.
+- `scripts/validate_production_deployment.py --strict` must pass with local
+  proof env and must not output unmasked secrets.
+- Auth session list/revoke tests must pass and audit session revocation.
+- `scripts/run_final_readiness_gates.sh` is the recommended aggregate gate
+  before re-running v3.4 final read-only certification.
 
 ## Evaluation Boundary
 

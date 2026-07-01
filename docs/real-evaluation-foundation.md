@@ -31,12 +31,19 @@ v3.2 adds `evals/datasets/benchmark/`, a 100-case synthetic benchmark foundation
 
 `human_review_sample.jsonl` is synthetic reviewer data for calibration and agreement metrics. It is not a real human-review protocol.
 
+v3.4 blocker rework adds `evals/datasets/anonymized_benchmark/`, a 155-case
+manually curated anonymized real-world-style benchmark foundation. It includes
+formal human review and advisory LLM judge sample fixtures. It is stronger than
+the synthetic benchmark but still must not be represented as private production
+data or completed external review.
+
 ## Commands
 
 ```bash
 backend/.venv/bin/python scripts/run_evals.py --dataset synthetic --output-dir /tmp/careeragent-evals-synthetic
 backend/.venv/bin/python scripts/run_evals.py --dataset service_level --output-dir /tmp/careeragent-evals-service
 backend/.venv/bin/python scripts/run_evals.py --dataset benchmark --output-dir /tmp/careeragent-evals-benchmark
+backend/.venv/bin/python scripts/run_evals.py --dataset anonymized_benchmark --output-dir /tmp/careeragent-evals-anonymized
 ```
 
 Each run writes:

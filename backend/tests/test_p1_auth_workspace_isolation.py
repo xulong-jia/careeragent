@@ -1,10 +1,10 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from conftest import get_data, get_error, make_client
 from app.agents import state
 from app.core.security import create_access_token, hash_password
 from app.core.tenant import DEFAULT_WORKSPACE_ID
-from app.models.auth import User, Workspace, WorkspaceMembership
+from app.models.auth import AuditLog, AuthSession, User, Workspace, WorkspaceMembership
 
 
 def _client_for(user_id: str, email: str):
@@ -233,6 +233,109 @@ def test_logout_revokes_current_access_token():
     me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 401
     assert get_error(me)["code"] == "token_revoked"
+
+
+def test_session_list_and_revoke_blocks_session(db_session):
+    client = make_client(authenticated=False)
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "email": "session-user@example.com",
+            "password": "Password123!",
+            "display_name": "Session User",
+        },
+    )
+    assert register.status_code == 201
+    session = get_data(register)
+    token = session["access_token"]
+    session_id = session["session_id"]
+
+    sessions = client.get(
+        "/api/auth/sessions",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert sessions.status_code == 200
+    session_items = get_data(sessions)["items"]
+    assert session_items[0]["session_id"] == session_id
+    assert session_items[0]["current"] is True
+    assert session_items[0]["device_label"] == "web session"
+
+    revoke = client.post(
+        f"/api/auth/sessions/{session_id}/revoke",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert revoke.status_code == 200
+    assert get_data(revoke)["status"] == "session_revoked"
+
+    denied = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert denied.status_code == 401
+    assert get_error(denied)["code"] in {"session_revoked", "token_revoked"}
+
+    saved_session = db_session.get(AuthSession, session_id)
+    assert saved_session.revoked_at is not None
+    assert saved_session.revoke_reason == "manual_revoke"
+    audit = db_session.query(AuditLog).filter_by(action="auth.session_revoke").first()
+    assert audit is not None
+    assert audit.metadata_json["session_id"] == session_id
+
+
+def test_session_validation_rejects_missing_or_cross_workspace_sessions(db_session):
+    client = make_client(authenticated=False)
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "email": "session-scope-user@example.com",
+            "password": "Password123!",
+            "display_name": "Session Scope User",
+        },
+    )
+    assert register.status_code == 201
+    session = get_data(register)
+    user_id = session["user"]["id"]
+    workspace_id = session["workspace"]["id"]
+    token = session["access_token"]
+
+    missing_session_token, _ = create_access_token(
+        subject=user_id,
+        email="session-scope-user@example.com",
+        role="user",
+        workspace_id=workspace_id,
+        session_id="session_missing_record",
+    )
+    missing = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {missing_session_token}"},
+    )
+    assert missing.status_code == 401
+    assert get_error(missing)["code"] == "session_invalid"
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    other_workspace_session = AuthSession(
+        session_id="session_other_workspace",
+        user_id=user_id,
+        workspace_id="other_workspace",
+        token_jti="jti_other_workspace",
+        device_label="other workspace",
+        issued_at=now,
+        expires_at=now + timedelta(hours=1),
+    )
+    db_session.add(other_workspace_session)
+    db_session.commit()
+
+    sessions = client.get(
+        "/api/auth/sessions",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert sessions.status_code == 200
+    session_ids = {item["session_id"] for item in get_data(sessions)["items"]}
+    assert "session_other_workspace" not in session_ids
+
+    revoke = client.post(
+        "/api/auth/sessions/session_other_workspace/revoke",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert revoke.status_code == 404
+    assert get_error(revoke)["code"] == "session_not_found"
 
 
 def test_core_business_routes_require_authentication():

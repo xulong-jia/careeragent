@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 
 import { AppShell } from "./components/AppShell";
-import { getMe, logout as logoutUser } from "./api/auth";
+import {
+  getMe,
+  listSessions,
+  logout as logoutUser,
+  revokeSession as revokeAuthSession,
+} from "./api/auth";
 import { clearAuthToken, getAuthToken } from "./api/client";
 import { listAgentRuns } from "./api/agents";
 import { getApplicationStats, listApplications } from "./api/applications";
@@ -32,6 +37,7 @@ import type {
   AgentRunRecord,
   AuthMe,
   AuthSession,
+  AuthSessionRecord,
   ApplicationRecord,
   ApplicationStats,
   BadCaseRecord,
@@ -193,7 +199,17 @@ export default function App() {
   const [evaluationStats, setEvaluationStats] = useState<EvaluationStats | null>(
     null,
   );
+  const [sessions, setSessions] = useState<AuthSessionRecord[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const refreshSessions = async () => {
+    try {
+      const sessionList = await listSessions();
+      setSessions(sessionList.items);
+    } catch {
+      setSessions([]);
+    }
+  };
 
   const refreshWorkbench = async () => {
     try {
@@ -270,22 +286,26 @@ export default function App() {
   useEffect(() => {
     const handleExpired = () => {
       setAuth(null);
+      setSessions([]);
       setLoadError("Session expired. Please sign in again.");
     };
     window.addEventListener("careeragent:auth-expired", handleExpired);
     if (!getAuthToken()) {
+      setSessions([]);
       setAuthChecked(true);
       return () => {
         window.removeEventListener("careeragent:auth-expired", handleExpired);
       };
     }
     getMe()
-      .then((me) => {
+      .then(async (me) => {
         setAuth(me);
+        await refreshSessions();
       })
       .catch(() => {
         clearAuthToken();
         setAuth(null);
+        setSessions([]);
       })
       .finally(() => setAuthChecked(true));
     return () => {
@@ -296,6 +316,7 @@ export default function App() {
   useEffect(() => {
     if (auth) {
       void refreshWorkbench();
+      void refreshSessions();
     }
   }, [auth]);
 
@@ -305,12 +326,29 @@ export default function App() {
       workspace: session.workspace,
     });
     setLoadError(null);
+    void refreshSessions();
   };
 
   const handleLogout = async () => {
     await logoutUser();
     setAuth(null);
+    setSessions([]);
     setActivePage("dashboard");
+  };
+
+  const handleRevokeSession = async (sessionId: string) => {
+    const revokingCurrent = sessions.some(
+      (session) => session.session_id === sessionId && session.current,
+    );
+    await revokeAuthSession(sessionId);
+    if (revokingCurrent) {
+      clearAuthToken();
+      setAuth(null);
+      setSessions([]);
+      setActivePage("dashboard");
+      return;
+    }
+    await refreshSessions();
   };
 
   const workbenchState = {
@@ -452,6 +490,8 @@ export default function App() {
       navigation={navigation}
       onNavigate={setActivePage}
       onLogout={handleLogout}
+      onRevokeSession={handleRevokeSession}
+      sessions={sessions}
       userEmail={auth.user.email}
       workspaceName={auth.workspace.name}
     >

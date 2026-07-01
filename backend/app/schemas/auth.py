@@ -31,6 +31,7 @@ class AuthTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_at: datetime
+    session_id: str
     user: AuthUser
     workspace: AuthWorkspace
 
@@ -38,3 +39,18 @@ class AuthTokenResponse(BaseModel):
 class AuthMeResponse(BaseModel):
     user: AuthUser
     workspace: AuthWorkspace
+
+
+class AuthSessionRecord(BaseModel):
+    session_id: str
+    device_label: str
+    issued_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None = None
+    revoke_reason: str | None = None
+    current: bool = False
+
+
+class AuthSessionListResponse(BaseModel):
+    items: list[AuthSessionRecord]
+    total: int

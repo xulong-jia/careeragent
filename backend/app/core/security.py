@@ -99,6 +99,7 @@ def create_access_token(
     email: str,
     role: str,
     workspace_id: str,
+    session_id: str | None = None,
     settings: Settings | None = None,
     expires_delta: timedelta | None = None,
 ) -> tuple[str, datetime]:
@@ -120,6 +121,8 @@ def create_access_token(
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
     }
+    if session_id:
+        payload["sid"] = session_id
     signing_input = ".".join(
         [
             _b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8")),

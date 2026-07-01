@@ -1,24 +1,30 @@
 import type { NavigationItem, PageKey } from "../types/navigation";
+import type { AuthSessionRecord } from "../types/api";
 
 type AppShellProps = {
   activePage: PageKey;
   navigation: NavigationItem[];
   userEmail: string;
   workspaceName: string;
+  sessions: AuthSessionRecord[];
   onNavigate: (page: PageKey) => void;
   onLogout: () => void;
+  onRevokeSession: (sessionId: string) => void;
   children: React.ReactNode;
 };
 
 export function AppShell({
   activePage,
   navigation,
+  sessions,
   userEmail,
   workspaceName,
   onNavigate,
   onLogout,
+  onRevokeSession,
   children,
 }: AppShellProps) {
+  const activeSessions = sessions.filter((session) => !session.revoked_at);
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="主导航">
@@ -57,6 +63,37 @@ export function AppShell({
             <div className="stage-badge">
               {workspaceName} · {userEmail}
             </div>
+            <details className="session-menu">
+              <summary>Sessions ({activeSessions.length})</summary>
+              <div className="session-menu-panel">
+                {sessions.length ? (
+                  sessions.map((session) => (
+                    <div className="session-row" key={session.session_id}>
+                      <span>
+                        {session.device_label}
+                        {session.current ? " · current" : ""}
+                      </span>
+                      <small>
+                        {session.revoked_at
+                          ? `revoked: ${session.revoke_reason ?? "manual"}`
+                          : `expires ${new Date(session.expires_at).toLocaleString()}`}
+                      </small>
+                      {!session.revoked_at ? (
+                        <button
+                          className="tiny-action"
+                          onClick={() => onRevokeSession(session.session_id)}
+                          type="button"
+                        >
+                          Revoke
+                        </button>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted-text">No active session metadata.</p>
+                )}
+              </div>
+            </details>
             <button className="ghost-action" onClick={onLogout} type="button">
               Logout
             </button>
