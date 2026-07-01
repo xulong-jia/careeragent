@@ -52,6 +52,11 @@ export type StructuredResume = {
   skills: Record<string, string[]>;
   certificates: Record<string, unknown>[];
   awards: Record<string, unknown>[];
+  risk_flags?: Record<string, unknown>[];
+  parse_confidence?: number;
+  evidence?: Record<string, unknown>[];
+  warnings?: string[];
+  parser_metadata?: Record<string, unknown>;
 };
 
 export type ResumeRecord = {
@@ -518,6 +523,9 @@ export type JobCreatePayload = {
 
 export type JobProfile = {
   job_profile_id: string;
+  job_title?: string | null;
+  company?: string | null;
+  location?: string | null;
   role_category: string;
   required_skills: string[];
   preferred_skills: string[];
@@ -527,6 +535,10 @@ export type JobProfile = {
   interview_focus: string[];
   risk_level: string;
   summary: string | null;
+  parse_confidence?: number;
+  evidence?: Record<string, unknown>[];
+  warnings?: string[];
+  parser_metadata?: Record<string, unknown>;
 };
 
 export type JobRecord = {

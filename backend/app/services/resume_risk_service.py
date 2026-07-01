@@ -22,7 +22,7 @@ STRONG_CLAIM_RE = re.compile(
 def evaluate_resume_risks(
     structured_resume: StructuredResume,
 ) -> tuple[list[ResumeRiskFlag], dict[str, object]]:
-    flags: list[ResumeRiskFlag] = []
+    flags: list[ResumeRiskFlag] = _parser_flags(structured_resume.risk_flags)
     declared_skills = _flatten_declared_skills(structured_resume.skills)
 
     for collection_name in ("education", "projects", "experience"):
@@ -40,6 +40,7 @@ def evaluate_resume_risks(
         flags.extend(_project_skill_flags(project, declared_skills, location))
         flags.extend(_project_evidence_flags(project, location))
 
+    flags = _dedupe_flags(flags)
     counter = Counter(flag.type for flag in flags)
     risk_report = {
         "passed": not flags,
@@ -60,6 +61,30 @@ def evaluate_resume_risks(
         "flags": [flag.model_dump() for flag in flags],
     }
     return flags, risk_report
+
+
+def _parser_flags(raw_flags: list[dict[str, object]]) -> list[ResumeRiskFlag]:
+    flags: list[ResumeRiskFlag] = []
+    for raw_flag in raw_flags:
+        if not isinstance(raw_flag, dict) or not raw_flag.get("type"):
+            continue
+        try:
+            flags.append(ResumeRiskFlag.model_validate(raw_flag))
+        except Exception:
+            continue
+    return flags
+
+
+def _dedupe_flags(flags: list[ResumeRiskFlag]) -> list[ResumeRiskFlag]:
+    seen: set[tuple[str, str | None, str | None]] = set()
+    result: list[ResumeRiskFlag] = []
+    for flag in flags:
+        key = (flag.type, flag.location, flag.evidence)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(flag)
+    return result
 
 
 def _timeline_flags(record: dict[str, Any], location: str) -> list[ResumeRiskFlag]:

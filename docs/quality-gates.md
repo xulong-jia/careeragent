@@ -19,6 +19,7 @@
 | Secret scan | `rg -n "sk-[A-Za-z0-9_-]{12,}|BEGIN (RSA|OPENSSH|PRIVATE)|AUTH_JWT_SECRET=|API_KEY=" --hidden -g '!frontend/node_modules/**' -g '!backend/.venv/**' .` | 查找明显 secret/private key/placeholder 命中 | `.env.example` 和测试 fake key 需要人工确认 |
 | Synthetic eval | `backend/.venv/bin/python scripts/run_evals.py --dataset synthetic --output-dir /tmp/careeragent-evals-synthetic` | synthetic contract runner 仍可执行 | 只防 contract fixture 破坏 |
 | Service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --output-dir /tmp/careeragent-evals-service` | runner 真实调用当前 service/retriever/parser/agent 路径并输出 metrics/failed cases | foundation，不是 production benchmark |
+| Parser service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module jd_parser --output-dir /tmp/careeragent-evals-jd-parser && backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module resume_parser --output-dir /tmp/careeragent-evals-resume-parser` | JD/Resume parser foundation cases 通过并输出 evidence/confidence/warnings metrics | parser foundation，不是 full production parser |
 | RAG service-level eval | `backend/.venv/bin/python scripts/run_evals.py --dataset service_level --module rag --output-dir /tmp/careeragent-evals-rag` | RAG lexical/vector/hybrid/no-evidence cases 通过并输出 vector metrics | local vector foundation，不是 full production RAG |
 
 ## Auth Secret Gate
@@ -43,6 +44,13 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 - 失败样例包含可人工转 Bad Case 的摘要字段。
 
 当前仍未做自动 DB 写入和 Bad Case draft。service-level pass/fail 都不得解释为核心 AI 能力生产完成。
+
+阶段 2.3 已新增 parser production foundation：
+
+- JD parser 输出 required/preferred、role_category、responsibilities、business scenarios、hidden requirements、evidence、confidence、warnings 和 parser metadata。
+- Resume parser 输出 section records、skill categories、risk flags、evidence、confidence、warnings 和 parser metadata。
+- Parser service-level dataset 扩展为 JD 12 cases、Resume 8 cases。
+- 默认 parser 仍是 local deterministic foundation；optional LLM path 不作为测试前提，也不是 production-ready parser。
 
 阶段 2.2 已新增 RAG local vector production foundation：
 

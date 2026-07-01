@@ -20,14 +20,18 @@ def create_resume_and_job(client):
             "company": "Mock Company",
             "job_title": "AI Application Engineer",
             "location": "Shanghai",
-            "raw_text": "Python FastAPI RAG React",
+            "raw_text": "Must build Python FastAPI RAG services. React is preferred.",
             "source_url": None,
         },
     )
     return get_data(resume_response)["resume_id"], get_data(job_response)["jd_id"]
 
 
-def create_job(client, title="AI Application Engineer", raw_text="Python FastAPI RAG React"):
+def create_job(
+    client,
+    title="AI Application Engineer",
+    raw_text="Must build Python FastAPI RAG services. React is preferred.",
+):
     response = client.post(
         "/api/jobs",
         json={

@@ -96,6 +96,7 @@ def create_resume(
     extraction = extract_resume_text(filename, file_type, content_type, content)
     raw_text = extraction.raw_text
     structured_resume = parse_structured_resume(raw_text)
+    parser_risk_flags = [dict(flag) for flag in structured_resume.risk_flags]
     return resume_repository.create_resume_with_initial_version(
         db,
         filename=filename,
@@ -108,8 +109,8 @@ def create_resume(
         extraction_status=extraction.extraction_status,
         extraction_method=extraction.extraction_method,
         extraction_warnings=extraction.warnings,
-        risk_flags=[],
-        risk_report={},
+        risk_flags=parser_risk_flags,
+        risk_report=_parser_risk_report(parser_risk_flags),
     )
 
 
@@ -250,6 +251,25 @@ def _risk_flags_from_report(risk_report: dict[str, object]) -> list[dict[str, ob
     if not isinstance(flags, list):
         return []
     return [flag for flag in flags if isinstance(flag, dict)]
+
+
+def _parser_risk_report(risk_flags: list[dict[str, object]]) -> dict[str, object]:
+    counts: dict[str, int] = {}
+    for flag in risk_flags:
+        flag_type = str(flag.get("type") or "unknown")
+        counts[flag_type] = counts.get(flag_type, 0) + 1
+    return {
+        "passed": not risk_flags,
+        "summary": (
+            "No parser risk flags detected."
+            if not risk_flags
+            else f"{len(risk_flags)} parser risk flag(s) detected."
+        ),
+        "flag_count": len(risk_flags),
+        "counts_by_type": counts,
+        "flags": risk_flags,
+        "source": "resume_parser",
+    }
 
 
 def _utc_now() -> datetime:

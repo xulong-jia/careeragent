@@ -25,11 +25,15 @@ The runner writes `summary.md`, `metrics.json`, `failed_cases.json`, `actual_out
 
 `metrics.json` includes a non-secret `run_config` with prompt/schema/retrieval/model/code/evaluation version metadata. This is for deterministic regression traceability only; it is not model comparison or LLM judging.
 
-`service_level` uses a temporary SQLite database and calls current CareerAgent services. It is a real evaluation foundation, but it still evaluates deterministic/mock/foundation service behavior and is not a production-quality benchmark.
+`service_level` uses a temporary SQLite database and calls current CareerAgent services. It is a real evaluation foundation, but it still evaluates foundation service behavior and is not a production-quality benchmark.
+
+Phase 2.3 parser cases cover 12 JD parser cases and 8 resume parser cases. Parser metrics include role/category hits, section/skill/project/education hits, risk flag hit rate, evidence coverage, confidence presence, warning expectations, and case pass.
 
 Phase 2.2 RAG cases cover `lexical`, `vector`, `hybrid`, and no-evidence behavior. RAG metrics include recall/citation/source type plus `retrieval_mode_match`, `average_top_score`, `vector_index_used`, and uncertainty matching.
 
 The current RAG path uses a local bag-of-words vectorizer with DB-persisted chunk vectors. It is a production foundation, not a final semantic embedding benchmark. Run the smoke dataset before enabling any real LLM or external embedding provider, and keep real-provider experiments out of committed `evals/results/` artifacts unless they are sanitized and explicitly reviewed.
+
+The current parser path uses local deterministic parser foundation by default. Optional LLM parser runs must use runtime secrets only and must not commit raw private outputs or provider traces.
 
 ## Boundaries
 

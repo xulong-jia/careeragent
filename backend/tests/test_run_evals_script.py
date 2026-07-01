@@ -90,12 +90,12 @@ def test_service_level_loader_reads_dataset_cases():
 
     assert by_module == {
         "agent_workflow": 3,
-        "jd_parser": 8,
+        "jd_parser": 12,
         "match": 5,
         "rag_retrieval": 6,
-        "resume_parser": 5,
+        "resume_parser": 8,
     }
-    assert len(cases) == 27
+    assert len(cases) == 34
 
 
 def test_eval_metrics_aggregate_module_metrics():
@@ -137,8 +137,10 @@ def test_service_level_runner_writes_outputs_and_calls_real_service(tmp_path):
     run_config = json.loads((output_dir / "run_config.json").read_text())
     summary = (output_dir / "summary.md").read_text()
 
-    assert metrics["total_count"] == 8
-    assert metrics["by_module"]["jd_parser"]["total"] == 8
+    assert metrics["total_count"] == 12
+    assert metrics["by_module"]["jd_parser"]["total"] == 12
+    assert "evidence_coverage" in metrics["by_module"]["jd_parser"]["metrics"]
+    assert "confidence_present" in metrics["by_module"]["jd_parser"]["metrics"]
     assert run_config["service_level"] is True
     assert run_config["production_quality"] is False
     assert "dataset_kind: service_level" in summary
@@ -147,7 +149,24 @@ def test_service_level_runner_writes_outputs_and_calls_real_service(tmp_path):
         "job_service.create_job" in item["actual_output"]["service_calls"]
         for item in actual_outputs
     )
-    assert failed_cases
+    assert isinstance(failed_cases, list)
+    _assert_private_safe(actual_outputs)
+    _assert_private_safe(failed_cases)
+
+
+def test_failed_case_summary_has_bad_case_conversion_fields():
+    summary = run_evals._failed_case_summary(
+        {
+            "case_id": "parser_failure",
+            "module": "resume_parser",
+            "case_type": "service_level",
+            "input_summary": "synthetic resume",
+            "expected_output": {"skill": "Python"},
+            "actual_output": {"skill": []},
+            "error": "Parser missed expected skill.",
+        }
+    )
+
     assert {
         "case_id",
         "module",
@@ -158,9 +177,8 @@ def test_service_level_runner_writes_outputs_and_calls_real_service(tmp_path):
         "actual_summary",
         "failure_reason",
         "suggested_bad_case_type",
-    }.issubset(failed_cases[0])
-    _assert_private_safe(actual_outputs)
-    _assert_private_safe(failed_cases)
+    }.issubset(summary)
+    assert summary["suggested_bad_case_type"] == "missing_skill_extraction"
 
 
 def test_synthetic_alias_report_is_distinct_from_service_level(tmp_path):
@@ -200,5 +218,25 @@ def test_service_level_rag_eval_covers_vector_metrics(tmp_path):
     )
     assert any(
         item["actual_output"]["uncertainty"] == "no_relevant_source"
+        for item in actual_outputs
+    )
+
+
+def test_service_level_resume_parser_eval_covers_parser_metrics(tmp_path):
+    output_dir = tmp_path / "resume-parser-service-level-results"
+
+    result_code = run_evals.run("service_level", "resume_parser", output_dir)
+
+    assert result_code == 0
+    metrics = json.loads((output_dir / "metrics.json").read_text())
+    actual_outputs = json.loads((output_dir / "actual_outputs.json").read_text())
+
+    assert metrics["total_count"] == 8
+    resume_metrics = metrics["by_module"]["resume_parser"]["metrics"]
+    assert "risk_flag_hit_rate" in resume_metrics
+    assert "evidence_coverage" in resume_metrics
+    assert "confidence_present" in resume_metrics
+    assert any(
+        item["actual_output"]["parser_metadata"]["foundation_only"] is True
         for item in actual_outputs
     )

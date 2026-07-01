@@ -9,16 +9,21 @@
         "company": "Example AI Co",
         "job_title": "Backend Engineer",
         "location": "Sydney",
-        "raw_text": "Build Python FastAPI services for student workflow APIs. Responsibilities include SQL data modelling, Docker packaging, and API reliability reviews."
+        "raw_text": "Must build Python FastAPI services with SQL-backed storage for student workflow APIs. Responsibilities include production API reliability reviews and migration checks. Docker is a plus."
       },
       "expected": {
         "role_category": "Python Backend Developer",
         "required_skills_should_include": ["Python", "FastAPI", "SQL"],
         "preferred_skills_should_include": ["Docker"],
-        "responsibilities_should_include": ["Build", "FastAPI"],
+        "responsibilities_should_include": ["build", "FastAPI"],
+        "hidden_requirements_should_include": ["Production API experience"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
         "minimum_required_skill_hits": 3,
         "minimum_preferred_skill_hits": 1,
-        "minimum_responsibility_hits": 2
+        "minimum_responsibility_hits": 2,
+        "minimum_hidden_requirement_hit_rate": 1.0,
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
@@ -28,16 +33,19 @@
         "company": "Example Cloud Lab",
         "job_title": "Fullstack Developer",
         "location": "Melbourne",
-        "raw_text": "Deliver TypeScript dashboards with React for operations teams. Responsibilities include SQL-backed reporting, Docker-based local environments, and frontend quality checks."
+        "raw_text": "Must deliver TypeScript UI workflow panels for operations teams. Responsibilities include API integration, frontend quality checks, and accessible component states. React is preferred. Docker is nice to have for local environments."
       },
       "expected": {
         "role_category": "Frontend / Fullstack Developer",
-        "required_skills_should_include": ["TypeScript", "SQL"],
+        "required_skills_should_include": ["TypeScript"],
         "preferred_skills_should_include": ["React", "Docker"],
-        "responsibilities_should_include": ["Deliver", "React"],
-        "minimum_required_skill_hits": 2,
+        "responsibilities_should_include": ["deliver", "API"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
+        "minimum_required_skill_hits": 1,
         "minimum_preferred_skill_hits": 2,
-        "minimum_responsibility_hits": 2
+        "minimum_responsibility_hits": 2,
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
@@ -47,16 +55,21 @@
         "company": "Example Search Studio",
         "job_title": "AI Application Engineer",
         "location": "Remote",
-        "raw_text": "Build RAG workflows for document-grounded answers. Responsibilities include Python service integration, FastAPI APIs, LLM prompt contracts, and vector search evaluation."
+        "raw_text": "Must build RAG workflows for document-grounded answers using Python and FastAPI. Responsibilities include citation checks, prompt contracts, and answer quality review. LLM and vector search experience are preferred."
       },
       "expected": {
         "role_category": "AI Application Engineer",
         "required_skills_should_include": ["Python", "FastAPI", "RAG"],
         "preferred_skills_should_include": ["LLM", "Vector Search"],
-        "responsibilities_should_include": ["Build", "RAG"],
+        "responsibilities_should_include": ["build", "RAG"],
+        "hidden_requirements_should_include": ["Evidence-grounded AI evaluation"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
         "minimum_required_skill_hits": 3,
         "minimum_preferred_skill_hits": 2,
-        "minimum_responsibility_hits": 2
+        "minimum_responsibility_hits": 2,
+        "minimum_hidden_requirement_hit_rate": 1.0,
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
@@ -66,92 +79,209 @@
         "company": "Example Data Tools",
         "job_title": "Data Platform Engineer",
         "location": "Brisbane",
-        "raw_text": "Own SQL data workflows and Python automation for analytics users. Responsibilities include Docker jobs, data quality checks, and backend service monitoring."
+        "raw_text": "Must own SQL data workflows and Python automation for analytics users. Responsibilities include data quality checks, pipeline monitoring, and backend service observability. Docker is a plus."
       },
       "expected": {
         "role_category": "Data Platform Engineer",
         "required_skills_should_include": ["Python", "SQL"],
         "preferred_skills_should_include": ["Docker"],
-        "responsibilities_should_include": ["Own", "SQL"],
+        "responsibilities_should_include": ["own", "SQL"],
+        "hidden_requirements_should_include": ["Data quality ownership"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
         "minimum_required_skill_hits": 2,
         "minimum_preferred_skill_hits": 1,
-        "minimum_responsibility_hits": 2
+        "minimum_responsibility_hits": 2,
+        "minimum_hidden_requirement_hit_rate": 1.0,
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
       "case_id": "jd_service_005",
       "module": "jd_parser",
       "input": {
-        "company": "Example Product UI",
-        "job_title": "Frontend Engineer",
+        "company": "Example Vision Lab",
+        "job_title": "Computer Vision Engineer",
         "location": "Perth",
-        "raw_text": "Create React interfaces with TypeScript for candidate workflows. Responsibilities include component states, accessibility checks, and API integration."
+        "raw_text": "Must build computer vision models for object detection using Python and PyTorch. Responsibilities include image data review, model evaluation, and deployment checks. OpenCV is preferred."
       },
       "expected": {
-        "role_category": "Frontend / Fullstack Developer",
-        "required_skills_should_include": ["TypeScript"],
-        "preferred_skills_should_include": ["React"],
-        "responsibilities_should_include": ["Create", "React"],
-        "minimum_required_skill_hits": 1,
+        "role_category": "Computer Vision Engineer",
+        "required_skills_should_include": ["Python", "PyTorch", "Computer Vision"],
+        "preferred_skills_should_include": ["OpenCV"],
+        "responsibilities_should_include": ["build", "object detection"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
+        "minimum_required_skill_hits": 3,
         "minimum_preferred_skill_hits": 1,
-        "minimum_responsibility_hits": 2
+        "minimum_responsibility_hits": 2,
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
       "case_id": "jd_service_006",
       "module": "jd_parser",
       "input": {
-        "company": "Example Retrieval Group",
-        "job_title": "RAG Engineer",
+        "company": "Example Bank",
+        "job_title": "Bank IT Graduate Program",
         "location": "Adelaide",
-        "raw_text": "Improve RAG retrieval quality for policy documents. Responsibilities include vector search experiments, LLM answer review, Python tooling, and citation checks."
+        "raw_text": "Graduate rotation across bank technology teams. Must support SQL reporting and Python automation for risk and operations stakeholders. Responsibilities include documentation, service support, and regulatory change coordination. Cloud exposure is preferred."
       },
       "expected": {
-        "role_category": "AI Application Engineer",
-        "required_skills_should_include": ["Python", "RAG"],
-        "preferred_skills_should_include": ["LLM", "Vector Search"],
-        "responsibilities_should_include": ["Improve", "RAG"],
+        "role_category": "Bank IT Graduate Program",
+        "required_skills_should_include": ["Python", "SQL"],
+        "preferred_skills_should_include": [],
+        "responsibilities_should_include": ["support", "SQL"],
+        "hidden_requirements_should_include": ["Enterprise stakeholder communication"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "responsibilities"],
+        "warnings_should_include": [],
         "minimum_required_skill_hits": 2,
-        "minimum_preferred_skill_hits": 2,
-        "minimum_responsibility_hits": 2
+        "minimum_preferred_skill_hits": 0,
+        "minimum_responsibility_hits": 2,
+        "minimum_hidden_requirement_hit_rate": 1.0,
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
       "case_id": "jd_service_007",
       "module": "jd_parser",
       "input": {
-        "company": "Example API Works",
-        "job_title": "Backend API Developer",
-        "location": "Canberra",
-        "raw_text": "Maintain FastAPI services for internal hiring tools. Responsibilities include SQL query tuning, Python tests, and Docker compose support."
+        "company": "Example LLM Platform",
+        "job_title": "LLM Application Engineer",
+        "location": "Hobart",
+        "raw_text": "Must build LLM application workflows with RAG, OpenAI integrations, and Python services. Responsibilities include prompt version records, grounded response checks, and trace review. Vector Search is a bonus."
       },
       "expected": {
-        "role_category": "Python Backend Developer",
-        "required_skills_should_include": ["Python", "FastAPI", "SQL"],
-        "preferred_skills_should_include": ["Docker"],
-        "responsibilities_should_include": ["Maintain", "FastAPI"],
-        "minimum_required_skill_hits": 3,
+        "role_category": "LLM Application Engineer",
+        "required_skills_should_include": ["Python", "RAG", "OpenAI", "LLM"],
+        "preferred_skills_should_include": ["Vector Search"],
+        "responsibilities_should_include": ["build", "LLM"],
+        "hidden_requirements_should_include": ["Evidence-grounded AI evaluation"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
+        "minimum_required_skill_hits": 4,
         "minimum_preferred_skill_hits": 1,
-        "minimum_responsibility_hits": 2
+        "minimum_responsibility_hits": 2,
+        "minimum_hidden_requirement_hit_rate": 1.0,
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
       "case_id": "jd_service_008",
       "module": "jd_parser",
       "input": {
-        "company": "Example LLM Platform",
-        "job_title": "LLM Platform Engineer",
-        "location": "Hobart",
-        "raw_text": "Operate LLM application services with Python and FastAPI. Responsibilities include Docker deployment checks, SQL-backed trace storage, and prompt version records."
+        "company": "Example Insights",
+        "job_title": "Data Analyst",
+        "location": "Canberra",
+        "raw_text": "Must create SQL reporting datasets and Power BI dashboards for operations leaders. Responsibilities include data quality checks, stakeholder review, and dashboard documentation. Python automation is preferred."
+      },
+      "expected": {
+        "role_category": "Data Analyst / Data Engineer",
+        "required_skills_should_include": ["SQL", "Power BI"],
+        "preferred_skills_should_include": ["Python"],
+        "responsibilities_should_include": ["create", "SQL"],
+        "hidden_requirements_should_include": ["Data quality ownership"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
+        "minimum_required_skill_hits": 2,
+        "minimum_preferred_skill_hits": 1,
+        "minimum_responsibility_hits": 2,
+        "minimum_hidden_requirement_hit_rate": 1.0,
+        "minimum_evidence_coverage": 1.0
+      }
+    },
+    {
+      "case_id": "jd_service_009",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example Enterprise",
+        "job_title": "Enterprise Digitalization Consultant",
+        "location": "Sydney",
+        "raw_text": "Must support enterprise digital transformation across CRM and ERP workflows. Responsibilities include stakeholder workshops, SQL data checks, and delivery documentation. Python scripting is nice to have."
+      },
+      "expected": {
+        "role_category": "Enterprise Digitalization Role",
+        "required_skills_should_include": ["SQL"],
+        "preferred_skills_should_include": ["Python"],
+        "responsibilities_should_include": ["support", "enterprise"],
+        "hidden_requirements_should_include": ["Enterprise stakeholder communication"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
+        "minimum_required_skill_hits": 1,
+        "minimum_preferred_skill_hits": 1,
+        "minimum_responsibility_hits": 2,
+        "minimum_hidden_requirement_hit_rate": 1.0,
+        "minimum_evidence_coverage": 1.0
+      }
+    },
+    {
+      "case_id": "jd_service_010",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example API Works",
+        "job_title": "Backend API Developer",
+        "location": "Melbourne",
+        "raw_text": "Must build FastAPI services in Python for internal hiring tools. Responsibilities include SQL query tuning and production API monitoring. React is nice to have. Docker is a bonus."
+      },
+      "expected": {
+        "role_category": "Python Backend Developer",
+        "required_skills_should_include": ["Python", "FastAPI", "SQL"],
+        "preferred_skills_should_include": ["React", "Docker"],
+        "responsibilities_should_include": ["build", "FastAPI"],
+        "hidden_requirements_should_include": ["Production API experience"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
+        "minimum_required_skill_hits": 3,
+        "minimum_preferred_skill_hits": 2,
+        "minimum_responsibility_hits": 2,
+        "minimum_hidden_requirement_hit_rate": 1.0,
+        "minimum_evidence_coverage": 1.0
+      }
+    },
+    {
+      "case_id": "jd_service_011",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example Short",
+        "job_title": "Backend API Developer",
+        "location": "Remote",
+        "raw_text": "Need Python API developer. Details TBD."
+      },
+      "expected": {
+        "role_category": "Python Backend Developer",
+        "required_skills_should_include": ["Python"],
+        "preferred_skills_should_include": [],
+        "responsibilities_should_include": [],
+        "evidence_fields_should_include": ["role_category", "required_skills"],
+        "warnings_should_include": ["job_description_short_low_confidence"],
+        "minimum_required_skill_hits": 1,
+        "minimum_preferred_skill_hits": 0,
+        "minimum_responsibility_hits": 0,
+        "minimum_evidence_coverage": 1.0
+      }
+    },
+    {
+      "case_id": "jd_service_012",
+      "module": "jd_parser",
+      "input": {
+        "company": "Example Policy AI",
+        "job_title": "AI Application Engineer",
+        "location": "Remote",
+        "raw_text": "Must implement RAG answer workflows for policy documents with Python services. Responsibilities include citation coverage checks, grounded summary review, and refusal handling when no evidence exists. LLM evaluation experience is preferred."
       },
       "expected": {
         "role_category": "AI Application Engineer",
-        "required_skills_should_include": ["Python", "FastAPI", "SQL"],
-        "preferred_skills_should_include": ["LLM", "Docker"],
-        "responsibilities_should_include": ["Operate", "LLM"],
-        "minimum_required_skill_hits": 3,
-        "minimum_preferred_skill_hits": 2,
-        "minimum_responsibility_hits": 2
+        "required_skills_should_include": ["Python", "RAG"],
+        "preferred_skills_should_include": ["LLM"],
+        "responsibilities_should_include": ["implement", "RAG"],
+        "hidden_requirements_should_include": ["Evidence-grounded AI evaluation"],
+        "evidence_fields_should_include": ["role_category", "required_skills", "preferred_skills", "responsibilities"],
+        "warnings_should_include": [],
+        "minimum_required_skill_hits": 2,
+        "minimum_preferred_skill_hits": 1,
+        "minimum_responsibility_hits": 2,
+        "minimum_hidden_requirement_hit_rate": 1.0,
+        "minimum_evidence_coverage": 1.0
       }
     }
   ]

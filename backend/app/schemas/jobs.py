@@ -11,6 +11,9 @@ class JobCreateRequest(BaseModel):
 
 class JobProfile(BaseModel):
     job_profile_id: str
+    job_title: str | None = None
+    company: str | None = None
+    location: str | None = None
     role_category: str
     required_skills: list[str] = Field(default_factory=list)
     preferred_skills: list[str] = Field(default_factory=list)
@@ -20,6 +23,10 @@ class JobProfile(BaseModel):
     interview_focus: list[str] = Field(default_factory=list)
     risk_level: str = "low"
     summary: str | None = None
+    parse_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence: list[dict[str, object]] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    parser_metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class JobRecord(BaseModel):

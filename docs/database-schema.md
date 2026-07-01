@@ -109,6 +109,8 @@ Owned tables 包括 `resumes`、`resume_versions`、`profiles`、`projects`、`p
 
 隐私说明：`raw_text` 是本地 prototype 数据，不应提交真实简历或输出到日志。前端 Resume Center 只展示 preview；生产化前需要继续收敛 raw_text 返回策略。
 
+2.3 parser 说明：`structured_resume` JSON 内包含 parser foundation 字段 `risk_flags`、`parse_confidence`、`evidence`、`warnings` 和 `parser_metadata`；不是 full production parser 证明。
+
 ## profiles
 
 用途：记录用户求职画像和后续匹配、学习计划、Agent 工作流可读取的手动确认上下文。
@@ -211,7 +213,7 @@ JSON 字段说明：
 
 ## job_profiles
 
-用途：记录 deterministic JD profile。
+用途：记录 JD parser foundation profile。
 
 关键字段：
 
@@ -222,8 +224,17 @@ JSON 字段说明：
 - `required_skills`
 - `preferred_skills`
 - `responsibilities`
+- `business_scenarios`
+- `hidden_requirements`
 - `interview_focus`
 - `risk_level`
+- `summary`
+- `parse_confidence`
+- `evidence`
+- `warnings`
+- `parser_metadata`
+
+2.3 parser 说明：`parse_confidence`、`evidence`、`warnings` 和 `parser_metadata` 记录 parser foundation 输出和 fallback 状态；不是 full production parser 证明。
 
 ## match_reports
 

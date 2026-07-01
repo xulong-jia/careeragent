@@ -416,11 +416,22 @@ def _evaluate_service_jd_parser(
     profile = job.job_profile
     actual = {
         "jd_id": job.jd_id,
+        "job_title": profile.job_title,
+        "company": profile.company,
+        "location": profile.location,
         "role_category": profile.role_category,
         "required_skills": profile.required_skills,
         "preferred_skills": profile.preferred_skills,
         "responsibilities": profile.responsibilities,
+        "business_scenarios": profile.business_scenarios,
+        "hidden_requirements": profile.hidden_requirements,
+        "interview_focus": profile.interview_focus,
+        "risk_level": profile.risk_level,
         "summary": profile.summary,
+        "parse_confidence": profile.parse_confidence,
+        "evidence": profile.evidence,
+        "warnings": profile.warnings,
+        "parser_metadata": profile.parser_metadata,
     }
     required_hits = _term_hit_count(
         expected.get("required_skills_should_include", []),
@@ -437,6 +448,15 @@ def _evaluate_service_jd_parser(
     role_match = str(profile.role_category).lower() == str(
         expected.get("role_category", "")
     ).lower()
+    hidden_text = _flatten_text(profile.hidden_requirements)
+    evidence_fields = [str(item.get("field", "")) for item in profile.evidence]
+    expected_evidence_fields = expected.get("evidence_fields_should_include", [])
+    warnings_expected = expected.get("warnings_should_include", [])
+    warnings_unexpected = expected.get("warnings_should_not_include", [])
+    warning_hit_rate = _hit_rate(warnings_expected, profile.warnings)
+    warning_absent = not set(str(item) for item in warnings_unexpected) & set(
+        str(item) for item in profile.warnings
+    )
     metrics = {
         "required_skill_hit_rate": _hit_rate(
             expected.get("required_skills_should_include", []),
@@ -451,12 +471,26 @@ def _evaluate_service_jd_parser(
             profile.responsibilities,
         ),
         "role_category_match": role_match,
+        "hidden_requirement_hit_rate": _hit_rate(
+            expected.get("hidden_requirements_should_include", []),
+            hidden_text,
+        ),
+        "evidence_coverage": _hit_rate(expected_evidence_fields, evidence_fields),
+        "confidence_present": isinstance(profile.parse_confidence, int | float)
+        and profile.parse_confidence > 0,
+        "warning_expected_match": warning_hit_rate == 1.0 and warning_absent,
     }
     passed = (
         role_match
         and required_hits >= int(expected.get("minimum_required_skill_hits", 0))
         and preferred_hits >= int(expected.get("minimum_preferred_skill_hits", 0))
         and responsibility_hits >= int(expected.get("minimum_responsibility_hits", 0))
+        and metrics["hidden_requirement_hit_rate"]
+        >= float(expected.get("minimum_hidden_requirement_hit_rate", 0))
+        and metrics["evidence_coverage"]
+        >= float(expected.get("minimum_evidence_coverage", 0))
+        and metrics["confidence_present"]
+        and metrics["warning_expected_match"]
     )
     return _service_result(
         case=case,
@@ -503,6 +537,10 @@ def _evaluate_service_resume_parser(
         for flag in risk.risk_flags
         if getattr(flag, "type", "")
     ]
+    evidence_fields = [
+        str(item.get("field", "")) for item in structured.get("evidence", [])
+        if isinstance(item, dict)
+    ]
     metrics = {
         "section_hit_rate": _hit_rate(expected.get("sections_should_include", []), sections),
         "skill_hit_rate": _hit_rate(expected.get("skills_should_include", []), skills),
@@ -514,8 +552,16 @@ def _evaluate_service_resume_parser(
             expected.get("education_should_include", []),
             education_text,
         ),
-        "risk_flags_match": sorted(risk_types)
-        == sorted(str(item) for item in expected.get("risk_flags_expected", [])),
+        "risk_flag_hit_rate": _hit_rate(
+            expected.get("risk_flags_expected", []),
+            risk_types,
+        ),
+        "evidence_coverage": _hit_rate(
+            expected.get("evidence_fields_should_include", []),
+            evidence_fields,
+        ),
+        "confidence_present": isinstance(structured.get("parse_confidence"), int | float)
+        and structured.get("parse_confidence", 0) > 0,
     }
     passed = all(
         [
@@ -523,7 +569,10 @@ def _evaluate_service_resume_parser(
             metrics["skill_hit_rate"] == 1.0,
             metrics["project_hit_rate"] == 1.0,
             metrics["education_hit_rate"] == 1.0,
-            metrics["risk_flags_match"],
+            metrics["risk_flag_hit_rate"] == 1.0,
+            metrics["evidence_coverage"]
+            >= float(expected.get("minimum_evidence_coverage", 0)),
+            metrics["confidence_present"],
         ]
     )
     actual = {
@@ -532,7 +581,13 @@ def _evaluate_service_resume_parser(
         "skills": skill_values,
         "projects": structured.get("projects", []),
         "education": structured.get("education", []),
+        "experience": structured.get("experience", []),
         "risk_flags": risk_types,
+        "parser_risk_flags": structured.get("risk_flags", []),
+        "parse_confidence": structured.get("parse_confidence"),
+        "evidence": structured.get("evidence", []),
+        "warnings": structured.get("warnings", []),
+        "parser_metadata": structured.get("parser_metadata", {}),
         "extraction_method": parsed.extraction_method,
     }
     return _service_result(

@@ -4,11 +4,11 @@ from pathlib import Path
 import subprocess
 
 
-PROMPT_VERSION = "deterministic-v1"
-SCHEMA_VERSION = "v2.2"
+PROMPT_VERSION = "parser-foundation-v2.3"
+SCHEMA_VERSION = "v2.3"
 RETRIEVAL_VERSION = "local-vector-v1"
 MODEL_VERSION = "none"
-EVALUATION_VERSION = "v2.2"
+EVALUATION_VERSION = "v2.3"
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 

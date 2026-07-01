@@ -120,6 +120,46 @@ def test_fake_openai_compatible_llm_response_is_schema_validated(monkeypatch):
     assert result.confidence == 0.9
 
 
+def test_openai_compatible_llm_retries_transient_request_failure(monkeypatch):
+    calls = {"count": 0}
+
+    def flaky_urlopen(request, timeout):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise TimeoutError("synthetic timeout")
+        return _FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {"summary": "retry ok", "confidence": 0.8}
+                            )
+                        }
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", flaky_urlopen)
+    provider = OpenAICompatibleLLMProvider(
+        api_base_url="https://provider.example/v1",
+        api_key="sk-testsecret123456789",
+        model="synthetic-model",
+        timeout_seconds=3,
+        retry_count=1,
+    )
+
+    result = provider.generate_structured(
+        prompt="Return JSON only.",
+        schema=SyntheticLLMOutput,
+        max_output_length=200,
+    )
+
+    assert calls["count"] == 2
+    assert result.summary == "retry ok"
+
+
 def test_invalid_llm_json_fails_schema_validation(monkeypatch):
     monkeypatch.setattr(
         "urllib.request.urlopen",

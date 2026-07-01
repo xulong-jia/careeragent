@@ -25,9 +25,14 @@ def _next_profile_id(jd_id: str, profile_version: int) -> str:
     return f"profile_{jd_id}_{profile_version:04d}"
 
 
-def _to_job_profile(profile: JobProfileModel) -> JobProfile:
+def _to_job_profile(
+    profile: JobProfileModel, job: JobDescription | None = None
+) -> JobProfile:
     return JobProfile(
         job_profile_id=profile.id,
+        job_title=job.job_title if job else None,
+        company=job.company if job else None,
+        location=job.location if job else None,
         role_category=profile.role_category,
         required_skills=list(profile.required_skills or []),
         preferred_skills=list(profile.preferred_skills or []),
@@ -37,6 +42,10 @@ def _to_job_profile(profile: JobProfileModel) -> JobProfile:
         interview_focus=list(profile.interview_focus or []),
         risk_level=profile.risk_level,
         summary=profile.summary,
+        parse_confidence=float(profile.parse_confidence or 0.0),
+        evidence=list(profile.evidence or []),
+        warnings=list(profile.warnings or []),
+        parser_metadata=dict(profile.parser_metadata or {}),
     )
 
 
@@ -48,7 +57,7 @@ def _to_job_record(job: JobDescription, profile: JobProfileModel) -> JobRecord:
         location=job.location,
         raw_text_preview=safe_preview(job.raw_text, RAW_TEXT_PREVIEW_CHARS),
         source_url=job.source_url,
-        job_profile=_to_job_profile(profile),
+        job_profile=_to_job_profile(profile, job),
     )
 
 
@@ -93,6 +102,10 @@ def create_job_with_profile(
         interview_focus=profile.interview_focus,
         risk_level=profile.risk_level,
         summary=profile.summary,
+        parse_confidence=profile.parse_confidence,
+        evidence=profile.evidence,
+        warnings=profile.warnings,
+        parser_metadata=profile.parser_metadata,
     )
 
     try:

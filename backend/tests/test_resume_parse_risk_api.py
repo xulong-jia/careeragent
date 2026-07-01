@@ -47,6 +47,11 @@ def clean_structured_resume() -> dict[str, object]:
         },
         "certificates": [],
         "awards": [],
+        "risk_flags": [],
+        "parse_confidence": 0.9,
+        "evidence": [],
+        "warnings": [],
+        "parser_metadata": {"parser_version": "test"},
     }
 
 
@@ -80,12 +85,70 @@ def test_parse_existing_resume_success():
     structured = data["structured_resume"]
     assert data["resume_id"] == resume["resume_id"]
     assert data["source_version_id"].endswith("version_0001")
-    assert data["extraction_method"] == "deterministic_resume_parser_v1"
+    assert data["extraction_method"] == "deterministic_resume_parser_v2"
     assert "raw_text_preview" in data
     assert structured["basic_info"]["email"] == "candidate@example.com"
     assert structured["education"]
     assert structured["projects"]
     assert "FastAPI" in structured["skills"]["backend"]
+    assert structured["parse_confidence"] > 0
+    assert structured["evidence"]
+    assert structured["parser_metadata"]["foundation_only"] is True
+
+
+def test_parse_resume_uses_skill_section_before_project_only_tools():
+    client = make_client()
+    resume = upload_markdown_resume(
+        client,
+        "\n".join(
+            [
+                "Candidate Name",
+                "## Projects",
+                "Project: Platform Migration",
+                "Tech: Python, Kubernetes",
+                "Responsibilities: Built deployment checks",
+                "Evidence: checklist",
+                "## Skills",
+                "Python",
+            ]
+        ),
+    )
+
+    response = client.post(f"/api/resumes/{resume['resume_id']}/parse")
+
+    assert response.status_code == 200
+    structured = get_data(response)["structured_resume"]
+    assert "Python" in structured["skills"]["programming"]
+    assert "Kubernetes" not in structured["skills"]["tools"]
+    risk_types = {flag["type"] for flag in structured["risk_flags"]}
+    assert "fabricated_skill" in risk_types
+
+
+def test_parse_resume_detects_ambiguous_and_low_confidence_sections():
+    client = make_client()
+    resume = upload_markdown_resume(
+        client,
+        "\n".join(
+            [
+                "Ambiguous Candidate",
+                "Experience",
+                "Project: Ambiguous Platform",
+                "Period: 2024-05 to 2024-02",
+                "Tech: Python",
+                "Skills",
+                "Python",
+            ]
+        ),
+    )
+
+    response = client.post(f"/api/resumes/{resume['resume_id']}/parse")
+
+    assert response.status_code == 200
+    structured = get_data(response)["structured_resume"]
+    assert "ambiguous_section_project_inside_experience" in structured["warnings"]
+    risk_types = {flag["type"] for flag in structured["risk_flags"]}
+    assert "ambiguous_section" in risk_types
+    assert "timeline_conflict" in risk_types
 
 
 def test_parse_specific_version_success():

@@ -155,7 +155,7 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 | Method | Path | 说明 |
 | --- | --- | --- |
 | POST | `/api/resumes/upload` | 上传 `.pdf` / `.docx` / `.md` / `.markdown` / `.txt` 并提取文本 |
-| POST | `/api/resumes/{resume_id}/parse` | deterministic parse，返回结构化简历候选结果 |
+| POST | `/api/resumes/{resume_id}/parse` | parser foundation parse，返回结构化简历候选结果 |
 | POST | `/api/resumes/{resume_id}/risk-check` | deterministic risk-check，不修改数据库 |
 | POST | `/api/resumes/{resume_id}/versions` | 保存用户确认后的 structured resume version |
 | GET | `/api/resumes` | 查询 resume 列表 |
@@ -172,11 +172,13 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 - `risk_flags`
 - `risk_report`
 
+`structured_resume` 在 2.3 后包含 `risk_flags`、`parse_confidence`、`evidence`、`warnings` 和 `parser_metadata`。默认 parser 是 local deterministic foundation；optional LLM parser 需要显式配置真实 provider。
+
 隐私边界：Resume / Resume Version 默认 API response 不返回完整 `raw_text`。后端仍在本地 DB 保存 raw_text，用于 parse、risk-check 和保存 confirmed version；前端默认只展示短 `raw_text_preview`。`DELETE /api/resumes/{resume_id}` 是本地 prototype 的软删除/归档策略，不代表生产级不可恢复删除证明。
 
 前端流程：Resume Center 会先调用 parse 生成可编辑 `structured_resume`，再用编辑后的 JSON 调用 risk-check，最后把 `structured_resume`、`risk_report`、`version_name`、`target_role` 和 `source_version_id` 提交到保存版本 API。risk-check 不会自动修改简历。
 
-解析边界：PDF 使用文本层提取，DOCX 使用文档文本提取，Markdown / txt 使用 UTF-8 文本读取；当前不做 OCR，不接真实 LLM parser。risk-check 只做 unsupported metric、fabricated skill、timeline conflict、missing evidence、overclaim 等确定性规则检测，不是事实审计。
+解析边界：PDF 使用文本层提取，DOCX 使用文档文本提取，Markdown / txt 使用 UTF-8 文本读取；当前不做 OCR，optional LLM parser 不是默认生产路径。risk-check 只做 unsupported metric、fabricated skill、timeline conflict、missing evidence、overclaim 等确定性规则检测，不是事实审计。
 
 ## Resume Version APIs
 
@@ -200,7 +202,7 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| POST | `/api/jobs` | 创建 JD 和 deterministic job profile |
+| POST | `/api/jobs` | 创建 JD 和 parser foundation job profile |
 | GET | `/api/jobs` | 查询 JD 列表 |
 | GET | `/api/jobs/{jd_id}` | 查询 JD detail |
 | DELETE | `/api/jobs/{jd_id}` | 归档 JD；默认列表/详情不再返回 |
@@ -212,9 +214,14 @@ v0.9 final handoff 的 Project Optimization API surface 以本节为准：Projec
 - `job_title`
 - `raw_text_preview`
 - `job_profile.required_skills`
+- `job_profile.preferred_skills`
 - `job_profile.role_category`
+- `job_profile.parse_confidence`
+- `job_profile.evidence`
+- `job_profile.warnings`
+- `job_profile.parser_metadata`
 
-隐私边界：JD 创建请求仍接收 `raw_text` 以生成 deterministic job profile；创建、列表和详情 response 默认只返回短 `raw_text_preview`，不返回完整 JD raw_text。归档 JD 不会删除历史 Application / Match refs。
+隐私边界：JD 创建请求仍接收 `raw_text` 以生成 parser foundation profile；创建、列表和详情 response 默认只返回短 `raw_text_preview`，不返回完整 JD raw_text。归档 JD 不会删除历史 Application / Match refs。
 
 ## Match APIs
 

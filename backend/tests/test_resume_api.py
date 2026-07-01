@@ -48,7 +48,7 @@ def test_resume_upload_accepts_supported_file_and_returns_parsed_result():
     assert "raw_text" not in data
     assert "PDF Candidate" in data["raw_text_preview"]
     assert "FastAPI" in data["structured_resume"]["skills"]["backend"]
-    assert data["risk_flags"] == []
+    assert {flag["type"] for flag in data["risk_flags"]} == {"parse_low_confidence"}
 
 
 def test_resume_upload_rejects_unsupported_file_type():

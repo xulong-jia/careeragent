@@ -1,8 +1,8 @@
 # CareerAgent Evaluation
 
-This document is the stable entrypoint for the deterministic evaluation regression foundation, version/privacy governance additions, and Phase 2.1/2.2 service-level evaluation foundation. The detailed design remains in `docs/evaluation-design.md`.
+This document is the stable entrypoint for the deterministic evaluation regression foundation, version/privacy governance additions, and Phase 2.1/2.2/2.3 service-level evaluation foundation. The detailed design remains in `docs/evaluation-design.md`.
 
-Phase 2.2 status: CareerAgent now has both synthetic contract regression and service-level evaluation foundation. RAG service-level cases cover lexical/vector/hybrid/no-evidence behavior. This is still not a production-quality benchmark.
+Phase 2.3 status: CareerAgent now has both synthetic contract regression and service-level evaluation foundation. RAG service-level cases cover lexical/vector/hybrid/no-evidence behavior; parser service-level cases cover JD/Resume evidence, confidence, warnings, and risk flags. This is still not a production-quality benchmark.
 
 ## Scope
 
@@ -30,7 +30,7 @@ Synthetic evaluation is deterministic contract regression only. It is not a real
 
 Service-level evaluation uses de-identified JD, resume, match, RAG, and agent workflow cases. The runner calls actual current services or runner paths instead of constructing `actual` in the script. Current service-level failures are quality signals, not something to hide.
 
-Current service-level evaluation still runs deterministic/mock modules. A pass does not mean parser, RAG, match, or agent production quality.
+Current service-level evaluation still runs foundation modules. A pass does not mean parser, RAG, match, or agent production quality.
 
 ## v1.5C Governance Additions
 
@@ -51,3 +51,10 @@ Current service-level evaluation still runs deterministic/mock modules. A pass d
 - RAG service-level cases include `retrieval_mode` and cover `lexical`, `vector`, `hybrid`, and no-evidence refusal.
 - RAG metrics add `retrieval_mode_match`, `average_top_score`, `vector_index_used`, and `uncertainty_match`.
 - RAG vector/hybrid eval checks the local persisted-vector path; it is not a final semantic embedding benchmark.
+
+## Phase 2.3 Parser Additions
+
+- JD parser service-level cases increased to 12 and cover required/preferred skills, role category, responsibilities, hidden requirements, evidence, confidence, and warnings.
+- Resume parser service-level cases increased to 8 and cover section parsing, skill categories, projects, education, risk flags, evidence, confidence, ambiguous sections, and low-confidence text.
+- Parser eval metrics add `evidence_coverage`, `confidence_present`, `warning_expected_match`, `hidden_requirement_hit_rate`, and `risk_flag_hit_rate`.
+- Parser eval uses local deterministic parser foundation by default; optional LLM provider runs are not required for tests and are not production-quality benchmark evidence.

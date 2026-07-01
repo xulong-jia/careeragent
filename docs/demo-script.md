@@ -101,8 +101,8 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 ### JD Center
 
 1. 创建 synthetic JD。
-2. 查看 deterministic job profile。
-3. 确认 required skills、role category、interview focus。
+2. 查看 parser foundation job profile。
+3. 确认 required / preferred skills、role category、evidence、confidence、warnings 和 interview focus。
 
 ### Match Report
 

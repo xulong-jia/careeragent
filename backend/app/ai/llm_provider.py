@@ -13,6 +13,7 @@ from app.core.errors import AppError
 
 
 T = TypeVar("T", bound=BaseModel)
+DEFAULT_RETRY_COUNT = 1
 
 
 class DeterministicLLMProvider:
@@ -41,11 +42,13 @@ class OpenAICompatibleLLMProvider:
         api_key: str,
         model: str,
         timeout_seconds: float,
+        retry_count: int = DEFAULT_RETRY_COUNT,
     ) -> None:
         self.api_base_url = api_base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.timeout_seconds = timeout_seconds
+        self.retry_count = retry_count
 
     def generate_structured(
         self,
@@ -74,15 +77,22 @@ class OpenAICompatibleLLMProvider:
             },
             method="POST",
         )
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except (TimeoutError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        last_exc: Exception | None = None
+        for _attempt in range(self.retry_count + 1):
+            try:
+                with urllib.request.urlopen(
+                    request, timeout=self.timeout_seconds
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                break
+            except (TimeoutError, urllib.error.URLError, json.JSONDecodeError) as exc:
+                last_exc = exc
+        else:
             raise AppError(
                 code="ai_provider_request_failed",
                 message="LLM provider request failed.",
                 status_code=502,
-            ) from exc
+            ) from last_exc
 
         content = _extract_openai_content(payload)
         if len(content) > max_output_length:

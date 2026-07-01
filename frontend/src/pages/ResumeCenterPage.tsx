@@ -342,7 +342,7 @@ export function ResumeCenterPage({
       <div className="page-heading">
         <p className="eyebrow">Resume</p>
         <h2 id="resume-title">Resume Center</h2>
-        <p>PDF / DOCX / Markdown / txt 会真实提取文本；deterministic parse、risk-check 和 confirmed version 保存来自 DB-backed API。</p>
+        <p>PDF / DOCX / Markdown / txt 会真实提取文本；parser foundation、risk-check 和 confirmed version 保存来自 DB-backed API。</p>
       </div>
 
       <div className="two-column wide-left">

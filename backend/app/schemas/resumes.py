@@ -18,6 +18,11 @@ class StructuredResume(BaseModel):
     skills: dict[str, list[str]] = Field(default_factory=dict)
     certificates: list[dict[str, object]] = Field(default_factory=list)
     awards: list[dict[str, object]] = Field(default_factory=list)
+    risk_flags: list[dict[str, object]] = Field(default_factory=list)
+    parse_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence: list[dict[str, object]] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    parser_metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class ResumeRecord(BaseModel):

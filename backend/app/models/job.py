@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -55,6 +55,10 @@ class JobProfile(Base):
     interview_focus: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     risk_level: Mapped[str] = mapped_column(String(40), default="low", nullable=False)
     summary: Mapped[str | None] = mapped_column(Text)
+    parse_confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    evidence: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    warnings: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    parser_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )

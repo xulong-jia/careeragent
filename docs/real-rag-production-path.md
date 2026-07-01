@@ -88,4 +88,4 @@ RAG metrics include:
 - Benchmark remains small.
 - `raw_text` and chunk `text` remain plaintext DB fields; 2.6 must address encryption, retention, deletion proof, backup policy, and audit hardening.
 
-Next phase: 2.3 Real JD Parser + Resume Parser.
+Next phase: 2.4 Trustworthy Match Scoring + Project Rewrite.

@@ -15,7 +15,9 @@
         "skills_should_include": ["Python", "FastAPI", "SQL", "Docker"],
         "projects_should_include": ["API Reliability Workbench"],
         "education_should_include": ["Example University", "Master"],
-        "risk_flags_expected": ["unsupported_metric", "missing_evidence"]
+        "risk_flags_expected": ["unsupported_metric", "missing_evidence"],
+        "evidence_fields_should_include": ["education", "projects", "skills.programming", "skills.backend"],
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
@@ -31,55 +33,117 @@
         "skills_should_include": ["Python", "RAG", "LLM", "OpenAI", "PostgreSQL"],
         "projects_should_include": ["Document Grounding Assistant"],
         "education_should_include": ["Example University", "Bachelor"],
-        "risk_flags_expected": ["unsupported_metric", "missing_evidence"]
+        "risk_flags_expected": ["unsupported_metric", "missing_evidence"],
+        "evidence_fields_should_include": ["education", "projects", "skills.programming", "skills.ai"],
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
       "case_id": "resume_service_003",
       "module": "resume_parser",
       "input": {
-        "filename": "frontend_candidate.md",
+        "filename": "project_heavy_candidate.md",
         "file_type": "md",
-        "raw_text": "Frontend Candidate\nLocation: Brisbane\n\nEducation\nExample Institute | Bachelor of Software Design | Major: Interaction Systems | 2020-02 to 2023-11\n\nProjects\nProject: Hiring Dashboard UI\nRole: Frontend Developer\nPeriod: 2023-07 to 2023-12\nTech: TypeScript, React, HTML, CSS\nResponsibilities: Built responsive workflow panels and API error states\nResults: Improved task completion in synthetic usability review\n\nSkills\nTypeScript, React, HTML, CSS, Git"
+        "raw_text": "Project Heavy Candidate\nLocation: Brisbane\n\nEducation\nExample Institute | Bachelor of Software Design | Major: Interaction Systems | 2020-02 to 2023-11\n\nProjects\nProject: Hiring Dashboard UI\nRole: Frontend Developer\nPeriod: 2023-07 to 2023-12\nTech: TypeScript, React, HTML, CSS\nResponsibilities: Built responsive workflow panels and API error states\nResults: Simplified synthetic reviewer handoff\n\nProject: Component State Library\nRole: UI Developer\nPeriod: 2023-01 to 2023-04\nTech: TypeScript, React\nResponsibilities: Designed reusable controls\nEvidence: reviewed component checklist\n\nSkills\nTypeScript, React, HTML, CSS, Git"
       },
       "expected": {
         "sections_should_include": ["education", "projects", "skills"],
         "skills_should_include": ["TypeScript", "React", "HTML", "CSS"],
-        "projects_should_include": ["Hiring Dashboard UI"],
+        "projects_should_include": ["Hiring Dashboard UI", "Component State Library"],
         "education_should_include": ["Example Institute", "Bachelor"],
-        "risk_flags_expected": ["unsupported_metric", "missing_evidence"]
+        "risk_flags_expected": ["missing_evidence"],
+        "evidence_fields_should_include": ["education", "projects", "skills.programming", "skills.frontend"],
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
       "case_id": "resume_service_004",
       "module": "resume_parser",
       "input": {
-        "filename": "data_candidate.txt",
+        "filename": "internship_project_candidate.txt",
         "file_type": "txt",
-        "raw_text": "Data Candidate\nLocation: Adelaide\n\nEducation\nExample University | Master of Data Analytics | Major: Analytics Engineering | 2023-02 to 2024-11\n\nProjects\nProject: SQL Quality Monitor\nRole: Data Platform Intern\nPeriod: 2024-04 to 2024-09\nTech: Python, SQL, PostgreSQL, Docker\nResponsibilities: Created validation jobs for reporting tables\nResults: Flagged stale records in synthetic data checks\n\nSkills\nPython, SQL, PostgreSQL, Docker, Linux"
+        "raw_text": "Data Candidate\nLocation: Adelaide\n\nEducation\nExample University | Master of Data Analytics | Major: Analytics Engineering | 2023-02 to 2024-11\n\nExperience\nCompany: Example Analytics Studio\nRole: Data Platform Intern\nPeriod: 2024-04 to 2024-09\nResponsibilities: Maintained SQL validation jobs and dashboard refresh checks\n\nProjects\nProject: SQL Quality Monitor\nRole: Data Platform Intern\nPeriod: 2024-04 to 2024-09\nTech: Python, SQL, PostgreSQL, Docker\nResponsibilities: Created validation jobs for reporting tables\nResults: Flagged stale records in synthetic data checks\nEvidence: de-identified QA checklist\n\nSkills\nPython, SQL, PostgreSQL, Docker, Linux"
       },
       "expected": {
-        "sections_should_include": ["education", "projects", "skills"],
+        "sections_should_include": ["education", "projects", "experience", "skills"],
         "skills_should_include": ["Python", "SQL", "PostgreSQL", "Docker"],
         "projects_should_include": ["SQL Quality Monitor"],
         "education_should_include": ["Example University", "Master"],
-        "risk_flags_expected": ["missing_evidence"]
+        "risk_flags_expected": [],
+        "evidence_fields_should_include": ["education", "projects", "experience", "skills.programming", "skills.database"],
+        "minimum_evidence_coverage": 1.0
       }
     },
     {
       "case_id": "resume_service_005",
       "module": "resume_parser",
       "input": {
-        "filename": "fullstack_candidate.md",
+        "filename": "bilingual_candidate.md",
         "file_type": "md",
-        "raw_text": "Fullstack Candidate\nLocation: Perth\n\nEducation\nExample College | Bachelor of Information Systems | Major: Web Engineering | 2020-02 to 2023-11\n\nProjects\nProject: Application Tracker\nRole: Fullstack Developer\nPeriod: 2023-03 to 2023-10\nTech: TypeScript, React, Python, FastAPI, SQLite\nResponsibilities: Built application board APIs and frontend filters\nResults: Simplified synthetic application tracking reviews\n\nSkills\nTypeScript, React, Python, FastAPI, SQLite"
+        "raw_text": "双语候选人\nLocation: Perth\n\n教育背景\nExample College | Bachelor of Information Systems | Major: Web Engineering | 2020-02 to 2023-11\n\n项目经历\nProject: Application Tracker\nRole: Fullstack Developer\nPeriod: 2023-03 to 2023-10\nTech: TypeScript, React, Python, FastAPI, SQLite\nResponsibilities: Built application board APIs and frontend filters\nResults: Simplified synthetic application tracking reviews\n\n技能\nTypeScript, React, Python, FastAPI, SQLite"
       },
       "expected": {
         "sections_should_include": ["education", "projects", "skills"],
         "skills_should_include": ["TypeScript", "React", "Python", "FastAPI", "SQLite"],
         "projects_should_include": ["Application Tracker"],
         "education_should_include": ["Example College", "Bachelor"],
-        "risk_flags_expected": ["missing_evidence"]
+        "risk_flags_expected": ["missing_evidence"],
+        "evidence_fields_should_include": ["education", "projects", "skills.programming", "skills.backend", "skills.frontend"],
+        "minimum_evidence_coverage": 1.0
+      }
+    },
+    {
+      "case_id": "resume_service_006",
+      "module": "resume_parser",
+      "input": {
+        "filename": "metric_risk_candidate.txt",
+        "file_type": "txt",
+        "raw_text": "Metric Risk Candidate\nLocation: Canberra\n\nEducation\nExample University | Bachelor of Computer Science | 2021-02 to 2024-11\n\nProjects\nProject: Production Claim API\nRole: Backend Developer\nPeriod: 2024-01 to 2024-05\nTech: Python, FastAPI, SQL\nResponsibilities: Built internal workflow APIs\nResults: Launched production platform for 1 million users and improved accuracy by 35%\n\nSkills\nPython, FastAPI, SQL"
+      },
+      "expected": {
+        "sections_should_include": ["education", "projects", "skills"],
+        "skills_should_include": ["Python", "FastAPI", "SQL"],
+        "projects_should_include": ["Production Claim API"],
+        "education_should_include": ["Example University", "Bachelor"],
+        "risk_flags_expected": ["unsupported_metric", "overclaim", "missing_evidence"],
+        "evidence_fields_should_include": ["education", "projects", "skills.programming", "skills.backend"],
+        "minimum_evidence_coverage": 1.0
+      }
+    },
+    {
+      "case_id": "resume_service_007",
+      "module": "resume_parser",
+      "input": {
+        "filename": "ambiguous_section_candidate.md",
+        "file_type": "md",
+        "raw_text": "Ambiguous Candidate\nLocation: Hobart\n\nExperience\nProject: Ambiguous Platform\nRole: Developer\nPeriod: 2024-05 to 2024-02\nTech: Python, Docker\nResponsibilities: Built unclear project or internship work\n\nSkills\nPython, Docker"
+      },
+      "expected": {
+        "sections_should_include": ["experience", "skills"],
+        "skills_should_include": ["Python", "Docker"],
+        "projects_should_include": [],
+        "education_should_include": [],
+        "risk_flags_expected": ["ambiguous_section", "timeline_conflict"],
+        "evidence_fields_should_include": ["experience", "skills.programming", "skills.tools"],
+        "minimum_evidence_coverage": 1.0
+      }
+    },
+    {
+      "case_id": "resume_service_008",
+      "module": "resume_parser",
+      "input": {
+        "filename": "low_confidence_candidate.txt",
+        "file_type": "txt",
+        "raw_text": "Candidate\nNeed job.\nPython"
+      },
+      "expected": {
+        "sections_should_include": [],
+        "skills_should_include": ["Python"],
+        "projects_should_include": [],
+        "education_should_include": [],
+        "risk_flags_expected": ["parse_low_confidence"],
+        "evidence_fields_should_include": ["skills.programming"],
+        "minimum_evidence_coverage": 1.0
       }
     }
   ]
