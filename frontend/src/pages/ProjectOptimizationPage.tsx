@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 
 import {
+  AllResumeVersionSelector,
+  JDSelector,
+  MatchReportSelector,
+  ProfileSelector,
+} from "../components/EntitySelectors";
+import {
   createProject,
   getProject,
   listProjects,
@@ -344,7 +350,7 @@ export function ProjectOptimizationPage({
       return;
     }
     if (!rewriteForm.jdId.trim()) {
-      setPageError("JD ID is required for rewrite.");
+      setPageError("JD is required for rewrite.");
       return;
     }
     setRewriteLoading(true);
@@ -446,30 +452,28 @@ export function ProjectOptimizationPage({
                   value={projectForm.period}
                 />
               </label>
-              <label>
-                Profile ID optional
-                <input
-                  onChange={(event) =>
-                    setProjectForm((current) => ({
-                      ...current,
-                      profileId: event.target.value,
-                    }))
-                  }
-                  value={projectForm.profileId}
-                />
-              </label>
-              <label>
-                Resume Version ID optional
-                <input
-                  onChange={(event) =>
-                    setProjectForm((current) => ({
-                      ...current,
-                      resumeVersionId: event.target.value,
-                    }))
-                  }
-                  value={projectForm.resumeVersionId}
-                />
-              </label>
+              <ProfileSelector
+                emptyText="No profile binding"
+                label="Profile"
+                onChange={(value) =>
+                  setProjectForm((current) => ({
+                    ...current,
+                    profileId: value,
+                  }))
+                }
+                value={projectForm.profileId}
+              />
+              <AllResumeVersionSelector
+                emptyText="No resume version binding"
+                label="Resume Version"
+                onChange={(value) =>
+                  setProjectForm((current) => ({
+                    ...current,
+                    resumeVersionId: value,
+                  }))
+                }
+                value={projectForm.resumeVersionId}
+              />
             </div>
             <label>
               Background
@@ -613,7 +617,7 @@ export function ProjectOptimizationPage({
           {selectedProject ? (
             <div className="project-detail">
               <div className="readonly-grid">
-                <span>ID: {selectedProject.id}</span>
+                <span>Project ref: {selectedProject.id}</span>
                 <span>Status: {selectedProject.status}</span>
                 <span>Profile: {selectedProject.profile_id ?? "None"}</span>
                 <span>
@@ -657,55 +661,51 @@ export function ProjectOptimizationPage({
             </span>
           </div>
           <div className="form-stack">
-            <label>
-              JD ID required
-              <input
-                onChange={(event) =>
+            <div className="filter-grid">
+              <JDSelector
+                emptyText="Select JD for rewrite"
+                label="JD"
+                onChange={(value) =>
                   setRewriteForm((current) => ({
                     ...current,
-                    jdId: event.target.value,
+                    jdId: value,
                   }))
                 }
                 value={rewriteForm.jdId}
               />
-            </label>
-            <div className="filter-grid">
-              <label>
-                Resume Version ID optional
-                <input
-                  onChange={(event) =>
-                    setRewriteForm((current) => ({
-                      ...current,
-                      resumeVersionId: event.target.value,
-                    }))
-                  }
-                  value={rewriteForm.resumeVersionId}
-                />
-              </label>
-              <label>
-                Match Report ID optional
-                <input
-                  onChange={(event) =>
-                    setRewriteForm((current) => ({
-                      ...current,
-                      matchReportId: event.target.value,
-                    }))
-                  }
-                  value={rewriteForm.matchReportId}
-                />
-              </label>
-              <label>
-                Profile ID optional
-                <input
-                  onChange={(event) =>
-                    setRewriteForm((current) => ({
-                      ...current,
-                      profileId: event.target.value,
-                    }))
-                  }
-                  value={rewriteForm.profileId}
-                />
-              </label>
+              <AllResumeVersionSelector
+                emptyText="No resume version context"
+                label="Resume Version"
+                onChange={(value) =>
+                  setRewriteForm((current) => ({
+                    ...current,
+                    resumeVersionId: value,
+                  }))
+                }
+                value={rewriteForm.resumeVersionId}
+              />
+              <MatchReportSelector
+                emptyText="No match report context"
+                label="Match Report"
+                onChange={(value) =>
+                  setRewriteForm((current) => ({
+                    ...current,
+                    matchReportId: value,
+                  }))
+                }
+                value={rewriteForm.matchReportId}
+              />
+              <ProfileSelector
+                emptyText="No profile context"
+                label="Profile"
+                onChange={(value) =>
+                  setRewriteForm((current) => ({
+                    ...current,
+                    profileId: value,
+                  }))
+                }
+                value={rewriteForm.profileId}
+              />
             </div>
             <button
               className="primary-action"
@@ -864,7 +864,7 @@ export function ProjectOptimizationPage({
         ) : (
           <div className="empty-state compact">
             <strong>No rewrite result</strong>
-            <span>Select a project and provide a JD ID to run rewrite.</span>
+            <span>Select a project and JD to run rewrite.</span>
           </div>
         )}
       </article>

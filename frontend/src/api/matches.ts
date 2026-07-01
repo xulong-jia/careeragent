@@ -11,13 +11,27 @@ type MatchListFilters = {
   resumeVersionId?: string;
 };
 
-export function runMatch(resumeId: string, jdId: string): Promise<MatchReport> {
+type MatchRunPayload = {
+  jdId: string;
+  resumeId?: string | null;
+  resumeVersionId?: string | null;
+};
+
+export function runMatch({
+  jdId,
+  resumeId,
+  resumeVersionId,
+}: MatchRunPayload): Promise<MatchReport> {
   return requestJson<MatchReport>("/api/matches/run", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ resume_id: resumeId, jd_id: jdId }),
+    body: JSON.stringify({
+      jd_id: jdId,
+      resume_id: resumeId ?? null,
+      resume_version_id: resumeVersionId ?? null,
+    }),
   });
 }
 

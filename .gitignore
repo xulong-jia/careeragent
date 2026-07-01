@@ -5,6 +5,7 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 .coverage
+coverage/
 htmlcov/
 *.egg-info/
 
@@ -18,6 +19,9 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+playwright-report/
+test-results/
+.nyc_output/
 
 # Environment and secrets
 .env

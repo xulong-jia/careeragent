@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 
 import {
+  AllResumeVersionSelector,
+  JDSelector,
+  ProjectSelector,
+  RagAnswerRunSelector,
+} from "../components/EntitySelectors";
+import {
   generateInterviewQuestions,
   listInterviewAnswers,
   listInterviewQuestions,
@@ -191,7 +197,7 @@ export function InterviewCenterPage() {
 
   const generateValidationError =
     !generateForm.jdId.trim() || !generateForm.resumeVersionId.trim()
-      ? "JD ID and Resume Version ID are required."
+      ? "JD and Resume Version are required."
       : null;
   const answerValidationError =
     selectedQuestion && !answerText.trim() ? "Answer text is required." : null;
@@ -387,67 +393,50 @@ export function InterviewCenterPage() {
           </div>
           <div className="form-stack">
             <div className="filter-grid">
-              <label>
-                JD ID required
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      jdId: event.target.value,
-                    }))
-                  }
-                  value={generateForm.jdId}
-                />
-              </label>
-              <label>
-                Resume Version ID required
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      resumeVersionId: event.target.value,
-                    }))
-                  }
-                  value={generateForm.resumeVersionId}
-                />
-              </label>
-              <label>
-                Project ID optional
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      projectId: event.target.value,
-                    }))
-                  }
-                  value={generateForm.projectId}
-                />
-              </label>
-              <label>
-                Project Rewrite ID optional
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      projectRewriteId: event.target.value,
-                    }))
-                  }
-                  value={generateForm.projectRewriteId}
-                />
-              </label>
-              <label>
-                RAG Answer Run IDs optional
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      ragAnswerRunIds: event.target.value,
-                    }))
-                  }
-                  placeholder="rag_answer_run_..."
-                  value={generateForm.ragAnswerRunIds}
-                />
-              </label>
+              <JDSelector
+                emptyText="Select JD"
+                label="JD"
+                onChange={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    jdId: value,
+                  }))
+                }
+                value={generateForm.jdId}
+              />
+              <AllResumeVersionSelector
+                emptyText="Select resume version"
+                label="Resume Version"
+                onChange={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    resumeVersionId: value,
+                  }))
+                }
+                value={generateForm.resumeVersionId}
+              />
+              <ProjectSelector
+                emptyText="No project context"
+                label="Project"
+                onChange={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    projectId: value,
+                  }))
+                }
+                value={generateForm.projectId}
+              />
+              <RagAnswerRunSelector
+                emptyText="No RAG answer context"
+                label="RAG Answer"
+                onChange={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    ragAnswerRunIds: value,
+                  }))
+                }
+                value={generateForm.ragAnswerRunIds}
+              />
               <label>
                 Question types optional
                 <input
@@ -475,6 +464,22 @@ export function InterviewCenterPage() {
                 />
               </label>
             </div>
+            <details className="json-details">
+              <summary>Advanced refs</summary>
+              <label>
+                Project Rewrite ref
+                <input
+                  onChange={(event) =>
+                    setGenerateForm((current) => ({
+                      ...current,
+                      projectRewriteId: event.target.value,
+                    }))
+                  }
+                  placeholder="optional rewrite ref"
+                  value={generateForm.projectRewriteId}
+                />
+              </label>
+            </details>
             <button
               className="primary-action"
               disabled={!canGenerate}
@@ -524,42 +529,39 @@ export function InterviewCenterPage() {
           </div>
           <div className="form-stack">
             <div className="filter-grid single">
-              <label>
-                JD ID
-                <input
-                  onChange={(event) =>
-                    setQuestionFilters((current) => ({
-                      ...current,
-                      jdId: event.target.value,
-                    }))
-                  }
-                  value={questionFilters.jdId}
-                />
-              </label>
-              <label>
-                Resume Version ID
-                <input
-                  onChange={(event) =>
-                    setQuestionFilters((current) => ({
-                      ...current,
-                      resumeVersionId: event.target.value,
-                    }))
-                  }
-                  value={questionFilters.resumeVersionId}
-                />
-              </label>
-              <label>
-                Project ID
-                <input
-                  onChange={(event) =>
-                    setQuestionFilters((current) => ({
-                      ...current,
-                      projectId: event.target.value,
-                    }))
-                  }
-                  value={questionFilters.projectId}
-                />
-              </label>
+              <JDSelector
+                emptyText="All JDs"
+                label="JD"
+                onChange={(value) =>
+                  setQuestionFilters((current) => ({
+                    ...current,
+                    jdId: value,
+                  }))
+                }
+                value={questionFilters.jdId}
+              />
+              <AllResumeVersionSelector
+                emptyText="All resume versions"
+                label="Resume Version"
+                onChange={(value) =>
+                  setQuestionFilters((current) => ({
+                    ...current,
+                    resumeVersionId: value,
+                  }))
+                }
+                value={questionFilters.resumeVersionId}
+              />
+              <ProjectSelector
+                emptyText="All projects"
+                label="Project"
+                onChange={(value) =>
+                  setQuestionFilters((current) => ({
+                    ...current,
+                    projectId: value,
+                  }))
+                }
+                value={questionFilters.projectId}
+              />
               <label>
                 Question type
                 <select

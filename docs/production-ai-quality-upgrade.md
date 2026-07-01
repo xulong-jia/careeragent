@@ -21,6 +21,10 @@ foundation. It does not certify production-ready AI.
   RAG answer, match, project rewrite, and agent workflow.
 - Added human-review/calibration utilities for human agreement, score stability,
   bad-case candidate conversion, and bad-case regression trend.
+- v3.3 frontend exposes retrieval mode and answer mode selectors in Knowledge
+  Base and routes RAG answer refs through selectors in Interview, Study Plan and
+  Agent flows. This is UX/productization only; it does not certify real provider
+  quality.
 
 ## Commands
 
@@ -76,5 +80,6 @@ eval outputs from private data.
   retrieval remains a production path to validate under real providers.
 - OCR remains unsupported; v3.2 only adds explicit OCR provider boundary and
   layout signals.
-- v3.3 frontend productization and v3.4 final read-only production readiness
-  certification are still required before any production-ready tag.
+- v3.3 frontend productization foundation is now present, but mocked E2E is not
+  browser certification. v3.4 final read-only production readiness
+  certification is still required before any production-ready tag.

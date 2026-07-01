@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 
 import {
+  AgentRunSelector,
+  AllResumeVersionSelector,
+  JDSelector,
+  MatchReportSelector,
+} from "../components/EntitySelectors";
+import {
   createApplication,
   deleteApplication,
   getApplication,
@@ -109,6 +115,16 @@ function formatCsv(values: string[]) {
 
 function statusClass(status: string) {
   return `status-pill status-${status.replace(/_/g, "-")}`;
+}
+
+function refSummary(application: ApplicationRecord) {
+  const linked = [
+    application.jd_id ? "JD" : null,
+    application.resume_version_id ? "Resume" : null,
+    application.match_report_id ? "Match" : null,
+    application.agent_run_id ? "Agent" : null,
+  ].filter(Boolean);
+  return linked.length ? `${linked.join(", ")} linked` : "No linked refs";
 }
 
 function initialFormState(): ApplicationFormState {
@@ -703,58 +719,50 @@ export function ApplicationTrackerPage({
               </label>
             </div>
             <div className="filter-grid">
-              <label>
-                JD ID
-                <input
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      jdId: event.target.value,
-                    }))
-                  }
-                  placeholder="required jd_0001"
-                  value={formState.jdId}
-                />
-              </label>
-              <label>
-                Resume Version ID
-                <input
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      resumeVersionId: event.target.value,
-                    }))
-                  }
-                  placeholder="required resume_0001_version_0001"
-                  value={formState.resumeVersionId}
-                />
-              </label>
-              <label>
-                Match Report ID
-                <input
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      matchReportId: event.target.value,
-                    }))
-                  }
-                  placeholder="optional match_0001"
-                  value={formState.matchReportId}
-                />
-              </label>
-              <label>
-                Agent Run ID
-                <input
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      agentRunId: event.target.value,
-                    }))
-                  }
-                  placeholder="optional agent_run_0001"
-                  value={formState.agentRunId}
-                />
-              </label>
+              <JDSelector
+                emptyText="Select JD"
+                label="JD"
+                onChange={(value) =>
+                  setFormState((current) => ({
+                    ...current,
+                    jdId: value,
+                  }))
+                }
+                value={formState.jdId}
+              />
+              <AllResumeVersionSelector
+                emptyText="Select resume version"
+                label="Resume Version"
+                onChange={(value) =>
+                  setFormState((current) => ({
+                    ...current,
+                    resumeVersionId: value,
+                  }))
+                }
+                value={formState.resumeVersionId}
+              />
+              <MatchReportSelector
+                emptyText="No match report"
+                label="Match Report"
+                onChange={(value) =>
+                  setFormState((current) => ({
+                    ...current,
+                    matchReportId: value,
+                  }))
+                }
+                value={formState.matchReportId}
+              />
+              <AgentRunSelector
+                emptyText="No agent run"
+                label="Agent Run"
+                onChange={(value) =>
+                  setFormState((current) => ({
+                    ...current,
+                    agentRunId: value,
+                  }))
+                }
+                value={formState.agentRunId}
+              />
             </div>
             <label>
               Notes
@@ -885,58 +893,50 @@ export function ApplicationTrackerPage({
                   value={filters.roleCategory ?? ""}
                 />
               </label>
-              <label>
-                JD ID
-                <input
-                  onChange={(event) =>
-                    setFilters((current) => ({
-                      ...current,
-                      jdId: event.target.value,
-                    }))
-                  }
-                  placeholder="optional jd_0001"
-                  value={filters.jdId ?? ""}
-                />
-              </label>
-              <label>
-                Resume Version ID
-                <input
-                  onChange={(event) =>
-                    setFilters((current) => ({
-                      ...current,
-                      resumeVersionId: event.target.value,
-                    }))
-                  }
-                  placeholder="optional resume_0001_version_0001"
-                  value={filters.resumeVersionId ?? ""}
-                />
-              </label>
-              <label>
-                Agent Run ID
-                <input
-                  onChange={(event) =>
-                    setFilters((current) => ({
-                      ...current,
-                      agentRunId: event.target.value,
-                    }))
-                  }
-                  placeholder="optional agent_run_0001"
-                  value={filters.agentRunId ?? ""}
-                />
-              </label>
-              <label>
-                Match Report ID
-                <input
-                  onChange={(event) =>
-                    setFilters((current) => ({
-                      ...current,
-                      matchReportId: event.target.value,
-                    }))
-                  }
-                  placeholder="optional match_0001"
-                  value={filters.matchReportId ?? ""}
-                />
-              </label>
+              <JDSelector
+                emptyText="All JDs"
+                label="JD"
+                onChange={(value) =>
+                  setFilters((current) => ({
+                    ...current,
+                    jdId: value,
+                  }))
+                }
+                value={filters.jdId ?? ""}
+              />
+              <AllResumeVersionSelector
+                emptyText="All resume versions"
+                label="Resume Version"
+                onChange={(value) =>
+                  setFilters((current) => ({
+                    ...current,
+                    resumeVersionId: value,
+                  }))
+                }
+                value={filters.resumeVersionId ?? ""}
+              />
+              <AgentRunSelector
+                emptyText="All agent runs"
+                label="Agent Run"
+                onChange={(value) =>
+                  setFilters((current) => ({
+                    ...current,
+                    agentRunId: value,
+                  }))
+                }
+                value={filters.agentRunId ?? ""}
+              />
+              <MatchReportSelector
+                emptyText="All match reports"
+                label="Match Report"
+                onChange={(value) =>
+                  setFilters((current) => ({
+                    ...current,
+                    matchReportId: value,
+                  }))
+                }
+                value={filters.matchReportId ?? ""}
+              />
               <label>
                 Priority
                 <select
@@ -996,12 +996,7 @@ export function ApplicationTrackerPage({
                       {application.next_step_date ?? "no next step"}
                     </small>
                     <small>
-                      JD {application.jd_id ?? "none"} / Resume{" "}
-                      {application.resume_version_id ?? "none"}
-                    </small>
-                    <small>
-                      Match {application.match_report_id ?? "none"} / Agent{" "}
-                      {application.agent_run_id ?? "none"}
+                      {refSummary(application)}
                     </small>
                   </button>
                 ))
@@ -1031,15 +1026,7 @@ export function ApplicationTrackerPage({
                   <div>
                     <strong>{application.company}</strong>
                     <small>{application.role_title}</small>
-                    <small>{application.application_id}</small>
-                    <small>
-                      JD {application.jd_id ?? "none"} / Resume{" "}
-                      {application.resume_version_id ?? "none"}
-                    </small>
-                    <small>
-                      Match {application.match_report_id ?? "none"} / Agent{" "}
-                      {application.agent_run_id ?? "none"}
-                    </small>
+                    <small>{refSummary(application)}</small>
                   </div>
                   <span className={statusClass(application.status)}>
                     {application.status}
@@ -1093,8 +1080,12 @@ export function ApplicationTrackerPage({
                 </li>
                 <li>
                   <strong>Refs</strong>
+                  <span>{refSummary(selectedApplication)}</span>
+                </li>
+                <li>
+                  <strong>Ref detail</strong>
                   <span>
-                    JD {selectedApplication.jd_id ?? "none"} / Resume Version{" "}
+                    JD {selectedApplication.jd_id ?? "none"} / Resume{" "}
                     {selectedApplication.resume_version_id ?? "none"} / Match{" "}
                     {selectedApplication.match_report_id ?? "none"} / Agent{" "}
                     {selectedApplication.agent_run_id ?? "none"}

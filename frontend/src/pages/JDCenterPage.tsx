@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { JDSelector } from "../components/EntitySelectors";
 import { createJob, deleteJob } from "../api/jobs";
 import type { JobRecord } from "../types/api";
 
@@ -130,9 +131,19 @@ export function JDCenterPage({
           <div className="panel-header">
             <h3>岗位画像</h3>
             <span className="status-pill">
-              {latestJob ? latestJob.jd_id : "Not created"}
+              {latestJob ? "Selected JD" : "Not created"}
             </span>
           </div>
+          <JDSelector
+            emptyText="Select JD"
+            label="JD"
+            onChange={(_, item) => {
+              if (item) {
+                onJobCreated(item);
+              }
+            }}
+            value={latestJob?.jd_id ?? ""}
+          />
           {latestJob ? (
             <div className="profile-field-list">
               <div className="profile-field">
@@ -180,9 +191,8 @@ export function JDCenterPage({
               <li key={job.jd_id}>
                 <div>
                   <strong>{job.job_title}</strong>
-                  <small>{job.company}</small>
+                  <small>{job.company} / ref {job.jd_id}</small>
                 </div>
-                <span>{job.jd_id}</span>
                 <span>{job.job_profile.role_category}</span>
                 <small>
                   Required: {job.job_profile.required_skills.join(", ") || "[]"}

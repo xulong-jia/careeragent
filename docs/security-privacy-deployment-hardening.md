@@ -55,7 +55,7 @@ v3.0 protects the main sensitive application fields at the repository/service wr
 The system reduces accidental exposure but is not a legal compliance product:
 
 - Default Resume/JD/RAG responses still expose short masked previews only, not full raw payloads.
-- Application and Bad Case detail APIs return decrypted values to the authorized current user/workspace context; UI-level privacy-safe display is a v3.3 productization requirement.
+- Application and Bad Case detail APIs return decrypted values to the authorized current user/workspace context; v3.3 adds UI-level privacy-safe display foundation through selectors, preview/snippet/citation displays, Bad Case source selectors, Agent `sanitizeForDisplay`, and `privacy_safe_payload`.
 - Deletion proof covers active database rows in the current app database scope. It does not purge backups, logs, exported files, local screenshots, provider traces or external systems.
 - Audit logs retain redacted tombstones for governance trail.
 
@@ -93,7 +93,8 @@ This is not centralized observability, SIEM, alerting, tracing, metrics SLO, or 
 - RBAC is route-level role foundation, not a full policy engine or database RLS.
 - v3.1 adds backup/restore scripts and retention policy docs; automated backup purge, legal hold and deletion attestation remain future production hardening.
 - Audit logs are DB-local redacted records, not centralized immutable audit/SIEM.
-- Frontend privacy-safe display, selectors and E2E coverage remain v3.3 work.
+- Frontend privacy-safe display selectors and mocked E2E foundation were added in v3.3, but real browser E2E, accessibility/visual regression, and token storage hardening remain future work.
+- Access tokens are still stored in browser localStorage by the existing frontend client; production session hardening should move to a stronger session model before production-ready certification.
 - Production AI quality, semantic provider, large benchmark and human review remain v3.2 work.
 
 阶段完成标准：v3.0 达到 Security / Privacy / Data Governance production foundation candidate；不得称为 production-ready。

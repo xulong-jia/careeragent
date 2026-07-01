@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { MarkBadCasePanel } from "../components/MarkBadCasePanel";
+import { KnowledgeDocumentSelector } from "../components/EntitySelectors";
 import {
   answerRag,
   createRagDocument,
@@ -34,6 +35,8 @@ const sourceTypes = [
   "learning",
   "company",
 ];
+const retrievalModes = ["lexical", "vector", "hybrid"];
+const answerModes = ["deterministic_summary", "grounded_llm"];
 
 type KnowledgeBasePageProps = {
   onDocumentsChanged?: (documents: RagDocumentRecord[]) => void;
@@ -260,10 +263,13 @@ export function KnowledgeBasePage({
   const [searchQuery, setSearchQuery] = useState("FastAPI interview");
   const [searchTopK, setSearchTopK] = useState(5);
   const [searchSourceType, setSearchSourceType] = useState("");
+  const [searchRetrievalMode, setSearchRetrievalMode] = useState("lexical");
   const [searchResult, setSearchResult] = useState<RagSearchResult | null>(null);
   const [question, setQuestion] = useState("How should I prepare for FastAPI interviews?");
   const [answerTopK, setAnswerTopK] = useState(5);
   const [answerSourceType, setAnswerSourceType] = useState("");
+  const [answerRetrievalMode, setAnswerRetrievalMode] = useState("lexical");
+  const [answerMode, setAnswerMode] = useState("deterministic_summary");
   const [answerResult, setAnswerResult] = useState<RagAnswerResult | null>(null);
   const [answerRuns, setAnswerRuns] = useState<RagAnswerRunRecord[]>([]);
   const [selectedAnswerRun, setSelectedAnswerRun] =
@@ -442,6 +448,7 @@ export function KnowledgeBasePage({
         query: searchQuery,
         top_k: searchTopK,
         filters: searchSourceType ? { source_type: searchSourceType } : null,
+        retrieval_mode: searchRetrievalMode,
       });
       setSearchResult(result);
     } catch (error) {
@@ -459,6 +466,8 @@ export function KnowledgeBasePage({
         question,
         top_k: answerTopK,
         filters: answerSourceType ? { source_type: answerSourceType } : null,
+        retrieval_mode: answerRetrievalMode,
+        answer_mode: answerMode,
       });
       setAnswerResult(result);
       const items = await refreshAnswerRuns();
@@ -545,6 +554,16 @@ export function KnowledgeBasePage({
             <h3>Documents</h3>
             <span className="status-pill">{documents.length} items</span>
           </div>
+          <KnowledgeDocumentSelector
+            emptyText="Select document"
+            label="Knowledge Document"
+            onChange={(value) => {
+              if (value) {
+                void loadDocument(value);
+              }
+            }}
+            value={selectedDocument?.doc_id ?? ""}
+          />
           {documents.length ? (
             <ul className="activity-list rag-document-list">
               {documents.map((document) => (
@@ -693,6 +712,19 @@ export function KnowledgeBasePage({
                 ))}
               </select>
             </label>
+            <label>
+              Retrieval Mode
+              <select
+                value={searchRetrievalMode}
+                onChange={(event) => setSearchRetrievalMode(event.target.value)}
+              >
+                {retrievalModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button className="primary-action" disabled={isLoading} onClick={handleSearch} type="button">
               Search
             </button>
@@ -734,6 +766,32 @@ export function KnowledgeBasePage({
                 {sourceTypes.map((item) => (
                   <option key={item} value={item}>
                     {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Retrieval Mode
+              <select
+                value={answerRetrievalMode}
+                onChange={(event) => setAnswerRetrievalMode(event.target.value)}
+              >
+                {retrievalModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Answer Mode
+              <select
+                value={answerMode}
+                onChange={(event) => setAnswerMode(event.target.value)}
+              >
+                {answerModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
                   </option>
                 ))}
               </select>

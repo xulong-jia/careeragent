@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 
 import {
+  AgentRunSelector,
+  AllResumeVersionSelector,
+  JDSelector,
+  KnowledgeDocumentSelector,
+  MatchReportSelector,
+  RagAnswerRunSelector,
+} from "../components/EntitySelectors";
+import {
   addBadCaseToEval,
   createBadCase,
   getBadCaseStats,
@@ -143,6 +151,87 @@ function BadCaseField({
       <strong>{label}</strong>
       <span>{value || "None"}</span>
     </li>
+  );
+}
+
+function SourceObjectSelector({
+  onChange,
+  sourceType,
+  value,
+}: {
+  onChange: (value: string) => void;
+  sourceType: BadCaseSourceType;
+  value: string;
+}) {
+  if (sourceType === "match_report") {
+    return (
+      <MatchReportSelector
+        emptyText="Select match report"
+        label="Source object"
+        onChange={onChange}
+        value={value}
+      />
+    );
+  }
+  if (sourceType === "rag_answer") {
+    return (
+      <RagAnswerRunSelector
+        emptyText="Select RAG answer"
+        label="Source object"
+        onChange={onChange}
+        value={value}
+      />
+    );
+  }
+  if (sourceType === "rag_document") {
+    return (
+      <KnowledgeDocumentSelector
+        emptyText="Select knowledge document"
+        label="Source object"
+        onChange={onChange}
+        value={value}
+      />
+    );
+  }
+  if (sourceType === "agent_run") {
+    return (
+      <AgentRunSelector
+        emptyText="Select agent run"
+        label="Source object"
+        onChange={onChange}
+        value={value}
+      />
+    );
+  }
+  if (sourceType === "resume_version") {
+    return (
+      <AllResumeVersionSelector
+        emptyText="Select resume version"
+        label="Source object"
+        onChange={onChange}
+        value={value}
+      />
+    );
+  }
+  if (sourceType === "job_description") {
+    return (
+      <JDSelector
+        emptyText="Select JD"
+        label="Source object"
+        onChange={onChange}
+        value={value}
+      />
+    );
+  }
+  return (
+    <label>
+      Source ref
+      <input
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="short source ref"
+        value={value}
+      />
+    </label>
   );
 }
 
@@ -455,6 +544,7 @@ export function QualityReviewPage({
                     setFormState((current) => ({
                       ...current,
                       source_type: event.target.value as BadCaseSourceType,
+                      source_id: "",
                     }))
                   }
                   value={formState.source_type}
@@ -466,19 +556,16 @@ export function QualityReviewPage({
                   ))}
                 </select>
               </label>
-              <label>
-                Source ID
-                <input
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      source_id: event.target.value,
-                    }))
-                  }
-                  placeholder="source object id only"
-                  value={formState.source_id}
-                />
-              </label>
+              <SourceObjectSelector
+                onChange={(value) =>
+                  setFormState((current) => ({
+                    ...current,
+                    source_id: value,
+                  }))
+                }
+                sourceType={formState.source_type}
+                value={formState.source_id}
+              />
               <label>
                 Category
                 <select
@@ -667,7 +754,7 @@ export function QualityReviewPage({
                 </select>
               </label>
               <label>
-                Source ID
+                Source ref
                 <input
                   onChange={(event) =>
                     setFilters((current) => ({
@@ -842,7 +929,7 @@ export function QualityReviewPage({
             <ul className="activity-list bad-case-detail">
               <BadCaseField label="ID" value={selectedBadCase.id} />
               <BadCaseField label="Source type" value={selectedBadCase.source_type} />
-              <BadCaseField label="Source ID" value={selectedBadCase.source_id} />
+              <BadCaseField label="Source ref" value={selectedBadCase.source_id} />
               <BadCaseField label="Category" value={selectedBadCase.category} />
               <BadCaseField label="Severity" value={selectedBadCase.severity} />
               <BadCaseField label="Title" value={selectedBadCase.title} />

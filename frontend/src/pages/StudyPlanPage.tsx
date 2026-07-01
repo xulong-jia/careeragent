@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 
 import {
+  InterviewAnswerSelector,
+  MatchReportSelector,
+  ProfileSelector,
+  RagAnswerRunSelector,
+} from "../components/EntitySelectors";
+import {
   generateStudyPlan,
   getStudyPlan,
   listStudyPlans,
@@ -232,7 +238,7 @@ export function StudyPlanPage() {
 
   const generateValidationError =
     !generateForm.targetRole.trim() && !generateForm.profileId.trim()
-      ? "Target role or Profile ID is required."
+      ? "Target role or Profile is required."
       : null;
 
   const refreshPlans = async (nextFilters: FilterState = filters) => {
@@ -401,68 +407,50 @@ export function StudyPlanPage() {
                   value={generateForm.targetRole}
                 />
               </label>
-              <label>
-                Profile ID
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      profileId: event.target.value,
-                    }))
-                  }
-                  value={generateForm.profileId}
-                />
-              </label>
-              <label>
-                Match Report ID
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      matchReportId: event.target.value,
-                    }))
-                  }
-                  value={generateForm.matchReportId}
-                />
-              </label>
-              <label>
-                Project Rewrite ID
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      projectRewriteId: event.target.value,
-                    }))
-                  }
-                  value={generateForm.projectRewriteId}
-                />
-              </label>
-              <label>
-                Interview Answer IDs
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      interviewAnswerIds: event.target.value,
-                    }))
-                  }
-                  placeholder="interview_answer_..."
-                  value={generateForm.interviewAnswerIds}
-                />
-              </label>
-              <label>
-                RAG Answer Run IDs
-                <input
-                  onChange={(event) =>
-                    setGenerateForm((current) => ({
-                      ...current,
-                      ragAnswerRunIds: event.target.value,
-                    }))
-                  }
-                  placeholder="rag_answer_run_..."
-                  value={generateForm.ragAnswerRunIds}
-                />
-              </label>
+              <ProfileSelector
+                emptyText="No profile context"
+                label="Profile"
+                onChange={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    profileId: value,
+                  }))
+                }
+                value={generateForm.profileId}
+              />
+              <MatchReportSelector
+                emptyText="No match report context"
+                label="Match Report"
+                onChange={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    matchReportId: value,
+                  }))
+                }
+                value={generateForm.matchReportId}
+              />
+              <InterviewAnswerSelector
+                emptyText="No interview answer context"
+                label="Interview Answer"
+                onChange={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    interviewAnswerIds: value,
+                  }))
+                }
+                value={generateForm.interviewAnswerIds}
+              />
+              <RagAnswerRunSelector
+                emptyText="No RAG answer context"
+                label="RAG Answer"
+                onChange={(value) =>
+                  setGenerateForm((current) => ({
+                    ...current,
+                    ragAnswerRunIds: value,
+                  }))
+                }
+                value={generateForm.ragAnswerRunIds}
+              />
               <label>
                 Weakness tags
                 <input
@@ -503,6 +491,22 @@ export function StudyPlanPage() {
                 />
               </label>
             </div>
+            <details className="json-details">
+              <summary>Advanced refs</summary>
+              <label>
+                Project Rewrite ref
+                <input
+                  onChange={(event) =>
+                    setGenerateForm((current) => ({
+                      ...current,
+                      projectRewriteId: event.target.value,
+                    }))
+                  }
+                  placeholder="optional rewrite ref"
+                  value={generateForm.projectRewriteId}
+                />
+              </label>
+            </details>
             <button
               className="primary-action"
               disabled={Boolean(generateValidationError) || generateLoading}
@@ -559,30 +563,28 @@ export function StudyPlanPage() {
                   value={filters.targetRole}
                 />
               </label>
-              <label>
-                Profile ID
-                <input
-                  onChange={(event) =>
-                    setFilters((current) => ({
-                      ...current,
-                      profileId: event.target.value,
-                    }))
-                  }
-                  value={filters.profileId}
-                />
-              </label>
-              <label>
-                Match Report ID
-                <input
-                  onChange={(event) =>
-                    setFilters((current) => ({
-                      ...current,
-                      matchReportId: event.target.value,
-                    }))
-                  }
-                  value={filters.matchReportId}
-                />
-              </label>
+              <ProfileSelector
+                emptyText="All profiles"
+                label="Profile"
+                onChange={(value) =>
+                  setFilters((current) => ({
+                    ...current,
+                    profileId: value,
+                  }))
+                }
+                value={filters.profileId}
+              />
+              <MatchReportSelector
+                emptyText="All match reports"
+                label="Match Report"
+                onChange={(value) =>
+                  setFilters((current) => ({
+                    ...current,
+                    matchReportId: value,
+                  }))
+                }
+                value={filters.matchReportId}
+              />
             </div>
           </div>
         </article>

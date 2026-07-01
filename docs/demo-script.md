@@ -112,11 +112,11 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 ### Project Optimization
 
-1. 先在 JD Center 创建或选择一个 synthetic JD，并复制 JD ID。
+1. 先在 JD Center 创建或选择一个 synthetic JD。
 2. 创建 synthetic project facts。
 3. 填写 name、role、period、background、tech stack、responsibilities、results 和 evidence JSON。
 4. 选择 project，查看 detail 和 evidence。
-5. 输入 JD ID，可选输入 resume version、match report 或 profile refs。
+5. 使用 JD selector 选择岗位，可选通过 selectors 绑定 resume version、match report 或 profile refs。
 6. 点击 Run rewrite。
 7. 查看 matched points、missing points、evidence required、rewritten bullets、forbidden changes 和 risk flags。
 
@@ -124,30 +124,30 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 
 ### Interview Center
 
-1. 先完成 JD Center、Resume Center 和 Project Optimization 的 synthetic 数据准备，至少复制一个 `jd_id` 和一个 `resume_version_id`。
+1. 先完成 JD Center、Resume Center 和 Project Optimization 的 synthetic 数据准备。
 2. 打开 Interview Center。
-3. 在 Generate Questions 中输入 `jd_id` 和 `resume_version_id`，可选输入 `project_id`、`project_rewrite_id`、RAG Answer Run IDs、question types 和 max questions。
+3. 在 Generate Questions 中使用 JD、Resume Version、Project 和 RAG Answer selectors；Project Rewrite ref 属于高级可选项。
 4. 点击 Generate Questions，查看 warnings、need more info、question type、difficulty、expected points 和 source refs。
 5. 选择一个 question，在 textarea 中输入 synthetic answer。
 6. 点击 Submit Answer，确认保存后页面只展示 `answer_text_preview`。
 7. 选择 answer 并点击 Score Answer，查看 structure、technical depth、business understanding、evidence、clarity、risk control、overall average、feedback 和 weakness tags。
 8. 使用 question filters 或 answer refresh 确认历史 question / answer 可从 DB-backed API 读取。
-9. 可选：从 Knowledge Base 复制一个 grounded RAG Answer Run ID 重新生成 questions，确认 grounded refs 只以 source refs preview 出现；ungrounded run 只显示 warning。
+9. 可选：从 RAG Answer selector 选择一个 grounded answer run 重新生成 questions，确认 grounded refs 只以 source refs preview 出现；ungrounded run 只显示 warning。
 10. 回到 Dashboard，查看 Interview Training 的 question count、answer count、scored answer count、latest average score 和 latest weakness tags。
 
 当前 Interview Center 只接 deterministic question generation、answer submit/list、scoring API、Dashboard training stats 和 v1.2 12D optional grounded RAG answer run refs；不接真实 LLM，不做 LLM judge，不写入 Study Plan，不展示 Resume/JD full raw_text、RAG full chunk text 或完整已保存 answer_text。请勿输入真实面试复盘或隐私答案。
 
 ### Study Plan Center
 
-1. 先完成 Profile、Match、Project Optimization 或 Interview Center 的 synthetic 数据准备，至少准备 target role；可选复制 `profile_id`、`match_report_id`、`project_rewrite_id` 或 `interview_answer_id`。
+1. 先完成 Profile、Match、Project Optimization 或 Interview Center 的 synthetic 数据准备，至少准备 target role。
 2. 打开 Study Plan。
-3. 在 Generate Study Plan 中输入 target role，或输入 profile ID 让后端从 profile target_roles 推断。
-4. 可选输入 match report ID、project rewrite ID、interview answer IDs、RAG answer run IDs、weakness tags、available hours per week 和 horizon weeks。
+3. 在 Generate Study Plan 中输入 target role，或通过 Profile selector 让后端从 profile target_roles 推断。
+4. 可选通过 Match Report、Interview Answer、RAG Answer selectors 绑定 refs；Project Rewrite ref 是高级可选项；填写 weakness tags、available hours per week 和 horizon weeks。
 5. 点击 Generate Study Plan，查看 phases、tasks、resources、deliverables、acceptance criteria 和 source refs preview。
-6. 使用 Plan Filters 按 status、target role、profile ID 或 match report ID 刷新列表。
+6. 使用 Plan Filters 按 status、target role、Profile selector 或 Match Report selector 刷新列表。
 7. 选择 plan，查看 detail 中的 task_id、priority、status、source_gap、description、acceptance criteria、evidence required 和 source refs preview。
 8. 修改 task status 为 todo、in progress、done、blocked 或 skipped，确认 detail 中 updated_at 刷新。
-9. 可选：用 grounded RAG Answer Run ID 重新生成 study plan，确认只新增学习/证据复核类 refs；ungrounded run 只记录 uncertainty ref，不作为强来源。
+9. 可选：用 RAG Answer selector 选择 grounded answer run 重新生成 study plan，确认只新增学习/证据复核类 refs；ungrounded run 只记录 uncertainty ref，不作为强来源。
 10. 回到 Dashboard，查看 Study Plans、Active Study Plans、Pending Tasks、Blocked Tasks、Done Tasks、Latest Study Target 和 In Progress Tasks 摘要。
 
 当前 Study Plan Center 只接 deterministic generate/list/detail/task status/stats API、前端 StudyPlanPage、Dashboard study stats 和 v1.2 12D optional grounded RAG answer run refs；完整演示路径为 generate -> 查看 phases/tasks -> 更新 task status -> Dashboard stats。v1.3 Agent Workflow 可调用 Study Plan generation，但 Study Plan 页面本身不接真实 LLM，不接外部学习平台或日历提醒，不展示 Resume/JD full raw_text、RAG full chunk text 或完整 answer_text。
@@ -161,16 +161,16 @@ PDF / DOCX 当前只做文本层提取，不做 OCR；risk-check 只展示规则
 5. 在 Answer History 中使用 grounded、uncertainty 和 retrieval mode filters 刷新历史。
 6. 选择一个 answer run，查看 detail 中的 question、answer、citations、source_refs preview、retrieval_debug 和 created_at。
 7. 回到 Dashboard，查看 RAG Documents、Indexed Documents、RAG Chunks、Grounded Answers、Ungrounded Answers、Latest RAG Answer 和 Latest RAG Uncertainty。
-8. 复制 grounded Answer Run ID，作为 Interview Center 或 Study Plan 的可选 RAG refs 输入。
+8. 在 Interview Center、Study Plan 或 Agent Runs 中通过 RAG Answer selector 选择 grounded answer run。
 
-当前 Knowledge Base 默认使用 lexical retrieval；阶段 2.2 可通过 API/env 测试 DB-persisted local vector/hybrid retrieval，但默认不接真实 LLM、外部 embedding 或 production vector DB。v1.2 final handoff 确认可完整演示 create/index document -> search -> grounded answer -> answer history -> Dashboard RAG stats -> Interview / Study Plan optional RAG Answer Run IDs。页面只展示 preview、snippet、source_refs preview、safe retrieval debug 和 stats 聚合，不展示 document full raw_text、chunk full text、embedding vector、Resume/JD full raw_text 或完整 interview answer_text，也不自动写入 Interview、Study Plan、Resume、Project 或 Application。
+当前 Knowledge Base 默认使用 lexical retrieval；阶段 2.2 可通过 API/env 测试 DB-persisted local vector/hybrid retrieval，但默认不接真实 LLM、外部 embedding 或 production vector DB。v1.2 final handoff 确认可完整演示 create/index document -> search -> grounded answer -> answer history -> Dashboard RAG stats -> Interview / Study Plan optional RAG Answer refs。页面只展示 preview、snippet、source_refs preview、safe retrieval debug 和 stats 聚合，不展示 document full raw_text、chunk full text、embedding vector、Resume/JD full raw_text 或完整 interview answer_text，也不自动写入 Interview、Study Plan、Resume、Project 或 Application。
 
 ### Agent Runs
 
-1. 先准备 `resume_version_id`、`jd_id`，建议同时准备一个绑定该 resume version 的 active project。
+1. 先准备 Resume Version、JD，建议同时准备一个绑定该 resume version 的 active project。
 2. 打开 Agent Runs，创建 `job_application_preparation` workflow。
-3. 输入 Resume Version ID 和 JD ID；可选输入 Project IDs、Existing Application ID、RAG Query 和 RAG Answer Run IDs。
-4. 保持 `Create or link application` 开启时，workflow 会创建 saved draft application；传入 Existing Application ID 时会绑定已有记录。
+3. 使用 Resume Version、JD、Project、Existing Application 和 RAG Answer selectors；可选填写 RAG Query。
+4. 保持 `Create or link application` 开启时，workflow 会创建 saved draft application；通过 Existing Application selector 可绑定已有记录。
 5. 点击 Create run。
 6. 查看 run detail、step timeline、`final_summary.total_score`、top strengths/gaps、next actions 和 created record IDs。
 7. 确认 step order 包含 Match、Project Rewrite、Interview Question generation、Study Plan generation、Application create/link 和 Final Summary。

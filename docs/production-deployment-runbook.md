@@ -53,6 +53,21 @@ curl http://localhost:8000/metrics
 
 `/metrics` 返回 HTTP 进程内汇总和 DB 聚合的 Agent/Eval/RAG run counts，不包含 raw resume、JD、chunk、question、answer 或 provider payload。
 
+## Frontend v3.3 Gates
+
+Before using the production frontend image or static bundle in a production-like environment, run:
+
+```bash
+cd frontend
+npm run lint
+npm run typecheck
+npm run test
+npm run test:e2e
+npm run build -- --outDir /tmp/careeragent-frontend-build-v33
+```
+
+`test:e2e` is a mocked workflow smoke gate. A production deployment still needs real browser E2E against the deployed frontend/backend, auth/data seeding, accessibility checks and visual/layout verification.
+
 ## Migration
 
 手动迁移入口：
@@ -82,4 +97,5 @@ v3.1 不提供自动 schema downgrade。生产回滚策略是：
 
 - v3.1 compose 是 production-like profile，不是托管云部署证明。
 - PostgreSQL/pgvector deployment profile 已存在，但应用 RAG 默认仍是 local/database JSON vector foundation；semantic provider/pgvector query path 属于 v3.2。
+- v3.3 frontend selectors and mocked E2E improve operator UX but are not cloud/browser production certification.
 - secret manager、backup encryption、centralized logs/metrics/tracing/alerts 需要由目标云平台接入并按本 runbook 验证。

@@ -10,7 +10,11 @@
 | Revision | `git rev-parse HEAD` | 记录验证起点 | 不代表 release tag |
 | Backend tests | `PYTHONPATH=backend backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests` | 后端 contract、API、migration-adjacent tests 通过 | 主要是 deterministic/local tests |
 | Aggregate v3.1 gate | `scripts/run_quality_gates.sh` | 聚合 backend tests、synthetic/service-level eval、frontend build、prod-like compose config、Alembic temp DB、diff/artifact/secret scan | 仍不是 cloud production certification |
-| Frontend build | `cd frontend && npm run build -- --outDir /tmp/careeragent-frontend-build-26` | TypeScript/Vite build 通过 | 不包含完整 UI regression |
+| Frontend build | `cd frontend && npm run build -- --outDir /tmp/careeragent-frontend-build-v33` | TypeScript/Vite build 通过 | 不包含完整 UI regression |
+| Frontend lint | `cd frontend && npm run lint` | 静态 contract lint 通过，检查 direct fetch、raw backend URL、手填 ID 文案和 selector exports | 不是 ESLint/AST 级完整 lint |
+| Frontend typecheck | `cd frontend && npm run typecheck` | TS app 和 Vite config typecheck 通过 | 不证明运行时 UX 正确 |
+| Frontend unit contract tests | `cd frontend && npm run test` | Node 内置 source contract tests 通过 | 不是 React Testing Library 组件测试 |
+| Frontend mocked E2E smoke | `cd frontend && npm run test:e2e` | mock workflow 覆盖 selector/ref/privacy contract | 不是 Playwright/Cypress browser E2E |
 | Docker Compose config | `docker compose config` | Compose 文件可解析，前提是 `.env` 或环境中提供 `AUTH_JWT_SECRET` | 不是 container build/push/deploy 证明 |
 | Docker missing-secret negative check | `COMPOSE_DISABLE_ENV_FILE=1 env -u AUTH_JWT_SECRET docker compose config` | 在没有 `.env`/env secret 时应明确失败 | 验证 Compose 不接受空 secret |
 | Alembic migration check | `DATABASE_URL=sqlite:////tmp/careeragent_phase26_alembic.db backend/.venv/bin/alembic -c backend/alembic.ini upgrade head` | 空临时 DB 可升级到 head | 不证明生产数据迁移策略 |
@@ -80,6 +84,16 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 - Resume parser metadata must report OCR unsupported status and table/bilingual/noisy layout signals without claiming OCR production readiness.
 - `scripts/run_evals.py --dataset benchmark` must write metrics, actual outputs, failed cases, run_config and human_review_summary under `/tmp` or ignored paths only.
 - Benchmark outputs must not include real private data, API keys, provider traces, raw resume/JD text or full RAG chunk text.
+
+## v3.3 Frontend Productization / E2E Gates
+
+- Main workflow pages must use object selectors for Profile, Resume Version, JD, Match Report, Project, Application, Agent Run, Knowledge Document, RAG Answer Run and Agent workflow refs.
+- MatchReportPage must run match by `resume_version_id + jd_id` when a version is selected and expose compare via `/api/matches/compare`.
+- Project, Interview, Study Plan, Application, Agent and Bad Case flows must not require ordinary users to copy/paste primary internal object IDs.
+- Frontend pages must use centralized `frontend/src/api/*` clients; direct `fetch` remains isolated to `frontend/src/api/client.ts`.
+- Privacy-sensitive saved data must render as preview, snippet, citation, source ref or sanitized JSON by default.
+- `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:e2e` and `npm run build -- --outDir /tmp/careeragent-frontend-build-v33` must pass.
+- The current `test:e2e` gate is mocked. Production readiness still requires real browser E2E, auth/data seeding, accessibility and visual/layout checks.
 
 ## Evaluation Boundary
 

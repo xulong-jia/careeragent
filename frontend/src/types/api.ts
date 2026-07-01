@@ -104,7 +104,7 @@ export type ResumeVersionClonePayload = {
 
 export type ResumeParseRequest = {
   resume_version_id?: string | null;
-  parser_mode?: "deterministic";
+  parser_mode?: "deterministic" | "llm_parser";
 };
 
 export type ResumeParseResponse = {
@@ -697,6 +697,11 @@ export type RagSearchSource = {
   embedding_provider?: string | null;
   embedding_model?: string | null;
   vector_index_used?: boolean | null;
+  original_score?: number | null;
+  rerank_score?: number | null;
+  final_score?: number | null;
+  reranker_mode?: string | null;
+  reranker_model?: string | null;
 };
 
 export type RagCitation = {
@@ -727,9 +732,14 @@ export type RagRetrievalDebug = {
   retrieval_version?: string | null;
   schema_version?: string | null;
   model_version?: string | null;
+  answer_mode?: string | null;
+  run_config?: Record<string, unknown>;
   embedding_provider?: string | null;
   embedding_model?: string | null;
   vector_index_used: boolean;
+  reranker_mode?: string | null;
+  reranker_model?: string | null;
+  reranker_applied?: boolean;
   query_tokens: string[];
   candidate_count: number;
   selected_chunk_ids: string[];
@@ -755,6 +765,7 @@ export type RagAnswerRequest = {
   retrieval_mode?: string | null;
   score_threshold?: number | null;
   persist?: boolean;
+  answer_mode?: string | null;
 };
 
 export type RagAnswerResult = {
@@ -765,7 +776,14 @@ export type RagAnswerResult = {
   uncertainty: string | null;
   grounded: boolean;
   answer_type: string;
+  answer_mode?: string | null;
   retrieval_mode?: string | null;
+  prompt_version?: string | null;
+  model_provider?: string | null;
+  model_name?: string | null;
+  groundedness_flags?: string[];
+  refused_due_to_no_evidence?: boolean;
+  run_config?: Record<string, unknown>;
   evidence_used?: string[];
   evidence_summary: string[];
   citations: RagCitation[];
@@ -781,6 +799,7 @@ export type RagAnswerRunRecord = {
   retrieval_mode: string;
   answer: string;
   answer_type: string;
+  answer_mode?: string | null;
   grounded: boolean;
   uncertainty: string;
   evidence_summary: string[];

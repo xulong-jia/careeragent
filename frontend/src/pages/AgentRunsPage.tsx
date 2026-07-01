@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 
 import { MarkBadCasePanel } from "../components/MarkBadCasePanel";
 import {
+  AgentWorkflowSelector,
+  AllResumeVersionSelector,
+  ApplicationSelector,
+  JDSelector,
+  ProjectSelector,
+  RagAnswerRunSelector,
+  ResumeSelector,
+} from "../components/EntitySelectors";
+import {
   createAgentRun,
   cancelAgentRun,
   getAgentRun,
@@ -376,7 +385,7 @@ export function AgentRunsPage({
         <div>
           <h3>安全边界</h3>
           <p>当前 Agent Workflow 是 deterministic state machine，不接真实 LLM，不自动投递，也不是自由聊天 Agent。</p>
-          <p>不要输入真实简历、真实 JD、投递记录、面试复盘或 API Key；页面只展示 refs、IDs 和 short metadata。</p>
+          <p>不要输入真实简历、真实 JD、投递记录、面试复盘或 API Key；页面只展示 refs 和 short metadata。</p>
         </div>
         <span className="status-pill">Refs only</span>
       </article>
@@ -390,59 +399,43 @@ export function AgentRunsPage({
             <span className="status-pill muted">POST /api/agents/runs</span>
           </div>
           <div className="form-stack">
-            <label>
-              Workflow
-              <select
+            <div className="selector-grid">
+              <AgentWorkflowSelector
+                label="Workflow"
+                onChange={setSelectedWorkflowName}
                 value={selectedWorkflowName}
-                onChange={(event) => setSelectedWorkflowName(event.target.value)}
-              >
-                {workflowOptions.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Resume ID
-              <input
-                placeholder="resume_0001"
+              />
+              <ResumeSelector
+                emptyText="No resume context"
+                label="Resume"
+                onChange={(value) => setResumeId(value)}
                 value={resumeId}
-                onChange={(event) => setResumeId(event.target.value)}
               />
-            </label>
-            <label>
-              Resume Version ID
-              <input
-                placeholder="resume_0001_version_0001"
+              <AllResumeVersionSelector
+                emptyText="No resume version context"
+                label="Resume Version"
+                onChange={(value) => setResumeVersionId(value)}
                 value={resumeVersionId}
-                onChange={(event) => setResumeVersionId(event.target.value)}
               />
-            </label>
-            <label>
-              JD ID
-              <input
-                placeholder="jd_0001"
+              <JDSelector
+                emptyText="No JD context"
+                label="JD"
+                onChange={(value) => setJdId(value)}
                 value={jdId}
-                onChange={(event) => setJdId(event.target.value)}
               />
-            </label>
-            <label>
-              Project IDs
-              <input
-                placeholder="optional project_0001, project_0002"
+              <ProjectSelector
+                emptyText="No project context"
+                label="Project"
+                onChange={(value) => setProjectIds(value)}
                 value={projectIds}
-                onChange={(event) => setProjectIds(event.target.value)}
               />
-            </label>
-            <label>
-              Existing Application ID
-              <input
-                placeholder="optional app_0001"
+              <ApplicationSelector
+                emptyText="No existing application"
+                label="Existing Application"
+                onChange={(value) => setApplicationId(value)}
                 value={applicationId}
-                onChange={(event) => setApplicationId(event.target.value)}
               />
-            </label>
+            </div>
             <label className="checkbox-row">
               <input
                 checked={createApplication}
@@ -468,14 +461,12 @@ export function AgentRunsPage({
                 onChange={(event) => setRagQuery(event.target.value)}
               />
             </label>
-            <label>
-              RAG Answer Run IDs
-              <input
-                placeholder="optional rag_answer_0001, rag_answer_0002"
-                value={ragAnswerRunIds}
-                onChange={(event) => setRagAnswerRunIds(event.target.value)}
-              />
-            </label>
+            <RagAnswerRunSelector
+              emptyText="No RAG answer context"
+              label="RAG Answer"
+              onChange={(value) => setRagAnswerRunIds(value)}
+              value={ragAnswerRunIds}
+            />
             <button
               className="primary-action"
               disabled={isCreating}

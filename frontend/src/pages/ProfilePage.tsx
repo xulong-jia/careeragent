@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { AllResumeVersionSelector } from "../components/EntitySelectors";
 import {
   createProfile,
   getProfile,
@@ -219,14 +220,12 @@ export function ProfilePage({
                 value={preferencesJson}
               />
             </label>
-            <label>
-              Source resume version id
-              <input
-                onChange={(event) => setSourceResumeVersionId(event.target.value)}
-                placeholder="Optional"
-                value={sourceResumeVersionId}
-              />
-            </label>
+            <AllResumeVersionSelector
+              emptyText="No source resume version"
+              label="Source Resume Version"
+              onChange={(value) => setSourceResumeVersionId(value)}
+              value={sourceResumeVersionId}
+            />
             <div className="inline-form">
               <button
                 className="primary-action"

@@ -89,14 +89,18 @@ export function DashboardPage({
     {
       label: "JD",
       value: String(state.jobs.length),
-      detail: state.latestJob?.jd_id ?? "等待创建",
+      detail: state.latestJob
+        ? `${state.latestJob.company} / ${state.latestJob.job_title}`
+        : "等待创建",
       tone: "blue",
       page: "jd" as const,
     },
     {
       label: "Match",
       value: String(state.matches.length),
-      detail: state.latestMatch?.match_report_id ?? "等待运行",
+      detail: state.latestMatch
+        ? `score ${state.latestMatch.total_score} / ${state.latestMatch.gaps.length} gaps`
+        : "等待运行",
       tone: "amber",
       page: "match" as const,
     },
@@ -168,7 +172,7 @@ export function DashboardPage({
     {
       label: "Latest RAG Uncertainty",
       value: latestRagUncertainty,
-      detail: ragStats?.latest_answer_run_id ?? "No answer run",
+      detail: latestRagAnswer,
       tone: "amber",
       page: "knowledge" as const,
     },
@@ -317,7 +321,7 @@ export function DashboardPage({
       <div className="page-heading">
         <p className="eyebrow">Workbench</p>
         <h2 id="dashboard-title">Dashboard</h2>
-        <p>当前稳定节点：v1.4 Product Operations Hardening，已支持 deterministic Agent Runs、RAG v1.2、Application Board、状态历史、投递复盘和运营统计。当前不接真实 LLM，不做 LLM judge，不自动投递。</p>
+        <p>v3.3 frontend workbench：通过 selectors 串联 Resume、JD、Match、Project、Interview、Study Plan、Knowledge、Agent、Application 与 Evaluation 主流程。当前仍不是 production-ready。</p>
       </div>
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
@@ -380,7 +384,11 @@ export function DashboardPage({
             </li>
             <li>
               <strong>Match</strong>
-              <span>{state.latestMatch?.match_report_id ?? "未运行"}</span>
+              <span>
+                {state.latestMatch
+                  ? `score ${state.latestMatch.total_score} / ${state.latestMatch.gaps.length} gaps`
+                  : "未运行"}
+              </span>
             </li>
             <li>
               <strong>Projects</strong>
@@ -414,7 +422,7 @@ export function DashboardPage({
               <strong>Agent Runs</strong>
               <span>
                 {latestAgentRun
-                  ? `${latestAgentRun.id} / ${latestAgentRun.status} / ${latestAgentScore}`
+                  ? `${latestAgentRun.workflow_name} / ${latestAgentRun.status} / ${latestAgentScore}`
                   : `${state.agentRuns.length} deterministic runs`}
               </span>
             </li>
@@ -422,7 +430,7 @@ export function DashboardPage({
               <strong>Agent Application</strong>
               <span>
                 {latestAgentApplication
-                  ? `${latestAgentApplication.application_id} / ${latestAgentApplication.status}`
+                  ? `${latestAgentApplication.company} / ${latestAgentApplication.status}`
                   : `${agentLinkedApplicationCount} linked records`}
               </span>
             </li>

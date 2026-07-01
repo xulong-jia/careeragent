@@ -1260,6 +1260,48 @@ button:disabled {
   color: var(--muted);
 }
 
+.selector-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.entity-selector {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.entity-selector label {
+  min-width: 0;
+}
+
+.entity-selector select {
+  width: 100%;
+}
+
+.entity-selector-meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tiny-action {
+  justify-self: start;
+  min-height: 30px;
+  padding: 6px 10px;
+}
+
+.compare-result {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
 .version-list li,
 .report-list li {
   display: grid;
@@ -1340,6 +1382,7 @@ button:disabled {
   .two-column.wide-left,
   .three-column,
   .profile-grid,
+  .selector-grid,
   .section-grid {
     grid-template-columns: 1fr;
   }

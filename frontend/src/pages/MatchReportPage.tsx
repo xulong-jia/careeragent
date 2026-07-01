@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 
 import { MarkBadCasePanel } from "../components/MarkBadCasePanel";
-import { getMatch, runMatch } from "../api/matches";
-import type { JobRecord, MatchReport, ResumeRecord } from "../types/api";
+import {
+  JDSelector,
+  ResumeSelector,
+  ResumeVersionSelector,
+} from "../components/EntitySelectors";
+import { compareMatches, getMatch, runMatch } from "../api/matches";
+import type {
+  JobRecord,
+  MatchCompareResponse,
+  MatchReport,
+  ResumeRecord,
+} from "../types/api";
 
 type MatchReportPageProps = {
   jobs: JobRecord[];
@@ -38,32 +48,97 @@ export function MatchReportPage({
   const [selectedReport, setSelectedReport] = useState<MatchReport | null>(
     latestMatch,
   );
+  const [selectedResumeId, setSelectedResumeId] = useState(
+    latestResume?.resume_id ?? "",
+  );
+  const [selectedResumeVersionId, setSelectedResumeVersionId] = useState(
+    latestMatch?.resume_version_id ?? "",
+  );
+  const [selectedJdId, setSelectedJdId] = useState(latestJob?.jd_id ?? "");
+  const [compareResumeId, setCompareResumeId] = useState(
+    latestResume?.resume_id ?? "",
+  );
+  const [compareVersionA, setCompareVersionA] = useState(
+    latestMatch?.resume_version_id ?? "",
+  );
+  const [compareVersionB, setCompareVersionB] = useState("");
+  const [compareJdId, setCompareJdId] = useState(latestJob?.jd_id ?? "");
+  const [compareResult, setCompareResult] =
+    useState<MatchCompareResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const [isComparing, setIsComparing] = useState(false);
 
-  const canRun = Boolean(latestResume && latestJob);
+  const canRun = Boolean(selectedJdId && (selectedResumeVersionId || selectedResumeId));
+  const canCompare =
+    Boolean(compareJdId && compareVersionA && compareVersionB) &&
+    compareVersionA !== compareVersionB;
 
   useEffect(() => {
     if (latestMatch) {
       setSelectedReport(latestMatch);
+      setSelectedResumeVersionId(latestMatch.resume_version_id ?? "");
+      setCompareVersionA(latestMatch.resume_version_id ?? "");
     }
   }, [latestMatch]);
 
+  useEffect(() => {
+    if (!selectedResumeId && latestResume) {
+      setSelectedResumeId(latestResume.resume_id);
+      setCompareResumeId(latestResume.resume_id);
+    }
+  }, [latestResume, selectedResumeId]);
+
+  useEffect(() => {
+    if (!selectedJdId && latestJob) {
+      setSelectedJdId(latestJob.jd_id);
+      setCompareJdId(latestJob.jd_id);
+    }
+  }, [latestJob, selectedJdId]);
+
   const handleRun = async () => {
-    if (!latestResume || !latestJob) {
-      setErrorMessage("请先上传 Resume 并创建 JD。");
+    if (!canRun) {
+      setErrorMessage("请先选择 Resume Version 和 JD。");
       return;
     }
     setIsRunning(true);
     setErrorMessage(null);
     try {
-      const report = await runMatch(latestResume.resume_id, latestJob.jd_id);
+      const report = await runMatch({
+        jdId: selectedJdId,
+        resumeId: selectedResumeVersionId ? null : selectedResumeId,
+        resumeVersionId: selectedResumeVersionId || null,
+      });
       onMatchRun(report);
       setSelectedReport(report);
+      setCompareJdId(report.jd_id);
+      setCompareVersionA(report.resume_version_id ?? "");
       await onRefresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "匹配失败。");
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleCompare = async () => {
+    if (!canCompare) {
+      setCompareError("请选择同一 JD 下的两个不同 Resume Version。");
+      return;
+    }
+    setIsComparing(true);
+    setCompareError(null);
+    try {
+      const result = await compareMatches({
+        jd_id: compareJdId,
+        resume_version_ids: [compareVersionA, compareVersionB],
+      });
+      setCompareResult(result);
+      await onRefresh();
+    } catch (error) {
+      setCompareError(error instanceof Error ? error.message : "对比失败。");
+    } finally {
+      setIsComparing(false);
     }
   };
 
@@ -91,7 +166,7 @@ export function MatchReportPage({
       <div className="page-heading">
         <p className="eyebrow">Report</p>
         <h2 id="match-title">Match Report</h2>
-        <p>使用最近的 resume_id 和 jd_id 生成 deterministic match report，并从 DB-backed API 展示历史报告。</p>
+        <p>选择 Resume Version 与 JD 运行 deterministic match report，并从 DB-backed API 展示历史和对比结果。</p>
       </div>
 
       <article className="panel">
@@ -99,9 +174,26 @@ export function MatchReportPage({
           <h3>运行匹配</h3>
           <span className="status-pill muted">POST /api/matches/run</span>
         </div>
-        <div className="run-row">
-          <span>Resume: {latestResume?.resume_id ?? "未上传"} ({resumes.length})</span>
-          <span>JD: {latestJob?.jd_id ?? "未创建"} ({jobs.length})</span>
+        <div className="selector-grid">
+          <ResumeSelector
+            label={`Resume (${resumes.length})`}
+            onChange={(value) => {
+              setSelectedResumeId(value);
+              setSelectedResumeVersionId("");
+            }}
+            value={selectedResumeId}
+          />
+          <ResumeVersionSelector
+            label="Resume Version"
+            onChange={(value) => setSelectedResumeVersionId(value)}
+            resumeId={selectedResumeId}
+            value={selectedResumeVersionId}
+          />
+          <JDSelector
+            label={`JD (${jobs.length})`}
+            onChange={(value) => setSelectedJdId(value)}
+            value={selectedJdId}
+          />
           <button
             className="primary-action"
             disabled={!canRun || isRunning}
@@ -117,12 +209,84 @@ export function MatchReportPage({
         {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
       </article>
 
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Compare Match Reports</h3>
+          <span className="status-pill muted">POST /api/matches/compare</span>
+        </div>
+        <div className="selector-grid">
+          <ResumeSelector
+            label="Resume"
+            onChange={(value) => {
+              setCompareResumeId(value);
+              setCompareVersionA("");
+              setCompareVersionB("");
+            }}
+            value={compareResumeId}
+          />
+          <ResumeVersionSelector
+            label="Version A"
+            onChange={(value) => setCompareVersionA(value)}
+            resumeId={compareResumeId}
+            value={compareVersionA}
+          />
+          <ResumeVersionSelector
+            label="Version B"
+            onChange={(value) => setCompareVersionB(value)}
+            resumeId={compareResumeId}
+            value={compareVersionB}
+          />
+          <JDSelector
+            label="JD"
+            onChange={(value) => setCompareJdId(value)}
+            value={compareJdId}
+          />
+          <button
+            className="primary-action"
+            disabled={!canCompare || isComparing}
+            onClick={handleCompare}
+            type="button"
+          >
+            {isComparing ? "Comparing..." : "Compare"}
+          </button>
+        </div>
+        {compareError ? <p className="error-text">{compareError}</p> : null}
+        {compareResult ? (
+          <div className="compare-result">
+            <div className="readonly-grid">
+              <span>Mode: {compareResult.compare_mode}</span>
+              <span>Sort: {compareResult.sort_key}</span>
+              <span>Items: {compareResult.items.length}</span>
+            </div>
+            <ul className="activity-list report-list">
+              {compareResult.items.map((item) => (
+                <li key={item.match_report_id}>
+                  <div>
+                    <strong>Rank {item.rank}: score {item.total_score}</strong>
+                    <small>{item.score_delta_from_top} from top / {item.main_gaps.length} gaps</small>
+                  </div>
+                  <span>{item.resume_version_id ?? "No version"}</span>
+                  <span>{item.main_strengths.slice(0, 2).join(", ") || "No strengths"}</span>
+                  <button
+                    className="ghost-action"
+                    onClick={() => void handleSelectReport(item.match_report_id)}
+                    type="button"
+                  >
+                    Detail
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </article>
+
       <div className="two-column">
         <article className="panel score-panel">
           <div className="panel-header">
             <h3>总分</h3>
             <span className="status-pill">
-              {latestMatch ? latestMatch.match_report_id : "No run"}
+              {latestMatch ? "Latest report" : "No run"}
             </span>
           </div>
           <div className="score-dial">
@@ -198,13 +362,13 @@ export function MatchReportPage({
                 key={match.match_report_id}
               >
                 <div>
-                  <strong>{match.match_report_id}</strong>
+                  <strong>Score {match.total_score}</strong>
                   <small>
                     Resume Version: {match.resume_version_id ?? "unknown"}
                   </small>
                 </div>
-                <span>JD: {match.jd_id}</span>
-                <span>score {match.total_score}</span>
+                <span>{match.jd_id}</span>
+                <span>{match.risk_flags.length} risks</span>
                 <span>
                   {match.created_at
                     ? new Date(match.created_at).toLocaleString()
@@ -232,12 +396,16 @@ export function MatchReportPage({
         <div className="panel-header">
           <h3>Report Detail</h3>
           <span className="status-pill muted">
-            {detailReport?.match_report_id ?? "None"}
+            {detailReport ? "Selected report" : "None"}
           </span>
         </div>
         {detailReport ? (
           <>
             <ul className="activity-list">
+              <li>
+                <strong>Report Ref</strong>
+                <span>{detailReport.match_report_id}</span>
+              </li>
               <li>
                 <strong>Resume Version</strong>
                 <span>{detailReport.resume_version_id ?? "unknown"}</span>
@@ -314,9 +482,6 @@ export function MatchReportPage({
             <span>运行或选择一条历史报告查看详情。</span>
           </div>
         )}
-        <p className="hint-text">
-          Resume version selector 和多版本对比页面留到后续阶段。
-        </p>
       </article>
     </section>
   );
