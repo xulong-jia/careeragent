@@ -19,7 +19,7 @@ from xml.sax.saxutils import escape
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATASET_DIR = REPO_ROOT / "evals" / "datasets" / "anonymized_benchmark"
 DEFAULT_CSV_OUTPUT = "evidence/private_outputs/human_review_sample_pack.{timestamp}.csv"
-DEFAULT_XLSX_OUTPUT = "evidence/private_outputs/human_review_sample_pack.{timestamp}.xlsx"
+DEFAULT_XLSX_OUTPUT = "evidence/private_outputs/human_review_fillable_simple_{timestamp}.xlsx"
 DEFAULT_SAMPLE_SIZE = 30
 DEFAULT_SEED = 35
 TASK_MODULES = {
@@ -91,6 +91,47 @@ BOOLEAN_FIELDS = [
     "requires_adjudication",
 ]
 DECISION_FIELDS = ["decision", "adjudication_decision"]
+FILL_SHEET_NAME = "填写表"
+IMPORT_SHEET_NAME = "导入字段_不要改"
+INSTRUCTIONS_SHEET_NAME = "填写说明"
+OPTIONS_SHEET_NAME = "选项"
+FILL_HEADER_ROW = 6
+FILL_DATA_START_ROW = FILL_HEADER_ROW + 1
+FILL_COLUMNS = [
+    ("sequence", "序号"),
+    ("task_type_label", "审核类型"),
+    ("input_summary", "输入摘要（匿名）"),
+    ("model_output_summary", "模型输出摘要"),
+    ("review_instruction", "审核说明"),
+    ("correctness_score", "正确性\n0-1"),
+    ("groundedness_score", "有依据\n0-1"),
+    ("safety_score", "安全性\n0-1"),
+    ("usefulness_score", "有用性\n0-1"),
+    ("privacy_risk_flag", "隐私风险"),
+    ("hallucination_flag", "幻觉"),
+    ("fabrication_flag", "编造"),
+    ("decision", "结论"),
+    ("requires_adjudication", "需复审"),
+    ("reviewer_comment", "备注"),
+    ("adjudication_decision", "复审结论"),
+    ("bad_case_ref", "Bad Case编号"),
+    ("item_id", "item_id"),
+]
+FILL_FORMULA_COLUMNS = {
+    "correctness_score": "F",
+    "groundedness_score": "G",
+    "safety_score": "H",
+    "usefulness_score": "I",
+    "privacy_risk_flag": "J",
+    "hallucination_flag": "K",
+    "fabrication_flag": "L",
+    "decision": "M",
+    "requires_adjudication": "N",
+    "reviewer_comment": "O",
+    "adjudication_decision": "P",
+    "bad_case_ref": "Q",
+}
+FILL_REVIEWER_FIELDS = set(SCORE_FIELDS + BOOLEAN_FIELDS + DECISION_FIELDS + ["reviewer_comment", "bad_case_ref"])
 PII_PATTERNS = [
     re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),
     re.compile(r"(?<!\d)(?:\+?\d[\d\s().-]{8,}\d)(?!\d)"),
@@ -252,110 +293,259 @@ def _column_letter(index: int) -> str:
 
 def _cell_xml(row_index: int, column_index: int, value: str, style_index: int) -> str:
     ref = f"{_column_letter(column_index)}{row_index}"
-    if value == "":
+    text = str(value)
+    if text == "":
         return f'<c r="{ref}" s="{style_index}"/>'
+    if text.startswith("="):
+        return f'<c r="{ref}" s="{style_index}"><f>{escape(text[1:])}</f></c>'
     return (
         f'<c r="{ref}" s="{style_index}" t="inlineStr">'
-        f"<is><t>{escape(value)}</t></is></c>"
+        f"<is><t>{escape(text)}</t></is></c>"
     )
 
 
-def _column_width(field: str, rows: list[dict[str, str]]) -> int:
-    max_len = max([len(field), *(len(row.get(field, "")) for row in rows)])
-    if field in {"input_summary", "model_output_summary", "review_instruction", "reviewer_comment"}:
-        return min(max(max_len // 2, 28), 72)
-    return min(max(max_len + 2, 12), 36)
+def _worksheet_xml(
+    *,
+    cols_xml: str,
+    rows_xml: str,
+    freeze_xml: str = "",
+    auto_filter_ref: str = "",
+    validations_xml: str = "",
+) -> str:
+    auto_filter_xml = f'<autoFilter ref="{auto_filter_ref}"/>' if auto_filter_ref else ""
+    return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+{freeze_xml}
+<cols>{cols_xml}</cols>
+<sheetData>{rows_xml}</sheetData>
+{auto_filter_xml}
+{validations_xml}
+</worksheet>'''
 
 
-def _sheet_xml(rows: list[dict[str, str]]) -> str:
-    last_column = _column_letter(len(CSV_FIELDS))
-    last_row = len(rows) + 1
-    reviewer_columns = set(REVIEWER_FIELDS)
-    wrap_columns = set(REVIEW_CONTEXT_FIELDS) | {"reviewer_comment"}
-    col_xml = []
-    for index, field in enumerate(CSV_FIELDS, start=1):
-        col_xml.append(
-            f'<col min="{index}" max="{index}" width="{_column_width(field, rows)}" customWidth="1"/>'
-        )
-    row_xml = []
-    header_cells = [
-        _cell_xml(1, index, field, 1)
-        for index, field in enumerate(CSV_FIELDS, start=1)
-    ]
-    row_xml.append('<row r="1" ht="34" customHeight="1">' + "".join(header_cells) + "</row>")
-    for row_index, row in enumerate(rows, start=2):
-        cells = []
-        for column_index, field in enumerate(CSV_FIELDS, start=1):
-            style = 3 if field in reviewer_columns else 2 if field in wrap_columns else 0
-            cells.append(_cell_xml(row_index, column_index, row.get(field, ""), style))
-        row_xml.append(f'<row r="{row_index}">' + "".join(cells) + "</row>")
+def _cols_xml(widths: list[int]) -> str:
+    return "".join(
+        f'<col min="{index}" max="{index}" width="{width}" customWidth="1"/>'
+        for index, width in enumerate(widths, start=1)
+    )
 
-    validations = []
-    for field in BOOLEAN_FIELDS:
-        column = _column_letter(CSV_FIELDS.index(field) + 1)
+
+def _freeze_xml(split_row: int, top_left_cell: str) -> str:
+    return (
+        '<sheetViews><sheetView workbookViewId="0">'
+        f'<pane ySplit="{split_row}" topLeftCell="{top_left_cell}" '
+        'activePane="bottomLeft" state="frozen"/>'
+        "</sheetView></sheetViews>"
+    )
+
+
+def _data_validations_xml(validations: list[str]) -> str:
+    if not validations:
+        return ""
+    return f'<dataValidations count="{len(validations)}">{"".join(validations)}</dataValidations>'
+
+
+def _fill_validations(last_row: int) -> str:
+    validations: list[str] = []
+    for column in ["J", "K", "L", "N"]:
         validations.append(
             f'<dataValidation type="list" allowBlank="1" showInputMessage="1" '
             f'promptTitle="Reviewer input" prompt="Choose true or false." '
-            f'sqref="{column}2:{column}{last_row}">'
+            f'sqref="{column}{FILL_DATA_START_ROW}:{column}{last_row}">'
             '<formula1>"true,false"</formula1></dataValidation>'
         )
-    for field in DECISION_FIELDS:
-        column = _column_letter(CSV_FIELDS.index(field) + 1)
+    for column in ["M", "P"]:
         validations.append(
             f'<dataValidation type="list" allowBlank="1" showInputMessage="1" '
             f'promptTitle="Reviewer input" prompt="Choose pass, minor_issue, major_issue, or fail." '
-            f'sqref="{column}2:{column}{last_row}">'
+            f'sqref="{column}{FILL_DATA_START_ROW}:{column}{last_row}">'
             '<formula1>"pass,minor_issue,major_issue,fail"</formula1></dataValidation>'
         )
-    for field in SCORE_FIELDS:
-        column = _column_letter(CSV_FIELDS.index(field) + 1)
+    for column in ["F", "G", "H", "I"]:
         validations.append(
             f'<dataValidation type="decimal" operator="between" allowBlank="1" '
             f'showInputMessage="1" promptTitle="Reviewer score" '
             f'prompt="Use 1.0 good, 0.8 minor issue, 0.5 major issue, 0.0 fail." '
-            f'sqref="{column}2:{column}{last_row}"><formula1>0</formula1><formula2>1</formula2>'
-            "</dataValidation>"
+            f'sqref="{column}{FILL_DATA_START_ROW}:{column}{last_row}">'
+            "<formula1>0</formula1><formula2>1</formula2></dataValidation>"
         )
-    data_validations = (
-        f'<dataValidations count="{len(validations)}">{"".join(validations)}</dataValidations>'
+    return _data_validations_xml(validations)
+
+
+def _first_reviewer_id(rows: list[dict[str, str]]) -> str:
+    for row in rows:
+        value = row.get("reviewer_id_hash", "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _fill_sheet_xml(rows: list[dict[str, str]]) -> str:
+    last_row = FILL_DATA_START_ROW + len(rows) - 1
+    last_column = _column_letter(len(FILL_COLUMNS))
+    widths = [8, 18, 46, 46, 34, 12, 12, 12, 12, 12, 12, 12, 15, 12, 32, 15, 18, 34]
+    row_xml: list[str] = []
+    row_xml.append(
+        '<row r="1" ht="24" customHeight="1">'
+        + _cell_xml(1, 1, "CareerAgent 人工审核表（简洁版）", 1)
+        + "</row>"
     )
-    return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
- xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
-<cols>{''.join(col_xml)}</cols>
-<sheetData>{''.join(row_xml)}</sheetData>
-<autoFilter ref="A1:{last_column}{last_row}"/>
-{data_validations}
-</worksheet>'''
+    row_xml.append('<row r="2"/>')
+    row_xml.append(
+        '<row r="3">'
+        + _cell_xml(3, 1, "Reviewer ID Hash（填一次即可）", 1)
+        + _cell_xml(3, 2, _first_reviewer_id(rows), 3)
+        + _cell_xml(3, 3, f"说明：请从第 {FILL_DATA_START_ROW} 行开始逐行审核。不要修改 item_id。", 2)
+        + "</row>"
+    )
+    row_xml.append('<row r="4"/>')
+    row_xml.append('<row r="5"/>')
+    header_cells = [
+        _cell_xml(FILL_HEADER_ROW, index, label, 1)
+        for index, (_field, label) in enumerate(FILL_COLUMNS, start=1)
+    ]
+    row_xml.append(
+        f'<row r="{FILL_HEADER_ROW}" ht="38" customHeight="1">'
+        + "".join(header_cells)
+        + "</row>"
+    )
+    for offset, row in enumerate(rows, start=0):
+        row_index = FILL_DATA_START_ROW + offset
+        cells = []
+        for column_index, (field, _label) in enumerate(FILL_COLUMNS, start=1):
+            value = str(offset + 1) if field == "sequence" else row.get(field, "")
+            style = 3 if field in FILL_REVIEWER_FIELDS else 2
+            cells.append(_cell_xml(row_index, column_index, value, style))
+        row_xml.append(f'<row r="{row_index}" ht="72" customHeight="1">{"".join(cells)}</row>')
+    return _worksheet_xml(
+        cols_xml=_cols_xml(widths),
+        rows_xml="".join(row_xml),
+        freeze_xml=_freeze_xml(FILL_HEADER_ROW, f"A{FILL_DATA_START_ROW}"),
+        auto_filter_ref=f"A{FILL_HEADER_ROW}:{last_column}{last_row}",
+        validations_xml=_fill_validations(last_row),
+    )
+
+
+def _import_formula(field: str, fill_row_index: int) -> str:
+    if field == "reviewer_id_hash":
+        return f"='{FILL_SHEET_NAME}'!$B$3"
+    column = FILL_FORMULA_COLUMNS.get(field)
+    if column:
+        return f"='{FILL_SHEET_NAME}'!{column}{fill_row_index}"
+    return ""
+
+
+def _import_sheet_xml(rows: list[dict[str, str]]) -> str:
+    last_row = len(rows) + 1
+    last_column = _column_letter(len(CSV_FIELDS))
+    widths = [24, 24, 34, 22, 18, 36, 18, 48, 48, 18, 44, 44, 34, 22, 14, 14, 14, 14, 14, 14, 14, 32, 18, 14, 18, 20]
+    row_xml: list[str] = []
+    row_xml.append(
+        '<row r="1" ht="32" customHeight="1">'
+        + "".join(_cell_xml(1, index, field, 1) for index, field in enumerate(CSV_FIELDS, start=1))
+        + "</row>"
+    )
+    for offset, row in enumerate(rows, start=0):
+        row_index = offset + 2
+        fill_row_index = FILL_DATA_START_ROW + offset
+        cells = []
+        for column_index, field in enumerate(CSV_FIELDS, start=1):
+            value = _import_formula(field, fill_row_index) if field in REVIEWER_FIELDS else row.get(field, "")
+            style = 3 if field in REVIEWER_FIELDS else 2
+            cells.append(_cell_xml(row_index, column_index, value, style))
+        row_xml.append(f'<row r="{row_index}">{"".join(cells)}</row>')
+    return _worksheet_xml(
+        cols_xml=_cols_xml(widths),
+        rows_xml="".join(row_xml),
+        freeze_xml=_freeze_xml(1, "A2"),
+        auto_filter_ref=f"A1:{last_column}{last_row}",
+    )
+
+
+def _simple_table_sheet_xml(rows: list[list[str]], widths: list[int]) -> str:
+    row_xml = []
+    for row_index, row in enumerate(rows, start=1):
+        style = 1 if row_index == 1 else 2
+        cells = [
+            _cell_xml(row_index, column_index, value, style)
+            for column_index, value in enumerate(row, start=1)
+        ]
+        row_xml.append(f'<row r="{row_index}">{"".join(cells)}</row>')
+    return _worksheet_xml(
+        cols_xml=_cols_xml(widths),
+        rows_xml="".join(row_xml),
+        freeze_xml=_freeze_xml(1, "A2"),
+    )
+
+
+def _instructions_sheet_xml() -> str:
+    rows = [
+        ["CareerAgent 人工审核填写说明"],
+        [""],
+        ["1. 只填写“填写表”。不要修改 item_id，也不要修改“导入字段_不要改”。"],
+        ["2. 每一行看：审核类型、输入摘要（匿名）、模型输出摘要、审核说明。"],
+        ["3. 分数：1.0=good，0.8=minor issue，0.5=major issue，0.0=fail。"],
+        ["4. 隐私风险、幻觉、编造、需复审必须显式选择 true 或 false。"],
+        ["5. 结论/复审结论只能使用 pass、minor_issue、major_issue、fail。"],
+        ["6. 不要写入真实姓名、邮箱、电话、API key、真实简历/JD 原文或私有证据。"],
+    ]
+    return _simple_table_sheet_xml(rows, [110])
+
+
+def _options_sheet_xml() -> str:
+    rows = [
+        ["decision", "bool"],
+        ["pass", "true"],
+        ["minor_issue", "false"],
+        ["major_issue", ""],
+        ["fail", ""],
+    ]
+    return _simple_table_sheet_xml(rows, [22, 18])
 
 
 def render_xlsx(rows: list[dict[str, str]], output_path: Path) -> None:
+    sheet_names = [FILL_SHEET_NAME, IMPORT_SHEET_NAME, INSTRUCTIONS_SHEET_NAME, OPTIONS_SHEET_NAME]
+    sheet_overrides = "\n".join(
+        f'<Override PartName="/xl/worksheets/sheet{index}.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        for index in range(1, len(sheet_names) + 1)
+    )
     content_types = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
 <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+{sheet_overrides}
 <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
 <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
 <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-</Types>'''
+</Types>'''.format(sheet_overrides=sheet_overrides)
     rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
 <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>'''
-    workbook = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    workbook_sheets = "".join(
+        f'<sheet name="{escape(name)}" sheetId="{index}" r:id="rId{index}"/>'
+        for index, name in enumerate(sheet_names, start=1)
+    )
+    workbook = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="Human Review" sheetId="1" r:id="rId1"/></sheets>
+<sheets>{workbook_sheets}</sheets>
 </workbook>'''
-    workbook_rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    workbook_sheet_rels = "\n".join(
+        f'<Relationship Id="rId{index}" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+        f'Target="worksheets/sheet{index}.xml"/>'
+        for index in range(1, len(sheet_names) + 1)
+    )
+    workbook_rels = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+{workbook_sheet_rels}
+<Relationship Id="rId{len(sheet_names) + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>'''
     styles = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -376,7 +566,10 @@ def render_xlsx(rows: list[dict[str, str]], output_path: Path) -> None:
         archive.writestr("_rels/.rels", rels)
         archive.writestr("xl/workbook.xml", workbook)
         archive.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
-        archive.writestr("xl/worksheets/sheet1.xml", _sheet_xml(rows))
+        archive.writestr("xl/worksheets/sheet1.xml", _fill_sheet_xml(rows))
+        archive.writestr("xl/worksheets/sheet2.xml", _import_sheet_xml(rows))
+        archive.writestr("xl/worksheets/sheet3.xml", _instructions_sheet_xml())
+        archive.writestr("xl/worksheets/sheet4.xml", _options_sheet_xml())
         archive.writestr("xl/styles.xml", styles)
         archive.writestr("docProps/core.xml", core)
         archive.writestr("docProps/app.xml", app)

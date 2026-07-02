@@ -7,8 +7,9 @@ import json
 from pathlib import Path
 import subprocess
 import threading
-import xml.etree.ElementTree as ET
 import zipfile
+
+import pytest
 
 from scripts import check_provider_proof_readiness
 from scripts import generate_human_review_sample_pack
@@ -164,22 +165,22 @@ def _write_human_review_csv(path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
-def _xlsx_sheet_rows(path: Path) -> tuple[list[str], list[dict[str, str]], str]:
-    ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+def _xlsx_workbook_xml(path: Path) -> str:
     with zipfile.ZipFile(path) as archive:
-        workbook_xml = archive.read("xl/workbook.xml").decode("utf-8")
-        sheet_xml = archive.read("xl/worksheets/sheet1.xml").decode("utf-8")
-    root = ET.fromstring(sheet_xml)
-    parsed_rows: list[list[str]] = []
-    for row in root.findall(".//main:sheetData/main:row", ns):
-        values: list[str] = []
-        for cell in row.findall("main:c", ns):
-            text = cell.findtext("main:is/main:t", default="", namespaces=ns)
-            values.append(text)
-        parsed_rows.append(values)
-    headers = parsed_rows[0]
-    data = [dict(zip(headers, row)) for row in parsed_rows[1:]]
-    return headers, data, workbook_xml + sheet_xml
+        return "\n".join(
+            archive.read(name).decode("utf-8")
+            for name in archive.namelist()
+            if name.startswith("xl/")
+        )
+
+
+def _xlsx_table(path: Path, sheet_name: str, required_headers: set[str]) -> tuple[list[str], list[dict[str, str]]]:
+    rows_by_sheet = import_human_review_batch._xlsx_rows_by_name(path)
+    raw_rows = rows_by_sheet[sheet_name]
+    header_index = import_human_review_batch._find_header_row(raw_rows, required_headers)
+    headers = [import_human_review_batch._normalize_header(value) for value in raw_rows[header_index]]
+    rows = import_human_review_batch._rows_after_header(raw_rows, header_index)
+    return headers, rows
 
 
 def _human_review_batch_payload(sample_size: int = 30) -> dict:
@@ -575,12 +576,12 @@ def test_human_review_sample_pack_default_outputs_are_private_outputs():
     )
     assert generate_human_review_sample_pack.default_output_for_format("csv").endswith(".csv")
     assert generate_human_review_sample_pack.default_output_for_format("xlsx").startswith(
-        "evidence/private_outputs/human_review_sample_pack."
+        "evidence/private_outputs/human_review_fillable_simple_"
     )
     assert generate_human_review_sample_pack.default_output_for_format("xlsx").endswith(".xlsx")
 
 
-def test_human_review_sample_pack_generates_reviewer_friendly_xlsx(tmp_path):
+def test_human_review_sample_pack_generates_simple_fillable_xlsx(tmp_path):
     output = tmp_path / "reviewer-pack.xlsx"
 
     result = subprocess.run(
@@ -603,28 +604,105 @@ def test_human_review_sample_pack_generates_reviewer_friendly_xlsx(tmp_path):
     )
 
     assert result.stdout.strip() == str(output)
-    headers, rows, workbook_xml = _xlsx_sheet_rows(output)
-    assert "name=\"Human Review\"" in workbook_xml
+    workbook_xml = _xlsx_workbook_xml(output)
+    for sheet_name in ["填写表", "导入字段_不要改", "填写说明", "选项"]:
+        assert f'name="{sheet_name}"' in workbook_xml
     assert "<autoFilter" in workbook_xml
     assert 'state="frozen"' in workbook_xml
     assert "<dataValidations" in workbook_xml
+    assert "<f>'填写表'!F7</f><v>0</v>" not in workbook_xml
+
+    fill_headers, fill_rows = _xlsx_table(output, "填写表", {"item_id", "审核类型"})
     for field in [
         "item_id",
+        "审核类型",
+        "输入摘要（匿名）",
+        "模型输出摘要",
+        "审核说明",
+        "正确性 0-1",
+        "有依据 0-1",
+        "安全性 0-1",
+        "有用性 0-1",
+        "隐私风险",
+        "幻觉",
+        "编造",
+        "结论",
+        "需复审",
+        "复审结论",
+        "Bad Case编号",
+        "备注",
+    ]:
+        assert field in fill_headers
+    assert len(fill_rows) == 30
+    assert all(row["正确性 0-1"] == "" for row in fill_rows)
+    assert all(row["结论"] == "" for row in fill_rows)
+
+    import_headers, import_rows = _xlsx_table(output, "导入字段_不要改", {"item_id", "task_type"})
+    for field in [
+        "review_batch_id",
+        "dataset_name",
+        "sampling_method",
+        "reviewer_role",
+        "privacy_sanitized",
         "task_type",
         "anonymized_input_ref",
         "model_output_ref",
-        "task_type_label",
-        "input_summary",
-        "model_output_summary",
-        "review_instruction",
-        "correctness_score",
-        "decision",
     ]:
-        assert field in headers
-    assert len(rows) == 30
-    assert {row["task_type"] for row in rows} == set(generate_human_review_sample_pack.TASK_MODULES)
-    rendered = "\n".join(",".join(row.values()) for row in rows)
+        assert field in import_headers
+    assert len(import_rows) == 30
+    assert {row["task_type"] for row in import_rows} == set(generate_human_review_sample_pack.TASK_MODULES)
+    rendered = "\n".join(",".join(row.values()) for row in [*fill_rows, *import_rows])
     assert not any(pattern.search(rendered) for pattern in generate_human_review_sample_pack.PII_PATTERNS)
+
+
+def test_human_review_simple_xlsx_import_reads_fill_sheet_values(tmp_path):
+    output = tmp_path / "completed-review.xlsx"
+    rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
+    for row in rows:
+        row["reviewer_id_hash"] = "reviewer:external_a"
+        row["correctness_score"] = "0.8"
+        row["groundedness_score"] = "0.9"
+        row["safety_score"] = "1.0"
+        row["usefulness_score"] = "0.95"
+        row["privacy_risk_flag"] = "false"
+        row["hallucination_flag"] = "false"
+        row["fabrication_flag"] = "false"
+        row["reviewer_comment"] = "synthetic completed workbook row"
+        row["decision"] = "pass"
+        row["requires_adjudication"] = "false"
+
+    generate_human_review_sample_pack.render_xlsx(rows, output)
+
+    loaded_rows = import_human_review_batch.load_review_rows(output)
+    assert len(loaded_rows) == 30
+    assert loaded_rows[0]["correctness_score"] == "0.8"
+    assert loaded_rows[0]["groundedness_score"] == "0.9"
+    assert loaded_rows[0]["decision"] == "pass"
+    assert loaded_rows[0]["privacy_risk_flag"] == "false"
+    assert loaded_rows[0]["reviewer_id_hash"] == "reviewer:external_a"
+
+    batch = import_human_review_batch.build_human_review_batch(output)
+    assert batch["sample_size"] == 30
+    assert batch["review_items"][0]["correctness_score"] == 0.8
+    assert batch["review_items"][0]["groundedness_score"] == 0.9
+    assert batch["review_items"][0]["privacy_risk_flag"] is False
+
+
+def test_human_review_simple_xlsx_import_rejects_blank_scores_not_cached_zero(tmp_path):
+    output = tmp_path / "blank-review.xlsx"
+    rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
+    for row in rows:
+        row["reviewer_id_hash"] = "reviewer:external_a"
+        row["privacy_risk_flag"] = "false"
+        row["hallucination_flag"] = "false"
+        row["fabrication_flag"] = "false"
+        row["decision"] = "pass"
+        row["requires_adjudication"] = "false"
+
+    generate_human_review_sample_pack.render_xlsx(rows, output)
+
+    with pytest.raises(ValueError, match="correctness_score must be a number"):
+        import_human_review_batch.build_human_review_batch(output)
 
 
 def test_human_review_sample_pack_template_is_not_real_evidence(tmp_path):

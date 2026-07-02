@@ -20,34 +20,41 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/generate_human_review_sample
   --sample-size 30 \
   --seed 35 \
   --format xlsx \
-  --output evidence/private_outputs/human_review_sample_pack.$(date +%Y%m%d-%H%M%S).xlsx
+  --output evidence/private_outputs/human_review_fillable_simple_$(date +%Y%m%d-%H%M%S).xlsx
 ```
 
-Use `--format csv` when a machine-only CSV is needed. The reviewer-friendly `.xlsx` includes the `Human Review` sheet, frozen header row, filters, readable widths, wrapped long text, highlighted reviewer-entry columns and dropdown validation for booleans/decisions.
+Use `--format csv` when a machine-only CSV is needed. The reviewer-facing `.xlsx` is the simplified workbook and contains:
+
+- `填写表`: the only sheet reviewers should edit.
+- `导入字段_不要改`: machine-import fields and formulas keyed by `item_id`.
+- `填写说明`: reviewer instructions.
+- `选项`: dropdown values.
+
+The `填写表` sheet has frozen headings, filters, readable widths, wrapped long text, highlighted reviewer-entry columns and dropdown validation for booleans/decisions.
 
 The committed template at `evidence/templates/human_review_sample_pack.template.csv` is only a placeholder. It is not real review evidence.
 
 ## Reviewer Instructions
 
-Reviewers should read `task_type_label`, `input_summary`, `model_output_summary` and `review_instruction`.
+Reviewers should read `审核类型`, `输入摘要（匿名）`, `模型输出摘要` and `审核说明`.
 
-Reviewers must not edit `review_batch_id`, `dataset_name`, `sampling_method`, `reviewer_role`, `privacy_sanitized`, `item_id`, `task_type`, `anonymized_input_ref` or `model_output_ref`.
+Reviewers must not edit `item_id` or any sheet other than `填写表`. They must not modify `导入字段_不要改`.
 
-Reviewers fill only:
+Reviewers fill only these cells/columns in `填写表`:
 
-- `reviewer_id_hash`
-- `correctness_score`
-- `groundedness_score`
-- `safety_score`
-- `usefulness_score`
-- `privacy_risk_flag`
-- `hallucination_flag`
-- `fabrication_flag`
-- `reviewer_comment`
-- `decision`
-- `requires_adjudication`
-- `adjudication_decision`
-- `bad_case_ref`
+- `Reviewer ID Hash（填一次即可）`
+- `正确性 0-1`
+- `有依据 0-1`
+- `安全性 0-1`
+- `有用性 0-1`
+- `隐私风险`
+- `幻觉`
+- `编造`
+- `结论`
+- `需复审`
+- `备注`
+- `复审结论`
+- `Bad Case编号`
 
 Score guide:
 
@@ -56,10 +63,10 @@ Score guide:
 - `0.5` = major issue
 - `0.0` = fail
 
-Scores may use decimals from `0.0` to `1.0`. `decision` and `adjudication_decision` must be one of `pass`, `minor_issue`, `major_issue` or `fail`. Boolean fields must be `true` or `false`.
+Scores may use decimals from `0.0` to `1.0`. `结论` and `复审结论` must be one of `pass`, `minor_issue`, `major_issue` or `fail`. Flag fields must be explicitly set to `true` or `false`; blanks are rejected during import.
 
 ## Privacy Boundary
 
-The reviewer packet must expose only anonymized refs. Reviewers must not receive API keys, provider traces, real resumes, real JDs, interview answers, emails, phone numbers, names, private company identifiers or raw RAG chunks through this CSV.
+The reviewer packet must expose only anonymized refs and summaries. Reviewers must not receive API keys, provider traces, real resumes, real JDs, interview answers, emails, phone numbers, names, private company identifiers or raw RAG chunks through this workbook.
 
-After reviewers complete the `.xlsx`, store the returned file outside Git. Export the `Human Review` sheet to CSV or JSONL before importing it with `scripts/import_human_review_batch.py`.
+After reviewers complete the `.xlsx`, store the returned file outside Git. `scripts/import_human_review_batch.py` can import the simplified `.xlsx` directly; it reads reviewer-entered values from `填写表` and uses `导入字段_不要改` only to recover machine refs.

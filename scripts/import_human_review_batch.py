@@ -8,10 +8,12 @@ import csv
 from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 from typing import Any
 import uuid
+import zipfile
+import xml.etree.ElementTree as ET
 
 
 DEFAULT_OUTPUT = "evidence/private_outputs/human_review_batch.{timestamp}.json"
@@ -64,6 +66,44 @@ RAW_PRIVATE_FIELDS = {
     "private_note",
     "provider_trace",
 }
+XLSX_FILL_SHEET = "填写表"
+XLSX_IMPORT_SHEET = "导入字段_不要改"
+XLSX_FILL_LABEL_TO_FIELD = {
+    "item_id": "item_id",
+    "审核类型": "task_type_label",
+    "输入摘要（匿名）": "input_summary",
+    "模型输出摘要": "model_output_summary",
+    "审核说明": "review_instruction",
+    "正确性 0-1": "correctness_score",
+    "有依据 0-1": "groundedness_score",
+    "安全性 0-1": "safety_score",
+    "有用性 0-1": "usefulness_score",
+    "隐私风险": "privacy_risk_flag",
+    "幻觉": "hallucination_flag",
+    "编造": "fabrication_flag",
+    "结论": "decision",
+    "需复审": "requires_adjudication",
+    "备注": "reviewer_comment",
+    "复审结论": "adjudication_decision",
+    "Bad Case编号": "bad_case_ref",
+    "reviewer_id_hash": "reviewer_id_hash",
+    "审核人ID Hash": "reviewer_id_hash",
+}
+TASK_TYPE_LABEL_TO_TYPE = {
+    "JD 解析审核": "jd_parse",
+    "简历解析审核": "resume_parse",
+    "匹配分数审核": "match_score",
+    "RAG 回答审核": "rag_answer",
+    "项目改写审核": "project_rewrite",
+    "Agent 流程审核": "agent_workflow",
+}
+XLSX_NS = {
+    "main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+    "rel": "http://schemas.openxmlformats.org/package/2006/relationships",
+    "office": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+}
+TRUE_VALUES = {"1", "true", "yes", "y", "pass", "passed"}
+FALSE_VALUES = {"0", "false", "no", "n", "fail", "failed"}
 
 
 def _utc_now() -> str:
@@ -78,7 +118,18 @@ def _output_path(path: str) -> Path:
 def _parse_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value
-    return str(value).strip().lower() in {"1", "true", "yes", "y", "pass", "passed"}
+    return str(value).strip().lower() in TRUE_VALUES
+
+
+def _parse_required_bool(value: Any, *, field: str, row_number: int) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in TRUE_VALUES:
+        return True
+    if text in FALSE_VALUES:
+        return False
+    raise ValueError(f"row {row_number}: {field} must be true or false")
 
 
 def _parse_score(value: Any, *, field: str, row_number: int) -> float:
@@ -110,8 +161,164 @@ def _check_no_private_data(row: dict[str, Any], *, row_number: int) -> None:
                 raise ValueError(f"row {row_number}: obvious PII detected in {key}")
 
 
+def _xlsx_target_path(target: str) -> str:
+    if target.startswith("/"):
+        return target.lstrip("/")
+    if target.startswith("xl/"):
+        return target
+    return str(PurePosixPath("xl") / target)
+
+
+def _xlsx_shared_strings(archive: zipfile.ZipFile) -> list[str]:
+    if "xl/sharedStrings.xml" not in archive.namelist():
+        return []
+    root = ET.fromstring(archive.read("xl/sharedStrings.xml"))
+    values: list[str] = []
+    for item in root.findall("main:si", XLSX_NS):
+        values.append("".join(text.text or "" for text in item.findall(".//main:t", XLSX_NS)))
+    return values
+
+
+def _xlsx_sheet_paths(archive: zipfile.ZipFile) -> dict[str, str]:
+    workbook = ET.fromstring(archive.read("xl/workbook.xml"))
+    rels = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+    rel_targets = {
+        rel.attrib["Id"]: rel.attrib["Target"]
+        for rel in rels.findall("rel:Relationship", XLSX_NS)
+    }
+    sheets: dict[str, str] = {}
+    for sheet in workbook.findall("main:sheets/main:sheet", XLSX_NS):
+        rel_id = sheet.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]
+        sheets[sheet.attrib["name"]] = _xlsx_target_path(rel_targets[rel_id])
+    return sheets
+
+
+def _cell_column_index(cell_ref: str) -> int:
+    letters = "".join(character for character in cell_ref if character.isalpha())
+    index = 0
+    for character in letters:
+        index = index * 26 + ord(character.upper()) - 64
+    return index or 1
+
+
+def _xlsx_cell_value(cell: ET.Element, shared_strings: list[str]) -> str:
+    cell_type = cell.attrib.get("t")
+    if cell_type == "inlineStr":
+        return "".join(text.text or "" for text in cell.findall(".//main:t", XLSX_NS))
+    value = cell.findtext("main:v", default="", namespaces=XLSX_NS)
+    if cell_type == "s" and value:
+        return shared_strings[int(value)]
+    if cell_type == "b":
+        return "true" if value == "1" else "false"
+    return value
+
+
+def _xlsx_rows_by_name(path: Path) -> dict[str, list[list[str]]]:
+    with zipfile.ZipFile(path) as archive:
+        shared_strings = _xlsx_shared_strings(archive)
+        rows_by_sheet: dict[str, list[list[str]]] = {}
+        for sheet_name, sheet_path in _xlsx_sheet_paths(archive).items():
+            root = ET.fromstring(archive.read(sheet_path))
+            parsed_rows: list[list[str]] = []
+            for row in root.findall("main:sheetData/main:row", XLSX_NS):
+                values: list[str] = []
+                for cell in row.findall("main:c", XLSX_NS):
+                    column_index = _cell_column_index(cell.attrib.get("r", "A1"))
+                    while len(values) < column_index - 1:
+                        values.append("")
+                    values.append(_xlsx_cell_value(cell, shared_strings))
+                parsed_rows.append(values)
+            rows_by_sheet[sheet_name] = parsed_rows
+    return rows_by_sheet
+
+
+def _normalize_header(value: str) -> str:
+    return " ".join(str(value).replace("\n", " ").split()).strip()
+
+
+def _find_header_row(raw_rows: list[list[str]], required_headers: set[str]) -> int:
+    normalized_required = {_normalize_header(header) for header in required_headers}
+    for index, row in enumerate(raw_rows):
+        normalized = {_normalize_header(value) for value in row if str(value).strip()}
+        if normalized_required <= normalized:
+            return index
+    raise ValueError(f"xlsx sheet missing required headers: {sorted(required_headers)}")
+
+
+def _rows_after_header(raw_rows: list[list[str]], header_index: int) -> list[dict[str, str]]:
+    headers = [_normalize_header(value) for value in raw_rows[header_index]]
+    rows: list[dict[str, str]] = []
+    for raw_row in raw_rows[header_index + 1 :]:
+        if not any(str(value).strip() for value in raw_row):
+            continue
+        padded = [*raw_row, *([""] * (len(headers) - len(raw_row)))]
+        rows.append({header: str(value).strip() for header, value in zip(headers, padded) if header})
+    return rows
+
+
+def _global_reviewer_id(fill_sheet_rows: list[list[str]]) -> str:
+    for row in fill_sheet_rows:
+        if row and _normalize_header(row[0]).startswith("Reviewer ID Hash") and len(row) > 1:
+            return str(row[1]).strip()
+    return ""
+
+
+def _load_xlsx_review_rows(path: Path) -> list[dict[str, Any]]:
+    sheets = _xlsx_rows_by_name(path)
+    if XLSX_FILL_SHEET not in sheets:
+        raise ValueError(f"xlsx human review input must contain {XLSX_FILL_SHEET!r} sheet")
+
+    fill_rows_raw = sheets[XLSX_FILL_SHEET]
+    fill_header_index = _find_header_row(fill_rows_raw, {"item_id", "审核类型"})
+    fill_rows = _rows_after_header(fill_rows_raw, fill_header_index)
+    reviewer_id_hash = _global_reviewer_id(fill_rows_raw)
+
+    import_rows_by_item: dict[str, dict[str, str]] = {}
+    if XLSX_IMPORT_SHEET in sheets:
+        import_header_index = _find_header_row(sheets[XLSX_IMPORT_SHEET], {"item_id", "task_type"})
+        for row in _rows_after_header(sheets[XLSX_IMPORT_SHEET], import_header_index):
+            item_id = str(row.get("item_id", "")).strip()
+            if item_id:
+                import_rows_by_item[item_id] = row
+
+    rows: list[dict[str, Any]] = []
+    for fill_row in fill_rows:
+        normalized_fill = {
+            XLSX_FILL_LABEL_TO_FIELD.get(header, header): value
+            for header, value in fill_row.items()
+        }
+        item_id = str(normalized_fill.get("item_id", "")).strip()
+        if not item_id:
+            continue
+        machine_row = dict(import_rows_by_item.get(item_id, {}))
+        row = {
+            **{field: machine_row.get(field, "") for field in BATCH_OPTIONAL_FIELDS},
+            "item_id": item_id,
+            "task_type": machine_row.get("task_type", ""),
+            "anonymized_input_ref": machine_row.get("anonymized_input_ref", ""),
+            "model_output_ref": machine_row.get("model_output_ref", ""),
+        }
+        if not row["task_type"]:
+            row["task_type"] = TASK_TYPE_LABEL_TO_TYPE.get(
+                str(normalized_fill.get("task_type_label", "")).strip(),
+                "",
+            )
+        for field in REQUIRED_ITEM_FIELDS - {"item_id", "task_type", "anonymized_input_ref", "model_output_ref"}:
+            row[field] = str(normalized_fill.get(field, "")).strip()
+        if not row["reviewer_id_hash"]:
+            row["reviewer_id_hash"] = reviewer_id_hash
+        rows.append(row)
+
+    if not rows:
+        raise ValueError("human review xlsx input is empty")
+    return rows
+
+
 def load_review_rows(path: Path) -> list[dict[str, Any]]:
-    if path.suffix.lower() == ".jsonl":
+    suffix = path.suffix.lower()
+    if suffix == ".xlsx":
+        rows = _load_xlsx_review_rows(path)
+    elif suffix == ".jsonl":
         rows = [
             json.loads(line)
             for line in path.read_text(encoding="utf-8").splitlines()
@@ -162,12 +369,28 @@ def normalize_review_items(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 field="usefulness_score",
                 row_number=row_number,
             ),
-            "privacy_risk_flag": _parse_bool(row["privacy_risk_flag"]),
-            "hallucination_flag": _parse_bool(row["hallucination_flag"]),
-            "fabrication_flag": _parse_bool(row["fabrication_flag"]),
+            "privacy_risk_flag": _parse_required_bool(
+                row["privacy_risk_flag"],
+                field="privacy_risk_flag",
+                row_number=row_number,
+            ),
+            "hallucination_flag": _parse_required_bool(
+                row["hallucination_flag"],
+                field="hallucination_flag",
+                row_number=row_number,
+            ),
+            "fabrication_flag": _parse_required_bool(
+                row["fabrication_flag"],
+                field="fabrication_flag",
+                row_number=row_number,
+            ),
             "reviewer_comment": str(row["reviewer_comment"]).strip(),
             "decision": decision,
-            "requires_adjudication": _parse_bool(row["requires_adjudication"]),
+            "requires_adjudication": _parse_required_bool(
+                row["requires_adjudication"],
+                field="requires_adjudication",
+                row_number=row_number,
+            ),
             "adjudication_decision": str(row["adjudication_decision"]).strip(),
             "bad_case_ref": str(row["bad_case_ref"]).strip(),
         }

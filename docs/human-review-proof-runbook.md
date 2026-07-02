@@ -17,12 +17,12 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/generate_human_review_sample
   --sample-size 30 \
   --seed 35 \
   --format xlsx \
-  --output evidence/private_outputs/human_review_sample_pack.$(date +%Y%m%d-%H%M%S).xlsx
+  --output evidence/private_outputs/human_review_fillable_simple_$(date +%Y%m%d-%H%M%S).xlsx
 ```
 
-Use `--dry-run` to inspect the CSV-shaped content without writing a file. The reviewer-friendly `.xlsx` has a `Human Review` sheet, readable summaries, filters, frozen header row and dropdowns for reviewer fields. The generated packet contains `item_id`, `task_type`, `anonymized_input_ref`, `model_output_ref`, `input_summary` and `model_output_summary`; it does not contain raw resume text, raw JD text, API keys, provider traces, real names, emails, phone numbers or private company identifiers.
+Use `--dry-run` to inspect the CSV-shaped content without writing a file. The reviewer-facing `.xlsx` is the simplified workbook with `填写表`, `导入字段_不要改`, `填写说明` and `选项`. Reviewers edit only `填写表`; the importer reads the reviewer-entered values from that sheet and uses `导入字段_不要改` only to recover machine refs. The generated packet contains `item_id`, anonymized refs, `输入摘要（匿名）` and `模型输出摘要`; it does not contain raw resume text, raw JD text, API keys, provider traces, real names, emails, phone numbers or private company identifiers.
 
-Send the CSV and reviewer instructions to the external reviewers. Reviewers must not edit `item_id`, `task_type`, `anonymized_input_ref` or `model_output_ref`. They should only fill `reviewer_id_hash`, score fields, risk flags, `reviewer_comment`, `decision`, `requires_adjudication`, `adjudication_decision` and `bad_case_ref`.
+Send the `.xlsx` and reviewer instructions to the external reviewers. Reviewers must not edit `item_id`, `审核类型`, summaries, refs or any sheet other than `填写表`. They should fill only `Reviewer ID Hash（填一次即可）`, score fields, risk flags, `备注`, `结论`, `需复审`, `复审结论` and `Bad Case编号`.
 
 ## Anonymization
 
@@ -58,11 +58,11 @@ For hallucination, fabrication, privacy risk, major issue or fail cases, create 
 
 ## Import Batch
 
-After reviewers return the completed `.xlsx`, keep it outside Git and export the `Human Review` sheet to CSV or JSONL. Then dry-run the import first:
+After reviewers return the completed `.xlsx`, keep it outside Git and dry-run the import first. Do not export through WPS/Excel unless the `.xlsx` import path fails:
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_batch.py \
-  --input /tmp/careeragent-v35b-human-review.csv \
+  --input evidence/private_outputs/human_review_fillable_simple_completed.xlsx \
   --batch-id human-review-v35b-real-batch \
   --dataset-name anonymized_v35b_external_review \
   --sampling-method stratified_by_task_type_and_risk \
@@ -75,7 +75,7 @@ Write the real redacted proof only to ignored private outputs:
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_batch.py \
-  --input /tmp/careeragent-v35b-human-review.csv \
+  --input evidence/private_outputs/human_review_fillable_simple_completed.xlsx \
   --output evidence/private_outputs/human_review_batch.$(date +%Y%m%d-%H%M%S).json \
   --batch-id human-review-v35b-real-batch \
   --dataset-name anonymized_v35b_external_review \
@@ -89,7 +89,7 @@ The complete reviewer operation is:
 1. Generate sample pack.
 2. Send the packet to reviewers.
 3. Reviewers fill scores, flags, decisions, comments and adjudication fields.
-4. Collect the completed CSV/JSONL outside Git.
+4. Collect the completed `.xlsx` outside Git.
 5. Import the completed review batch into `evidence/private_outputs`.
 6. Summarize the imported batch.
 7. Validate the external evidence package.
