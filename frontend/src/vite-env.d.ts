@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_SENTRY_RELEASE?: string;
   readonly VITE_SENTRY_TRACES_SAMPLE_RATE?: string;
   readonly VITE_SENTRY_TRACE_TARGETS?: string;
+  readonly VITE_ENABLE_OBSERVABILITY_TEST_TOOLS?: string;
 }
 
 interface ImportMeta {

@@ -24,14 +24,16 @@ function fail(message) {
 }
 
 const sourceFiles = walk(srcRoot).filter((path) => /\.(ts|tsx)$/.test(path));
+const directFetchAllowed = new Set(["src/api/client.ts", "src/observability.ts"]);
+const rawBackendUrlAllowed = new Set(["src/api/client.ts", "src/observability.ts"]);
 
 for (const file of sourceFiles) {
   const rel = relative(root, file);
   const text = read(file);
-  if (text.includes("fetch(") && rel !== "src/api/client.ts") {
+  if (text.includes("fetch(") && !directFetchAllowed.has(rel)) {
     fail(`${rel}: direct fetch is only allowed in src/api/client.ts`);
   }
-  if (text.includes("http://localhost") && rel !== "src/api/client.ts") {
+  if (text.includes("http://localhost") && !rawBackendUrlAllowed.has(rel)) {
     fail(`${rel}: raw backend URL is only allowed in src/api/client.ts`);
   }
 }

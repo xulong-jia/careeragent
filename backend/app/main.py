@@ -38,6 +38,19 @@ from app.core.metrics import record_http_request
 from app.core.observability import initialize_sentry
 
 
+CORS_ALLOW_HEADERS = [
+    "Accept",
+    "Authorization",
+    "Content-Type",
+    "Origin",
+    "X-Observability-Test",
+    "X-Request-ID",
+    "X-Requested-With",
+    "baggage",
+    "sentry-trace",
+]
+
+
 def _validate_startup_security(settings) -> None:
     validate_runtime_settings(settings)
 
@@ -54,7 +67,7 @@ def create_app() -> FastAPI:
         allow_origins=list(settings.cors_origins),
         allow_credentials=True,
         allow_methods=["*"],
-        allow_headers=["*"],
+        allow_headers=CORS_ALLOW_HEADERS,
     )
 
     @app.middleware("http")

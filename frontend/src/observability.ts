@@ -29,6 +29,10 @@ const SENSITIVE_KEY_PARTS = [
 
 let initialized = false;
 
+function apiBaseUrl(): string {
+  return import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+}
+
 function scrubString(value: string): string {
   return value
     .replace(EMAIL_PATTERN, "[redacted-email]")
@@ -86,10 +90,14 @@ export function scrubSentryEvent(event: ErrorEvent): ErrorEvent {
   return scrubRequest(scrubbed);
 }
 
-function parseSampleRate(value: string | undefined): number {
-  const parsed = Number(value ?? "0");
+function observabilityTestToolsEnabled(): boolean {
+  return import.meta.env.VITE_ENABLE_OBSERVABILITY_TEST_TOOLS === "true";
+}
+
+function parseSampleRate(value: string | undefined, defaultValue = 0.05): number {
+  const parsed = Number(value ?? String(defaultValue));
   if (!Number.isFinite(parsed)) {
-    return 0;
+    return defaultValue;
   }
   return Math.min(1, Math.max(0, parsed));
 }
@@ -102,7 +110,29 @@ function traceTargets(): Array<string | RegExp> {
       .map((target) => target.trim())
       .filter(Boolean);
   }
-  return [window.location.origin, import.meta.env.VITE_API_BASE_URL ?? "/api"];
+  return [window.location.origin, apiBaseUrl()];
+}
+
+async function runObservabilityTraceCheck(): Promise<void> {
+  if (!observabilityTestToolsEnabled()) {
+    return;
+  }
+  await Sentry.startSpan(
+    {
+      name: "observability.trace_check",
+      op: "observability.proof",
+      forceTransaction: true,
+    },
+    async () => {
+      await fetch(`${apiBaseUrl()}/live`, {
+        method: "GET",
+        cache: "no-store",
+        headers: {
+          "X-Observability-Test": "trace-check",
+        },
+      });
+    },
+  );
 }
 
 export function initObservability(): boolean {
@@ -118,11 +148,21 @@ export function initObservability(): boolean {
     dsn,
     environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
     release: import.meta.env.VITE_SENTRY_RELEASE || undefined,
-    tracesSampleRate: parseSampleRate(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE),
+    tracesSampleRate: observabilityTestToolsEnabled()
+      ? 1
+      : parseSampleRate(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE),
     tracePropagationTargets: traceTargets(),
     beforeSend: scrubSentryEvent,
-    integrations: [Sentry.browserTracingIntegration()],
+    integrations: [
+      Sentry.browserTracingIntegration({
+        instrumentPageLoad: true,
+        instrumentNavigation: true,
+        traceFetch: true,
+        traceXHR: true,
+      }),
+    ],
   });
   initialized = true;
+  void runObservabilityTraceCheck();
   return true;
 }

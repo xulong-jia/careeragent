@@ -92,9 +92,16 @@ Frontend runtime/build vars:
 - `VITE_SENTRY_RELEASE`
 - `VITE_SENTRY_TRACES_SAMPLE_RATE`
 - `VITE_SENTRY_TRACE_TARGETS`
+- `VITE_ENABLE_OBSERVABILITY_TEST_TOOLS=false`
 
 `SENTRY_AUTH_TOKEN` is build-time only for source map upload. Store it in CI or
 Render build secrets, never in committed env files and never in runtime JS.
+
+For a temporary tracing proof run, set `VITE_ENABLE_OBSERVABILITY_TEST_TOOLS=true`
+and redeploy the frontend. The app will create one synthetic
+`observability.trace_check` transaction and fetch `/live` without auth headers,
+request body or private user text. Set it back to `false` after collecting
+redacted trace ids.
 
 ## Validate
 

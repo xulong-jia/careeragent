@@ -74,6 +74,33 @@ def test_sentry_before_send_scrubs_sensitive_payload():
     assert "raw user text" not in dumped
 
 
+def test_cors_allows_sentry_trace_headers_without_header_wildcard():
+    from app.main import CORS_ALLOW_HEADERS, app
+
+    assert "*" not in CORS_ALLOW_HEADERS
+    assert "sentry-trace" in CORS_ALLOW_HEADERS
+    assert "baggage" in CORS_ALLOW_HEADERS
+
+    response = TestClient(app).options(
+        "/live",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": (
+                "sentry-trace,baggage,authorization,x-observability-test"
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    allowed = response.headers["access-control-allow-headers"].lower()
+    assert "*" not in allowed
+    assert "sentry-trace" in allowed
+    assert "baggage" in allowed
+    assert "authorization" in allowed
+    assert "x-observability-test" in allowed
+
+
 def test_observability_test_error_endpoint_default_closed():
     from app.main import app
 

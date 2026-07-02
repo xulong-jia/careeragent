@@ -39,9 +39,34 @@ test("frontend observability scrubs auth, cookie, pii, and raw career text field
 test("Sentry tracing is target-limited and Session Replay is not configured", () => {
   const source = read("src/observability.ts");
   const packageJson = JSON.parse(read("package.json"));
+  assert.match(source, /Sentry\.browserTracingIntegration\(\{/);
+  assert.match(source, /instrumentPageLoad: true/);
+  assert.match(source, /instrumentNavigation: true/);
+  assert.match(source, /traceFetch: true/);
   assert.match(source, /tracePropagationTargets: traceTargets\(\)/);
+  assert.match(source, /apiBaseUrl\(\)/);
   assert.doesNotMatch(source, /replayIntegration|Replay/);
   assert.equal(packageJson.dependencies["@sentry/replay"], undefined);
+});
+
+
+test("frontend observability test tools create a synthetic sampled trace", () => {
+  const source = read("src/observability.ts");
+  const env = read("src/vite-env.d.ts");
+  assert.match(source, /VITE_ENABLE_OBSERVABILITY_TEST_TOOLS/);
+  assert.match(env, /VITE_ENABLE_OBSERVABILITY_TEST_TOOLS/);
+  assert.match(source, /observabilityTestToolsEnabled\(\)\s+\?\s+1/);
+  assert.match(source, /Sentry\.startSpan\(/);
+  assert.match(source, /forceTransaction: true/);
+  assert.match(source, /observability\.trace_check/);
+  assert.match(source, /fetch\(`\$\{apiBaseUrl\(\)\}\/live`/);
+});
+
+
+test("frontend tracing defaults to low nonzero sampling when DSN is present", () => {
+  const source = read("src/observability.ts");
+  assert.match(source, /defaultValue = 0\.05/);
+  assert.doesNotMatch(source, /Number\(value \?\? "0"\)/);
 });
 
 
