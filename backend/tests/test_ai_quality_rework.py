@@ -6,7 +6,7 @@ import threading
 
 from app.evaluation import ai_quality
 from scripts import run_evals
-from scripts.validate_ai_providers import build_provider_proof
+from scripts.validate_ai_providers import LLM_JOB_PROFILE_SCHEMA_PROMPT, build_provider_proof
 
 
 class _FakeProviderHandler(BaseHTTPRequestHandler):
@@ -62,6 +62,32 @@ def test_provider_validation_supports_offline_without_secret(monkeypatch):
     assert proof["status"] == "pass"
     assert proof["provider_mode"] == "offline"
     assert proof["secrets_masked"] is True
+
+
+def test_provider_validation_prompt_requests_complete_job_profile_schema():
+    required_fields = [
+        "job_profile_id",
+        "job_title",
+        "company",
+        "location",
+        "role_category",
+        "required_skills",
+        "preferred_skills",
+        "responsibilities",
+        "business_scenarios",
+        "hidden_requirements",
+        "interview_focus",
+        "risk_level",
+        "summary",
+        "parse_confidence",
+        "evidence",
+        "warnings",
+        "parser_metadata",
+    ]
+
+    for field in required_fields:
+        assert field in LLM_JOB_PROFILE_SCHEMA_PROMPT
+    assert "exactly one valid JSON object" in LLM_JOB_PROFILE_SCHEMA_PROMPT
 
 
 def test_provider_validation_accepts_fake_openai_compatible_server(monkeypatch):

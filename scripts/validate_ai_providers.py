@@ -21,6 +21,33 @@ from app.ai.llm_provider import OpenAICompatibleLLMProvider  # noqa: E402
 from app.schemas.jobs import JobProfile  # noqa: E402
 
 
+LLM_JOB_PROFILE_SCHEMA_PROMPT = """\
+Return exactly one valid JSON object for a synthetic, anonymized backend role.
+Do not include Markdown, code fences, comments, private data, emails, phone numbers or real company names.
+
+The JSON object must validate against this JobProfile shape and must include every key below:
+- job_profile_id: non-empty string, for example "provider_probe_backend_001"
+- job_title: string
+- company: anonymized string
+- location: string
+- role_category: string
+- required_skills: array of strings
+- preferred_skills: array of strings
+- responsibilities: array of strings
+- business_scenarios: array of strings
+- hidden_requirements: array of objects
+- interview_focus: array of strings
+- risk_level: string, one of "low", "medium" or "high"
+- summary: string
+- parse_confidence: number between 0 and 1
+- evidence: array of objects
+- warnings: array of strings
+- parser_metadata: object
+
+Use safe synthetic content only. Keep the response concise but complete.
+"""
+
+
 def _mask(value: str) -> str:
     return f"[set length={len(value)}]" if value else ""
 
@@ -56,10 +83,7 @@ def _validate_llm() -> dict[str, Any]:
         timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "10")),
     )
     output = provider.generate_structured(
-        prompt=(
-            "Return a minimal JSON job profile for an anonymized backend role. "
-            "Do not include private data."
-        ),
+        prompt=LLM_JOB_PROFILE_SCHEMA_PROMPT,
         schema=JobProfile,
         max_output_length=4000,
     )
