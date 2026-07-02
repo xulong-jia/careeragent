@@ -21,6 +21,36 @@ This runbook collects external backup, restore and privacy deletion evidence. It
 7. Fill only redacted evidence refs and boolean outcomes.
 8. Set `production_quality_candidate_signal=true` only when all backup purge checks pass.
 
+## Restore-After-Delete Drill
+
+Use the verifier only against an isolated restore database. Do not point it at
+the production database and do not paste database URLs into tracked files or
+chat. Export the restore connection string only in a private local shell:
+
+```bash
+export RESTORE_DATABASE_URL='postgresql+psycopg://...'
+export RESTORE_DELETE_SUBJECT_EMAIL='test@example.com'
+```
+
+Read-only scan:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/verify_restore_after_delete.py
+```
+
+Re-delete/redaction drill against the isolated restore DB:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/verify_restore_after_delete.py \
+  --apply-redaction \
+  --confirm-isolated-restore-db careeragent-postgres-restore-test-20260702
+```
+
+The script writes redacted evidence to `evidence/private_outputs/` by default,
+hashes the subject and restore DB identifiers, and refuses to run if
+`RESTORE_DATABASE_URL` equals `DATABASE_URL` or `PRODUCTION_DATABASE_URL`.
+It does not prove legal hold behavior by itself.
+
 ## Counts As Proof
 
 - Redacted backup policy and restore drill refs.
