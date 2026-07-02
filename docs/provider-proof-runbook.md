@@ -24,13 +24,17 @@ export LLM_PROVIDER=openai_compatible
 export LLM_BASE_URL=...
 export LLM_MODEL=...
 export LLM_API_KEY=...
+export LLM_TIMEOUT_SECONDS=30
 export EMBEDDING_PROVIDER=openai_compatible
 export EMBEDDING_BASE_URL=...
 export EMBEDDING_MODEL=...
 export EMBEDDING_API_KEY=...
+export EMBEDDING_DIMENSION=1536
 export DATA_ENCRYPTION_KEY=...
 export AUTH_JWT_SECRET=...
 ```
+
+For OpenAI `text-embedding-3-small`, keep `EMBEDDING_DIMENSION=1536`.
 
 The checker does not call the provider and does not print keys:
 
@@ -63,8 +67,8 @@ The runner validates LLM reachability, embedding reachability and dimension, LLM
 - `readiness_status=missing_required_env`: export the missing variables.
 - `readiness_status=unsafe_config`: replace placeholder/dev secrets or localhost URLs.
 - `provider_mode=not_verified`: inspect the redacted `source_provider_probe` status and provider endpoint configuration.
-- `rag_grounded_answer_sample_passed=false`: the LLM did not return cited grounded JSON for the safe sample.
-- `llm_judge_sample_passed=false`: the LLM judge advisory schema failed.
+- `rag_grounded_answer_sample_passed=false`: the LLM did not return cited grounded JSON for the safe sample; check the script prompt contract and keep `LLM_TIMEOUT_SECONDS=30`.
+- `llm_judge_sample_passed=false`: the LLM judge advisory schema failed; check the script prompt contract and keep `LLM_TIMEOUT_SECONDS=30`.
 - `secret_leak_check_passed=false`: delete the output from private storage and rotate any exposed secret.
 
 Do not commit proof output, provider keys, raw prompts, provider traces or screenshots.

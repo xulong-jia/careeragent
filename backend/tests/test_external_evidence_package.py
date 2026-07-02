@@ -24,7 +24,7 @@ class _FakeProviderHandler(BaseHTTPRequestHandler):
         prompt = json.dumps(payload)
         if self.path.endswith("/embeddings"):
             body = {"data": [{"embedding": [0.1, 0.2, 0.3, 0.4]}]}
-        elif "grounded=true" in prompt:
+        elif "CareerAgent requires redacted provider proof" in prompt:
             body = {
                 "choices": [
                     {
@@ -40,7 +40,7 @@ class _FakeProviderHandler(BaseHTTPRequestHandler):
                     }
                 ]
             }
-        elif "advisory judge" in prompt:
+        elif "groundedness_score" in prompt:
             body = {
                 "choices": [
                     {
@@ -194,6 +194,31 @@ def test_provider_dry_run_is_not_production_proof(monkeypatch):
     assert proof["production_quality_candidate_signal"] is False
     assert proof["secret_leak_check_passed"] is True
     assert secret not in rendered
+
+
+def test_external_provider_probe_prompts_request_exact_json_shapes():
+    grounded_prompt = run_external_provider_proof.GROUNDED_ANSWER_PROBE_PROMPT
+    judge_prompt = run_external_provider_proof.LLM_JUDGE_PROBE_PROMPT
+
+    for token in [
+        "Return JSON only",
+        "No markdown",
+        "answer",
+        "citations",
+        "grounded",
+        "chunk_safe_1",
+    ]:
+        assert token in grounded_prompt
+    for token in [
+        "Return JSON only",
+        "No markdown",
+        "groundedness_score",
+        "factuality_score",
+        "hallucination_flag",
+        "evidence_refs",
+        "chunk_safe_1",
+    ]:
+        assert token in judge_prompt
 
 
 def test_provider_fake_server_is_marked_fake_not_external(monkeypatch):
@@ -475,6 +500,8 @@ def test_provider_docs_commands_match_cli_arguments():
         assert flag in docs
         assert flag in help_text
     assert "scripts/check_provider_proof_readiness.py" in docs
+    assert "LLM_TIMEOUT_SECONDS=30" in docs
+    assert "EMBEDDING_DIMENSION=1536" in docs
 
 
 def test_templates_do_not_contain_secret_like_material():

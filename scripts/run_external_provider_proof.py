@@ -32,6 +32,28 @@ SECRET_PATTERNS = [
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"(?i)(authorization|api[_-]?key|token|secret)[\"'=:\s]+[A-Za-z0-9_./+=-]{12,}"),
 ]
+GROUNDED_ANSWER_PROBE_PROMPT = """\
+Return JSON only. No markdown. Use only this safe evidence:
+chunk_id=chunk_safe_1 says CareerAgent requires redacted provider proof.
+
+Return exactly:
+{
+  "answer": "CareerAgent requires redacted provider proof.",
+  "citations": ["chunk_safe_1"],
+  "grounded": true
+}
+"""
+LLM_JUDGE_PROBE_PROMPT = """\
+Return JSON only. No markdown.
+
+Return exactly:
+{
+  "groundedness_score": 1.0,
+  "factuality_score": 1.0,
+  "hallucination_flag": false,
+  "evidence_refs": ["chunk_safe_1"]
+}
+"""
 
 
 def _utc_now() -> str:
@@ -126,11 +148,7 @@ def _validate_grounded_answer() -> bool:
         timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "10")),
     )
     output = provider.generate_structured(
-        prompt=(
-            "Use only this safe evidence: chunk_id=chunk_safe_1 says CareerAgent "
-            "requires redacted provider proof. Return JSON with answer, citations "
-            "containing chunk_safe_1, and grounded=true."
-        ),
+        prompt=GROUNDED_ANSWER_PROBE_PROMPT,
         schema=GroundedAnswerProbe,
         max_output_length=2000,
     )
@@ -155,11 +173,7 @@ def _validate_llm_judge() -> bool:
         timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "10")),
     )
     output = provider.generate_structured(
-        prompt=(
-            "Return advisory judge JSON for a safe synthetic answer. Include "
-            "groundedness_score=1.0, factuality_score=1.0, hallucination_flag=false, "
-            "and evidence_refs containing chunk_safe_1."
-        ),
+        prompt=LLM_JUDGE_PROBE_PROMPT,
         schema=LLMJudgeProbe,
         max_output_length=2000,
     )
