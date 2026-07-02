@@ -20,9 +20,9 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/generate_human_review_sample
   --output evidence/private_outputs/human_review_fillable_simple_$(date +%Y%m%d-%H%M%S).xlsx
 ```
 
-Use `--dry-run` to inspect the CSV-shaped content without writing a file. The reviewer-facing `.xlsx` is the simplified workbook with `填写表`, `导入字段_不要改`, `填写说明` and `选项`. Reviewers edit only `填写表`; the importer reads the reviewer-entered values from that sheet and uses `导入字段_不要改` only to recover machine refs. The generated packet contains `item_id`, anonymized refs, `输入摘要（匿名）` and `模型输出摘要`; it does not contain raw resume text, raw JD text, API keys, provider traces, real names, emails, phone numbers or private company identifiers.
+Use `--dry-run` to inspect the CSV-shaped content without writing a file. The reviewer-facing `.xlsx` is a conservative two-sheet workbook with `填写表` and `填写说明`. Reviewers edit only `填写表`; the importer reads the reviewer-entered values from that first sheet and reconstructs machine refs from `item_id`. The workbook intentionally avoids formulas, cross-sheet references and dropdown validation for better Excel/WPS compatibility. The generated packet contains `item_id`, anonymized summaries, `输入摘要（匿名）` and `模型输出摘要`; it does not contain raw resume text, raw JD text, API keys, provider traces, real names, emails, phone numbers or private company identifiers.
 
-Send the `.xlsx` and reviewer instructions to the external reviewers. Reviewers must not edit `item_id`, `审核类型`, summaries, refs or any sheet other than `填写表`. They should fill only `Reviewer ID Hash（填一次即可）`, score fields, risk flags, `备注`, `结论`, `需复审`, `复审结论` and `Bad Case编号`.
+Send the `.xlsx` and reviewer instructions to the external reviewers. Reviewers must not edit `item_id`, `审核类型`, summaries or any sheet other than `填写表`. They should fill only `reviewer_id_hash`, score fields, risk flags, `备注`, `结论`, `需复审_true_false`, `复审结论` and `BadCase编号`.
 
 ## Anonymization
 

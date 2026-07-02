@@ -75,17 +75,26 @@ XLSX_FILL_LABEL_TO_FIELD = {
     "模型输出摘要": "model_output_summary",
     "审核说明": "review_instruction",
     "正确性 0-1": "correctness_score",
+    "正确性_0到1": "correctness_score",
     "有依据 0-1": "groundedness_score",
+    "有依据_0到1": "groundedness_score",
     "安全性 0-1": "safety_score",
+    "安全性_0到1": "safety_score",
     "有用性 0-1": "usefulness_score",
+    "有用性_0到1": "usefulness_score",
     "隐私风险": "privacy_risk_flag",
+    "隐私风险_true_false": "privacy_risk_flag",
     "幻觉": "hallucination_flag",
+    "幻觉_true_false": "hallucination_flag",
     "编造": "fabrication_flag",
+    "编造_true_false": "fabrication_flag",
     "结论": "decision",
     "需复审": "requires_adjudication",
+    "需复审_true_false": "requires_adjudication",
     "备注": "reviewer_comment",
     "复审结论": "adjudication_decision",
     "Bad Case编号": "bad_case_ref",
+    "BadCase编号": "bad_case_ref",
     "reviewer_id_hash": "reviewer_id_hash",
     "审核人ID Hash": "reviewer_id_hash",
 }
@@ -102,8 +111,31 @@ XLSX_NS = {
     "rel": "http://schemas.openxmlformats.org/package/2006/relationships",
     "office": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
 }
-TRUE_VALUES = {"1", "true", "yes", "y", "pass", "passed"}
-FALSE_VALUES = {"0", "false", "no", "n", "fail", "failed"}
+DEFAULT_XLSX_BATCH_FIELDS = {
+    "review_batch_id": "human-review-sample-pack-v35b",
+    "dataset_name": "anonymized_benchmark",
+    "sampling_method": "generated_fillable_xlsx",
+    "reviewer_role": "external_reviewer",
+    "privacy_sanitized": "true",
+}
+TRUE_VALUES = {"1", "true", "yes", "y", "pass", "passed", "是", "真", "对", "通过"}
+FALSE_VALUES = {"0", "false", "no", "n", "fail", "failed", "否", "假", "错", "不通过"}
+DECISION_ALIASES = {
+    "pass": "pass",
+    "通过": "pass",
+    "minor_issue": "minor_issue",
+    "minor issue": "minor_issue",
+    "小问题": "minor_issue",
+    "minor": "minor_issue",
+    "major_issue": "major_issue",
+    "major issue": "major_issue",
+    "严重问题": "major_issue",
+    "major": "major_issue",
+    "fail": "fail",
+    "failed": "fail",
+    "失败": "fail",
+    "不通过": "fail",
+}
 
 
 def _utc_now() -> str:
@@ -140,6 +172,18 @@ def _parse_score(value: Any, *, field: str, row_number: int) -> float:
     if not 0 <= score <= 1:
         raise ValueError(f"row {row_number}: {field} must be between 0 and 1")
     return score
+
+
+def _parse_decision(value: Any, *, field: str, row_number: int, allow_blank: bool = False) -> str:
+    text = str(value).strip()
+    if not text:
+        if allow_blank:
+            return ""
+        raise ValueError(f"row {row_number}: {field} is required")
+    normalized = DECISION_ALIASES.get(text.lower(), DECISION_ALIASES.get(text))
+    if not normalized:
+        raise ValueError(f"row {row_number}: unsupported {field} {text!r}")
+    return normalized
 
 
 def _reviewer_hash(value: str) -> str:
@@ -263,6 +307,28 @@ def _global_reviewer_id(fill_sheet_rows: list[list[str]]) -> str:
     return ""
 
 
+def _machine_fields_from_item_id(item_id: str) -> dict[str, str]:
+    fields = dict(DEFAULT_XLSX_BATCH_FIELDS)
+    task_type = ""
+    case_id = ""
+    if item_id.startswith("hr_"):
+        remainder = item_id[3:]
+        for candidate in sorted(TASK_TYPES, key=len, reverse=True):
+            prefix = f"{candidate}_"
+            if remainder.startswith(prefix):
+                task_type = candidate
+                case_id = remainder[len(prefix) :]
+                break
+    fields["task_type"] = task_type
+    fields["anonymized_input_ref"] = (
+        f"anonymized_benchmark:{task_type}:{case_id}:input" if task_type and case_id else ""
+    )
+    fields["model_output_ref"] = (
+        f"anonymized_benchmark:{task_type}:{case_id}:model_output" if task_type and case_id else ""
+    )
+    return fields
+
+
 def _load_xlsx_review_rows(path: Path) -> list[dict[str, Any]]:
     sheets = _xlsx_rows_by_name(path)
     if XLSX_FILL_SHEET not in sheets:
@@ -290,7 +356,7 @@ def _load_xlsx_review_rows(path: Path) -> list[dict[str, Any]]:
         item_id = str(normalized_fill.get("item_id", "")).strip()
         if not item_id:
             continue
-        machine_row = dict(import_rows_by_item.get(item_id, {}))
+        machine_row = {**_machine_fields_from_item_id(item_id), **import_rows_by_item.get(item_id, {})}
         row = {
             **{field: machine_row.get(field, "") for field in BATCH_OPTIONAL_FIELDS},
             "item_id": item_id,
@@ -343,9 +409,7 @@ def normalize_review_items(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         task_type = str(row["task_type"]).strip()
         if task_type not in TASK_TYPES:
             raise ValueError(f"row {row_number}: unsupported task_type {task_type!r}")
-        decision = str(row["decision"]).strip()
-        if decision not in DECISIONS:
-            raise ValueError(f"row {row_number}: unsupported decision {decision!r}")
+        decision = _parse_decision(row["decision"], field="decision", row_number=row_number)
 
         item = {
             "item_id": str(row["item_id"]).strip(),
@@ -391,7 +455,12 @@ def normalize_review_items(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 field="requires_adjudication",
                 row_number=row_number,
             ),
-            "adjudication_decision": str(row["adjudication_decision"]).strip(),
+            "adjudication_decision": _parse_decision(
+                row["adjudication_decision"],
+                field="adjudication_decision",
+                row_number=row_number,
+                allow_blank=True,
+            ),
             "bad_case_ref": str(row["bad_case_ref"]).strip(),
         }
         if not item["item_id"]:

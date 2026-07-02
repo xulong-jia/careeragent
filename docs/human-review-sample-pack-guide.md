@@ -26,11 +26,9 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/generate_human_review_sample
 Use `--format csv` when a machine-only CSV is needed. The reviewer-facing `.xlsx` is the simplified workbook and contains:
 
 - `填写表`: the only sheet reviewers should edit.
-- `导入字段_不要改`: machine-import fields and formulas keyed by `item_id`.
 - `填写说明`: reviewer instructions.
-- `选项`: dropdown values.
 
-The `填写表` sheet has frozen headings, filters, readable widths, wrapped long text, highlighted reviewer-entry columns and dropdown validation for booleans/decisions.
+The `填写表` sheet has frozen headings, filters, readable widths, wrapped long text and highlighted reviewer-entry columns. It intentionally avoids formulas, cross-sheet references and dropdown validation for better Excel/WPS compatibility.
 
 The committed template at `evidence/templates/human_review_sample_pack.template.csv` is only a placeholder. It is not real review evidence.
 
@@ -38,7 +36,7 @@ The committed template at `evidence/templates/human_review_sample_pack.template.
 
 Reviewers should read `审核类型`, `输入摘要（匿名）`, `模型输出摘要` and `审核说明`.
 
-Reviewers must not edit `item_id` or any sheet other than `填写表`. They must not modify `导入字段_不要改`.
+Reviewers must not edit `item_id` or any sheet other than `填写表`.
 
 ## What Reviewers Should Use
 
@@ -53,18 +51,18 @@ Reviewers do not need source code, API keys, databases, provider traces, real re
 Reviewers fill only these cells/columns in `填写表`:
 
 - `Reviewer ID Hash（填一次即可）`
-- `正确性 0-1`
-- `有依据 0-1`
-- `安全性 0-1`
-- `有用性 0-1`
-- `隐私风险`
-- `幻觉`
-- `编造`
+- `正确性_0到1`
+- `有依据_0到1`
+- `安全性_0到1`
+- `有用性_0到1`
+- `隐私风险_true_false`
+- `幻觉_true_false`
+- `编造_true_false`
 - `结论`
-- `需复审`
+- `需复审_true_false`
 - `备注`
 - `复审结论`
-- `Bad Case编号`
+- `BadCase编号`
 
 Score guide:
 
@@ -73,10 +71,10 @@ Score guide:
 - `0.5` = major issue
 - `0.0` = fail
 
-Scores may use decimals from `0.0` to `1.0`. `结论` and `复审结论` must be one of `pass`, `minor_issue`, `major_issue` or `fail`. Flag fields must be explicitly set to `true` or `false`; blanks are rejected during import.
+Scores may use decimals from `0.0` to `1.0`. `结论` and `复审结论` must be one of `pass`, `minor_issue`, `major_issue` or `fail`. Flag fields must be explicitly set to `true` or `false`; `TRUE/FALSE` and `是/否` are also accepted. Blanks are rejected during import.
 
 ## Privacy Boundary
 
 The reviewer packet must expose only anonymized refs and summaries. Reviewers must not receive API keys, provider traces, real resumes, real JDs, interview answers, emails, phone numbers, names, private company identifiers or raw RAG chunks through this workbook.
 
-After reviewers complete the `.xlsx`, store the returned file outside Git. `scripts/import_human_review_batch.py` can import the simplified `.xlsx` directly; it reads reviewer-entered values from `填写表` and uses `导入字段_不要改` only to recover machine refs.
+After reviewers complete the `.xlsx`, store the returned file outside Git. `scripts/import_human_review_batch.py` can import the simplified `.xlsx` directly; it reads reviewer-entered values from `填写表` and reconstructs machine refs from `item_id`.

@@ -641,12 +641,14 @@ def test_human_review_sample_pack_generates_simple_fillable_xlsx(tmp_path):
 
     assert result.stdout.strip() == str(output)
     workbook_xml = _xlsx_workbook_xml(output)
-    for sheet_name in ["填写表", "导入字段_不要改", "填写说明", "选项"]:
+    for sheet_name in ["填写表", "填写说明"]:
         assert f'name="{sheet_name}"' in workbook_xml
+    assert 'name="导入字段_不要改"' not in workbook_xml
+    assert 'name="选项"' not in workbook_xml
     assert "<autoFilter" in workbook_xml
     assert 'state="frozen"' in workbook_xml
-    assert "<dataValidations" in workbook_xml
-    assert "<f>'填写表'!F7</f><v>0</v>" not in workbook_xml
+    assert "<dataValidations" not in workbook_xml
+    assert "<f>" not in workbook_xml
 
     fill_headers, fill_rows = _xlsx_table(output, "填写表", {"item_id", "审核类型"})
     for field in [
@@ -655,42 +657,49 @@ def test_human_review_sample_pack_generates_simple_fillable_xlsx(tmp_path):
         "输入摘要（匿名）",
         "模型输出摘要",
         "审核说明",
-        "正确性 0-1",
-        "有依据 0-1",
-        "安全性 0-1",
-        "有用性 0-1",
-        "隐私风险",
-        "幻觉",
-        "编造",
+        "reviewer_id_hash",
+        "正确性_0到1",
+        "有依据_0到1",
+        "安全性_0到1",
+        "有用性_0到1",
+        "隐私风险_true_false",
+        "幻觉_true_false",
+        "编造_true_false",
         "结论",
-        "需复审",
+        "需复审_true_false",
         "复审结论",
-        "Bad Case编号",
+        "BadCase编号",
         "备注",
     ]:
         assert field in fill_headers
-    assert len(fill_rows) == 30
-    assert all(row["正确性 0-1"] == "" for row in fill_rows)
-    assert all(row["结论"] == "" for row in fill_rows)
-    for row in fill_rows:
-        _assert_readable_review_context(row)
-
-    import_headers, import_rows = _xlsx_table(output, "导入字段_不要改", {"item_id", "task_type"})
     for field in [
-        "review_batch_id",
         "dataset_name",
         "sampling_method",
         "reviewer_role",
         "privacy_sanitized",
-        "task_type",
         "anonymized_input_ref",
         "model_output_ref",
     ]:
-        assert field in import_headers
-    assert len(import_rows) == 30
-    assert {row["task_type"] for row in import_rows} == set(generate_human_review_sample_pack.TASK_MODULES)
-    rendered = "\n".join(",".join(row.values()) for row in [*fill_rows, *import_rows])
+        assert field not in fill_headers
+    assert len(fill_rows) == 30
+    assert all(row["正确性_0到1"] == "" for row in fill_rows)
+    assert all(row["结论"] == "" for row in fill_rows)
+    for row in fill_rows:
+        _assert_readable_review_context(row)
+    rendered = "\n".join(",".join(row.values()) for row in fill_rows)
     assert not any(pattern.search(rendered) for pattern in generate_human_review_sample_pack.PII_PATTERNS)
+
+
+def test_human_review_sample_pack_openpyxl_smoke_loads_when_available(tmp_path):
+    openpyxl = pytest.importorskip("openpyxl")
+    output = tmp_path / "reviewer-pack.xlsx"
+    rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
+
+    generate_human_review_sample_pack.render_xlsx(rows, output)
+
+    workbook = openpyxl.load_workbook(output)
+    assert workbook.sheetnames == ["填写表", "填写说明"]
+    assert workbook["填写表"]["A1"].value == "item_id"
 
 
 def test_human_review_simple_xlsx_import_reads_fill_sheet_values(tmp_path):
@@ -741,6 +750,54 @@ def test_human_review_simple_xlsx_import_rejects_blank_scores_not_cached_zero(tm
 
     with pytest.raises(ValueError, match="correctness_score must be a number"):
         import_human_review_batch.build_human_review_batch(output)
+
+
+def test_human_review_simple_xlsx_import_rejects_blank_flags(tmp_path):
+    output = tmp_path / "blank-flag-review.xlsx"
+    rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
+    for row in rows:
+        row["reviewer_id_hash"] = "reviewer:external_a"
+        row["correctness_score"] = "1.0"
+        row["groundedness_score"] = "1.0"
+        row["safety_score"] = "1.0"
+        row["usefulness_score"] = "1.0"
+        row["privacy_risk_flag"] = ""
+        row["hallucination_flag"] = "false"
+        row["fabrication_flag"] = "false"
+        row["decision"] = "pass"
+        row["requires_adjudication"] = "false"
+
+    generate_human_review_sample_pack.render_xlsx(rows, output)
+
+    with pytest.raises(ValueError, match="privacy_risk_flag must be true or false"):
+        import_human_review_batch.build_human_review_batch(output)
+
+
+def test_human_review_simple_xlsx_import_normalizes_bool_and_decision_values(tmp_path):
+    output = tmp_path / "localized-review.xlsx"
+    rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
+    for row in rows:
+        row["reviewer_id_hash"] = "reviewer:external_a"
+        row["correctness_score"] = "1.0"
+        row["groundedness_score"] = "1.0"
+        row["safety_score"] = "1.0"
+        row["usefulness_score"] = "1.0"
+        row["privacy_risk_flag"] = "否"
+        row["hallucination_flag"] = "FALSE"
+        row["fabrication_flag"] = "是"
+        row["decision"] = "PASS"
+        row["requires_adjudication"] = "TRUE"
+        row["adjudication_decision"] = "通过"
+
+    generate_human_review_sample_pack.render_xlsx(rows, output)
+
+    item = import_human_review_batch.build_human_review_batch(output)["review_items"][0]
+    assert item["privacy_risk_flag"] is False
+    assert item["hallucination_flag"] is False
+    assert item["fabrication_flag"] is True
+    assert item["decision"] == "pass"
+    assert item["requires_adjudication"] is True
+    assert item["adjudication_decision"] == "pass"
 
 
 def test_human_review_sample_pack_template_is_not_real_evidence(tmp_path):
