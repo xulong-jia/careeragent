@@ -20,6 +20,14 @@ This runbook collects external deployment evidence. It does not create proof by 
 7. Set `template_only=false` or remove it only after real checks pass.
 8. Set `production_quality_candidate_signal=true` only when all deployment checks pass.
 
+## Render Backend Notes
+
+- Deploy the backend as a Render Docker web service from `backend/`.
+- The backend container listens on `0.0.0.0` and reads `PORT` from the runtime environment, defaulting to `8000` for local Docker/prod-like compose.
+- Use `/ready` as the Render health check path so database reachability and Alembic head status are checked before treating the service as ready.
+- Inject `DATABASE_URL`, `AUTH_JWT_SECRET`, `DATA_ENCRYPTION_KEY`, `DATA_ENCRYPTION_KEY_ID` and `BACKEND_CORS_ORIGINS` through Render environment variables or secret management. Do not commit real values.
+- Use the deployed backend URL as the frontend `VITE_API_BASE_URL` when deploying the frontend as a Render static site.
+
 ## Counts As Proof
 
 - Redacted cloud deployment run id or release id.

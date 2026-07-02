@@ -45,8 +45,16 @@ def test_production_like_compose_uses_postgres_pgvector_and_required_secrets():
     assert "AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?" in compose
     assert "DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?" in compose
     assert "DB_ECHO_SQL: ${DB_ECHO_SQL:-false}" in compose
+    assert "PORT: 8000" in compose
     assert "/ready" in compose
     assert "Dockerfile.production" in compose
+
+
+def test_backend_dockerfile_uses_dynamic_port_default():
+    dockerfile = (ROOT_DIR / "backend" / "Dockerfile").read_text()
+
+    assert "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}" in dockerfile
+    assert "--port 8000" not in dockerfile
 
 
 def test_gitignore_keeps_production_env_template_but_blocks_backups():
