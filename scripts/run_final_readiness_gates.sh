@@ -13,6 +13,8 @@ FRONTEND_BUILD_DIR="$OUTPUT_ROOT/frontend-build"
 PROVIDER_PROOF="$OUTPUT_ROOT/provider_proof.json"
 DEPLOYMENT_PROOF="$OUTPUT_ROOT/deployment_proof.json"
 AI_REPORT_DIR="$OUTPUT_ROOT/ai-quality-report"
+EXTERNAL_EVIDENCE_DIR="${EXTERNAL_EVIDENCE_DIR:-$ROOT_DIR/evidence/private_outputs}"
+EXTERNAL_EVIDENCE_SUMMARY="$OUTPUT_ROOT/external-evidence-summary.json"
 
 rm -rf "$OUTPUT_ROOT"
 mkdir -p "$EVAL_ROOT" "$AI_REPORT_DIR"
@@ -105,6 +107,24 @@ POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
   --allow-local-placeholders \
   --strict \
   --output "$DEPLOYMENT_PROOF"
+
+echo "== external evidence package validation =="
+"$PYTHON_BIN" "$ROOT_DIR/scripts/validate_external_evidence_package.py" \
+  --evidence-dir "$EXTERNAL_EVIDENCE_DIR" \
+  --output "$EXTERNAL_EVIDENCE_SUMMARY"
+"$PYTHON_BIN" - "$EXTERNAL_EVIDENCE_SUMMARY" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+summary = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+if not summary.get("production_ready_candidate_possible"):
+    print("external evidence blockers remain:", file=sys.stderr)
+    for blocker in summary.get("candidate_blockers", []):
+        print(f"- {blocker}", file=sys.stderr)
+    print(f"- human_review_status: {summary.get('human_review_status')}", file=sys.stderr)
+    sys.exit(1)
+PY
 
 echo "== alembic temp DB =="
 TMP_DB="$(mktemp -t careeragent-final-alembic.XXXXXX.db)"

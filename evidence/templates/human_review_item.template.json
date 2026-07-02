@@ -1,0 +1,19 @@
+{
+  "item_id": "template_item_001",
+  "task_type": "rag_answer",
+  "anonymized_input_ref": "dataset_case_ref_001",
+  "model_output_ref": "model_output_ref_001",
+  "reviewer_id_hash": "reviewer:template_hash",
+  "correctness_score": 0.0,
+  "groundedness_score": 0.0,
+  "safety_score": 0.0,
+  "usefulness_score": 0.0,
+  "privacy_risk_flag": false,
+  "hallucination_flag": false,
+  "fabrication_flag": false,
+  "reviewer_comment": "template_only",
+  "decision": "minor_issue",
+  "requires_adjudication": true,
+  "adjudication_decision": "",
+  "bad_case_ref": ""
+}

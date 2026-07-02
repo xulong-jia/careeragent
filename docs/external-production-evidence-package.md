@@ -16,7 +16,7 @@ The current conservative tag is `v3.4.0-production-foundation-reaudit-passed`. T
 ## Proof Types
 
 - `provider`: external embedding and LLM provider proof with redacted endpoint metadata.
-- `human_review`: external reviewer agreement and privacy pass summary.
+- `human_review`: external reviewer batch with item-level scores, summary metrics, adjudication status and privacy pass.
 - `deployment`: cloud deployment, managed DB, secret manager, KMS, TLS, readiness and rollback proof.
 - `backup_purge`: privacy deletion to backup purge/restore-block attestation.
 - `monitoring`: metrics, logs, tracing, error reporting, alerts and incident runbook proof.
@@ -64,6 +64,31 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/run_external_provider_proof.
 ```
 
 The generated proof must stay in ignored private outputs or `/tmp`.
+
+## Human Review Proof
+
+Use the v3.5-B importer for formal external reviewer batches:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_batch.py \
+  --input /tmp/careeragent-v35b-human-review.csv \
+  --output evidence/private_outputs/human_review_batch.$(date +%Y%m%d-%H%M%S).json \
+  --batch-id human-review-v35b-real-batch \
+  --dataset-name anonymized_v35b_external_review \
+  --sampling-method stratified_by_task_type_and_risk \
+  --reviewer-role external_ai_quality_reviewer \
+  --privacy-sanitized
+```
+
+Then summarize:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/summarize_human_review_evidence.py \
+  --input evidence/private_outputs/human_review_batch.real.json \
+  --output /tmp/careeragent-v35b-human-review-summary.json
+```
+
+Templates and dry-runs are not human review proof. The evidence package validator must report `human_review_candidate_passed` before this blocker can be considered resolved.
 
 ## Private Evidence Validation
 

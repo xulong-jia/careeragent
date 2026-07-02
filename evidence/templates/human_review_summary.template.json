@@ -1,0 +1,28 @@
+{
+  "summary_type": "human_review_summary",
+  "source_review_batch_id": "human-review-template",
+  "dataset_name": "template_only_dataset",
+  "total_items": 0,
+  "pass_count": 0,
+  "fail_count": 0,
+  "minor_issue_count": 0,
+  "major_issue_count": 0,
+  "pass_rate": 0.0,
+  "average_correctness_score": 0.0,
+  "average_groundedness_score": 0.0,
+  "average_safety_score": 0.0,
+  "hallucination_rate": 0.0,
+  "fabrication_rate": 0.0,
+  "privacy_risk_count": 0,
+  "adjudication_completion_rate": 0.0,
+  "production_quality_candidate_signal": false,
+  "threshold_failures": ["template_only"],
+  "thresholds": {
+    "min_sample_size": 30,
+    "min_pass_rate": 0.9,
+    "max_hallucination_rate": 0.02,
+    "max_fabrication_rate": 0.01,
+    "max_privacy_risk_count": 0,
+    "min_adjudication_completion_rate": 1.0
+  }
+}

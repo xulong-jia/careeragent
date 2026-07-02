@@ -8,9 +8,11 @@ import subprocess
 import threading
 
 from scripts import check_provider_proof_readiness
+from scripts import import_human_review_batch
 from scripts import import_human_review_proof
 from scripts import run_ai_quality_certification
 from scripts import run_external_provider_proof
+from scripts import summarize_human_review_evidence
 from scripts import validate_external_evidence_package
 
 
@@ -114,6 +116,84 @@ def _write_quality_inputs(tmp_path: Path) -> Path:
     return eval_dir
 
 
+def _human_review_row(
+    index: int,
+    *,
+    reviewer: str = "reviewer:external_a",
+    decision: str = "pass",
+    hallucination: bool = False,
+    fabrication: bool = False,
+    privacy_risk: bool = False,
+    requires_adjudication: bool = False,
+    adjudication_decision: str = "",
+) -> dict:
+    return {
+        "review_batch_id": "human-review-test",
+        "dataset_name": "anonymized_external_review_test",
+        "sampling_method": "stratified_by_task_type_and_risk",
+        "reviewer_role": "external_ai_quality_reviewer",
+        "privacy_sanitized": "true",
+        "item_id": f"item_{index:03d}",
+        "task_type": "rag_answer",
+        "anonymized_input_ref": f"case_ref_{index:03d}",
+        "model_output_ref": f"output_ref_{index:03d}",
+        "reviewer_id_hash": reviewer,
+        "correctness_score": "0.95",
+        "groundedness_score": "0.95",
+        "safety_score": "1.0",
+        "usefulness_score": "0.9",
+        "privacy_risk_flag": str(privacy_risk).lower(),
+        "hallucination_flag": str(hallucination).lower(),
+        "fabrication_flag": str(fabrication).lower(),
+        "reviewer_comment": "anonymized synthetic test row",
+        "decision": decision,
+        "requires_adjudication": str(requires_adjudication).lower(),
+        "adjudication_decision": adjudication_decision,
+        "bad_case_ref": "bad_case_001" if decision in {"major_issue", "fail"} else "",
+    }
+
+
+def _write_human_review_csv(path: Path, rows: list[dict]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _human_review_batch_payload(sample_size: int = 30) -> dict:
+    rows = [
+        _human_review_row(
+            index,
+            reviewer="reviewer:external_a" if index % 2 else "reviewer:external_b",
+        )
+        for index in range(1, sample_size + 1)
+    ]
+    items = import_human_review_batch.normalize_review_items(rows)
+    summary = import_human_review_batch.summarize_items(items)
+    return {
+        "proof_type": "human_review",
+        "review_batch_id": "human-review-test",
+        "created_at": "2026-07-02T00:00:00Z",
+        "reviewer_count": 2,
+        "reviewer_roles": ["external_ai_quality_reviewer"],
+        "dataset_name": "anonymized_external_review_test",
+        "sample_size": sample_size,
+        "sampling_method": "stratified_by_task_type_and_risk",
+        "privacy_sanitized": True,
+        "review_items": items,
+        "agreement_metrics": {
+            "comparable_item_count": 0,
+            "decision_agreement_rate": 0.0,
+        },
+        "adjudication_required_count": summary["adjudication_required_count"],
+        "adjudication_completed_count": summary["adjudication_completed_count"],
+        "bad_case_count": summary["bad_case_count"],
+        "summary": summary,
+        "production_quality_candidate_signal": True,
+        "limitations": [],
+    }
+
+
 def test_evidence_templates_match_schema_required_fields():
     for schema_path in sorted((ROOT / "evidence" / "schemas").glob("*.schema.json")):
         schema = _json(schema_path)
@@ -134,6 +214,10 @@ def test_human_review_input_template_has_required_columns():
     with template.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         assert import_human_review_proof.REQUIRED_FIELDS <= set(reader.fieldnames or [])
+    batch_template = ROOT / "evidence" / "templates" / "human_review_batch.template.csv"
+    with batch_template.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        assert import_human_review_batch.REQUIRED_ITEM_FIELDS <= set(reader.fieldnames or [])
 
 
 def test_private_outputs_are_gitignored():
@@ -303,12 +387,153 @@ def test_human_review_import_redacts_reviewers_and_computes_agreement(tmp_path):
     assert all(item.startswith("reviewer:") for item in proof["reviewer_ids_redacted"])
 
 
+def test_human_review_batch_schema_validation_pass_and_fail(tmp_path):
+    input_path = tmp_path / "reviews.csv"
+    _write_human_review_csv(
+        input_path,
+        [
+            _human_review_row(1, reviewer="reviewer:external_a"),
+            _human_review_row(2, reviewer="reviewer:external_b"),
+        ],
+    )
+
+    batch = import_human_review_batch.build_human_review_batch(
+        input_path,
+        batch_id="human-review-schema-test",
+        privacy_sanitized=True,
+    )
+
+    assert import_human_review_batch.validate_human_review_batch_payload(batch) == []
+    broken = dict(batch)
+    broken.pop("review_batch_id")
+    assert "missing required field: review_batch_id" in (
+        import_human_review_batch.validate_human_review_batch_payload(broken)
+    )
+
+
+def test_human_review_batch_csv_and_jsonl_dry_run(tmp_path):
+    csv_path = tmp_path / "reviews.csv"
+    jsonl_path = tmp_path / "reviews.jsonl"
+    rows = [
+        _human_review_row(1, reviewer="reviewer:external_a"),
+        _human_review_row(2, reviewer="reviewer:external_b"),
+    ]
+    _write_human_review_csv(csv_path, rows)
+    jsonl_path.write_text(
+        "\n".join(json.dumps(row) for row in rows) + "\n",
+        encoding="utf-8",
+    )
+
+    for input_path in [csv_path, jsonl_path]:
+        output_path = tmp_path / f"{input_path.stem}.json"
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/import_human_review_batch.py",
+                "--input",
+                str(input_path),
+                "--output",
+                str(output_path),
+                "--dry-run",
+            ],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+        assert payload["proof_type"] == "human_review"
+        assert output_path.exists() is False
+
+
+def test_human_review_batch_blocks_pii_and_raw_private_fields(tmp_path):
+    input_path = tmp_path / "reviews.csv"
+    row = _human_review_row(1)
+    row["reviewer_comment"] = "contact reviewer@example.invalid"
+    _write_human_review_csv(input_path, [row])
+
+    try:
+        import_human_review_batch.build_human_review_batch(input_path)
+    except ValueError as exc:
+        assert "obvious PII" in str(exc)
+    else:  # pragma: no cover - assertion branch
+        raise AssertionError("PII row should be rejected")
+
+    raw_path = tmp_path / "raw.csv"
+    raw_row = _human_review_row(1)
+    raw_row["raw_text"] = "raw resume text must never be imported"
+    _write_human_review_csv(raw_path, [raw_row])
+    try:
+        import_human_review_batch.build_human_review_batch(raw_path)
+    except ValueError as exc:
+        assert "private field raw_text" in str(exc)
+    else:  # pragma: no cover - assertion branch
+        raise AssertionError("raw private row should be rejected")
+
+
+def test_human_review_summary_metrics_and_thresholds(tmp_path):
+    input_path = tmp_path / "reviews.csv"
+    rows = [
+        _human_review_row(index, reviewer="reviewer:external_a" if index % 2 else "reviewer:external_b")
+        for index in range(1, 31)
+    ]
+    _write_human_review_csv(input_path, rows)
+
+    summary = summarize_human_review_evidence.build_human_review_summary(input_path)
+
+    assert summary["total_items"] == 30
+    assert summary["pass_count"] == 30
+    assert summary["pass_rate"] == 1.0
+    assert summary["hallucination_rate"] == 0.0
+    assert summary["fabrication_rate"] == 0.0
+    assert summary["privacy_risk_count"] == 0
+    assert summary["adjudication_completion_rate"] == 1.0
+    assert summary["production_quality_candidate_signal"] is True
+
+    failing_summary = summarize_human_review_evidence.build_human_review_summary(
+        input_path,
+        min_sample_size=31,
+    )
+    assert failing_summary["production_quality_candidate_signal"] is False
+    assert "insufficient_sample_size" in failing_summary["threshold_failures"]
+
+
 def test_evidence_validator_blocks_missing_external_proofs(tmp_path):
     summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
 
     assert summary["production_ready_candidate_possible"] is False
+    assert summary["human_review_status"] == "missing_human_review"
     assert "provider" in summary["missing_external_proofs"]
     assert "security_review" in summary["certified_blockers"][-1]
+
+
+def test_evidence_validator_rejects_template_only_human_review(tmp_path):
+    template = _json(ROOT / "evidence" / "templates" / "human_review_batch.template.json")
+    (tmp_path / "human_review.json").write_text(json.dumps(template), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["human_review_status"] == "template_only"
+    assert summary["production_ready_candidate_possible"] is False
+    assert "human review proof status: template_only" in summary["candidate_blockers"]
+
+
+def test_evidence_validator_reports_human_review_threshold_statuses(tmp_path):
+    insufficient = _human_review_batch_payload(sample_size=2)
+    (tmp_path / "human_review.json").write_text(json.dumps(insufficient), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["human_review_status"] == "insufficient_sample_size"
+
+    failing = _human_review_batch_payload(sample_size=30)
+    failing["summary"]["pass_rate"] = 0.5
+    failing["production_quality_candidate_signal"] = False
+    (tmp_path / "human_review.json").write_text(json.dumps(failing), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["human_review_status"] == "thresholds_failed"
 
 
 def test_evidence_validator_accepts_complete_redacted_package(tmp_path):
@@ -337,20 +562,7 @@ def test_evidence_validator_accepts_complete_redacted_package(tmp_path):
             "production_quality_candidate_signal": True,
             "limitations": [],
         },
-        {
-            "proof_type": "human_review",
-            "review_batch_id": "human-review-test",
-            "generated_at": "2026-07-02T00:00:00Z",
-            "reviewer_count": 2,
-            "reviewer_ids_redacted": ["reviewer:aaaa", "reviewer:bbbb"],
-            "rubric_version": "human-review-v3.5",
-            "case_count": 40,
-            "modules_covered": ["match", "rag"],
-            "agreement_rate": 0.85,
-            "adjudication_required_count": 0,
-            "privacy_review_passed": True,
-            "limitations": [],
-        },
+        _human_review_batch_payload(),
         {
             "proof_type": "deployment",
             "proof_id": "deployment-proof-test",
@@ -417,6 +629,7 @@ def test_evidence_validator_accepts_complete_redacted_package(tmp_path):
 
     assert summary["schema_validation_passed"] is True
     assert summary["secret_leak_check_passed"] is True
+    assert summary["human_review_status"] == "human_review_candidate_passed"
     assert summary["production_ready_candidate_possible"] is True
     assert summary["production_readiness_certified_possible"] is True
 
@@ -502,6 +715,14 @@ def test_provider_docs_commands_match_cli_arguments():
     assert "scripts/check_provider_proof_readiness.py" in docs
     assert "LLM_TIMEOUT_SECONDS=30" in docs
     assert "EMBEDDING_DIMENSION=1536" in docs
+
+
+def test_final_readiness_gate_requires_external_evidence_package():
+    script = (ROOT / "scripts" / "run_final_readiness_gates.sh").read_text(encoding="utf-8")
+
+    assert "scripts/validate_external_evidence_package.py" in script
+    assert "production_ready_candidate_possible" in script
+    assert "human_review_status" in script
 
 
 def test_templates_do_not_contain_secret_like_material():

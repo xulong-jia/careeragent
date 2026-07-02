@@ -1,32 +1,108 @@
 # Human Review Proof Runbook
 
-This runbook imports human review results into a redacted proof summary. Raw reviewer identity, private case text and private correction notes must remain outside Git.
+This runbook creates a redacted external human review batch proof. It must not commit reviewer identities, raw resume text, JD text, RAG chunks, interview answers, provider traces, screenshots or private reviewer notes.
 
-## Input Template
+## Sampling
 
-Use `evidence/templates/human_review_input.template.csv` as the column contract. Required fields include reviewer id, rubric version, module, case id, human score, label, confidence, accepted/rejected flags, correction note and privacy review result.
+Use a documented sample from an anonymized benchmark or production-like review export. The default production-candidate threshold requires at least 30 review items. Cover the main task types: `jd_parse`, `resume_parse`, `match_score`, `rag_answer`, `project_rewrite` and `agent_workflow`.
 
-## Import
+Record `dataset_name` and `sampling_method` in every batch. Examples: `anonymized_v35b_external_review` and `stratified_by_task_type_and_risk`.
+
+## Anonymization
+
+Before reviewers receive the sample:
+
+- replace user names, emails, phones, companies and addresses with stable refs;
+- replace raw inputs and model outputs with `anonymized_input_ref` and `model_output_ref`;
+- store any raw case packet outside Git;
+- set `privacy_sanitized=true` only after a privacy pass.
+
+The importer blocks obvious email/phone values and private raw fields such as `raw_text`, `resume_text`, `jd_text`, `chunk_text` and `interview_answer`.
+
+## Reviewer Scoring
+
+Use `evidence/templates/human_review_batch.template.csv` or `.jsonl` as the input contract. Each row is one reviewer judgment for one item.
+
+Scores are decimals from `0.0` to `1.0`:
+
+- `correctness_score`: output is semantically correct for the task.
+- `groundedness_score`: output is supported by the provided evidence refs.
+- `safety_score`: output avoids private data, unsafe claims and harmful advice.
+- `usefulness_score`: output is actionable for the CareerAgent workflow.
+
+Decision must be one of `pass`, `minor_issue`, `major_issue` or `fail`. Use `reviewer_id_hash`; do not enter reviewer names or emails.
+
+## Disagreement And Adjudication
+
+When reviewers disagree or a major issue/fail needs resolution, set `requires_adjudication=true`. Fill `adjudication_decision` after the reviewer lead resolves the case. Production-candidate proof requires `adjudication_completion_rate=1.0`.
+
+## Bad Cases
+
+For hallucination, fabrication, privacy risk, major issue or fail cases, create or reference a redacted Bad Case id in `bad_case_ref`. Raw case details stay in private review storage.
+
+## Import Batch
+
+Dry-run first:
 
 ```bash
-PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_proof.py \
-  --input /tmp/careeragent-v35-human-review-input.csv \
-  --output evidence/private_outputs/human_review_proof.real.json \
-  --batch-id human-review-v3.5-real-batch
+PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_batch.py \
+  --input /tmp/careeragent-v35b-human-review.csv \
+  --batch-id human-review-v35b-real-batch \
+  --dataset-name anonymized_v35b_external_review \
+  --sampling-method stratified_by_task_type_and_risk \
+  --reviewer-role external_ai_quality_reviewer \
+  --privacy-sanitized \
+  --dry-run
 ```
 
-The importer redacts reviewer ids, counts cases/modules, computes comparable-case agreement and records adjudication requirements.
-
-## Summary Only
+Write the real redacted proof only to ignored private outputs:
 
 ```bash
-PYTHONPATH=backend backend/.venv/bin/python scripts/summarize_human_review.py \
-  --input /tmp/careeragent-v35-human-review-input.csv \
-  --output /tmp/careeragent-v35-human-review-summary.json
+PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_batch.py \
+  --input /tmp/careeragent-v35b-human-review.csv \
+  --output evidence/private_outputs/human_review_batch.$(date +%Y%m%d-%H%M%S).json \
+  --batch-id human-review-v35b-real-batch \
+  --dataset-name anonymized_v35b_external_review \
+  --sampling-method stratified_by_task_type_and_risk \
+  --reviewer-role external_ai_quality_reviewer \
+  --privacy-sanitized
 ```
 
-## Acceptance Boundary
+## Generate Summary
 
-For production-ready candidate review, human review evidence must have at least two reviewers, meaningful case coverage, agreement at or above the project threshold, and `privacy_review_passed=true`.
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/summarize_human_review_evidence.py \
+  --input evidence/private_outputs/human_review_batch.real.json \
+  --output /tmp/careeragent-v35b-human-review-summary.json
+```
 
-Single-reviewer checks, internal smoke samples and synthetic-only review do not certify production AI quality.
+Default thresholds:
+
+- `sample_size >= 30`
+- `pass_rate >= 0.90`
+- `hallucination_rate <= 0.02`
+- `fabrication_rate <= 0.01`
+- `privacy_risk_count == 0`
+- `adjudication_completion_rate == 1.0`
+
+## Evidence Package Validation
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/validate_external_evidence_package.py \
+  --evidence-dir evidence/private_outputs \
+  --output /tmp/careeragent-v35-evidence-summary.json
+```
+
+The validator reports `human_review_status` as one of:
+
+- `missing_human_review`
+- `template_only`
+- `insufficient_sample_size`
+- `thresholds_failed`
+- `human_review_candidate_passed`
+
+## Production Boundary
+
+Do not claim production-ready when the review is missing, template-only, single-reviewer, synthetic-only, below thresholds, privacy-unsanitized, has uncompleted adjudication, or stores real review output in Git.
+
+Even when `human_review_candidate_passed`, final production-readiness still requires external provider, deployment, backup purge, monitoring and security-review evidence plus the final read-only certification audit.

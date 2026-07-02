@@ -10,6 +10,11 @@ from pathlib import Path
 import re
 from typing import Any
 
+try:
+    from .import_human_review_batch import validate_human_review_batch_payload
+except ImportError:  # pragma: no cover - direct script execution path
+    from import_human_review_batch import validate_human_review_batch_payload
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = REPO_ROOT / "evidence" / "schemas"
@@ -86,14 +91,53 @@ def _provider_ok(proofs: list[dict[str, Any]]) -> bool:
     return False
 
 
-def _human_review_ok(proofs: list[dict[str, Any]]) -> bool:
-    return any(
-        proof.get("reviewer_count", 0) >= 2
-        and proof.get("case_count", 0) > 0
-        and proof.get("agreement_rate", 0) >= 0.8
-        and proof.get("privacy_review_passed") is True
-        for proof in proofs
+def _is_template_human_review(proof: dict[str, Any]) -> bool:
+    text = " ".join(
+        [
+            str(proof.get("review_batch_id", "")),
+            str(proof.get("dataset_name", "")),
+            str(proof.get("sampling_method", "")),
+            " ".join(str(item) for item in proof.get("limitations", [])),
+        ]
+    ).lower()
+    return "template" in text or proof.get("sample_size") == 0
+
+
+def _human_review_candidate_passes(proof: dict[str, Any]) -> bool:
+    summary = proof.get("summary") or {}
+    sample_size = int(proof.get("sample_size") or summary.get("total_items") or 0)
+    review_items = proof.get("review_items") or []
+    return all(
+        [
+            not validate_human_review_batch_payload(proof),
+            proof.get("reviewer_count", 0) >= 2,
+            proof.get("privacy_sanitized") is True,
+            sample_size >= 30,
+            len(review_items) >= sample_size,
+            summary.get("pass_rate", 0) >= 0.90,
+            summary.get("hallucination_rate", 1) <= 0.02,
+            summary.get("fabrication_rate", 1) <= 0.01,
+            summary.get("privacy_risk_count", 1) == 0,
+            summary.get("adjudication_completion_rate", 0) >= 1.0,
+            proof.get("production_quality_candidate_signal") is True,
+        ]
     )
+
+
+def _human_review_status(proofs: list[dict[str, Any]]) -> str:
+    if not proofs:
+        return "missing_human_review"
+    real_proofs = [proof for proof in proofs if not _is_template_human_review(proof)]
+    if not real_proofs:
+        return "template_only"
+    if any(_human_review_candidate_passes(proof) for proof in real_proofs):
+        return "human_review_candidate_passed"
+    for proof in real_proofs:
+        summary = proof.get("summary") or {}
+        sample_size = int(proof.get("sample_size") or summary.get("total_items") or 0)
+        if sample_size < 30:
+            return "insufficient_sample_size"
+    return "thresholds_failed"
 
 
 def _deployment_ok(proofs: list[dict[str, Any]]) -> bool:
@@ -179,8 +223,9 @@ def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
         candidate_blockers.append("secret-like material detected in evidence artifacts")
     if by_type.get("provider") and not _provider_ok(by_type["provider"]):
         candidate_blockers.append("provider proof is not externally verified end-to-end")
-    if by_type.get("human_review") and not _human_review_ok(by_type["human_review"]):
-        candidate_blockers.append("human review proof lacks reviewer agreement/privacy pass")
+    human_review_status = _human_review_status(by_type.get("human_review", []))
+    if human_review_status != "human_review_candidate_passed" and by_type.get("human_review"):
+        candidate_blockers.append(f"human review proof status: {human_review_status}")
     if by_type.get("deployment") and not _deployment_ok(by_type["deployment"]):
         candidate_blockers.append("deployment proof lacks cloud/DB/KMS/readiness/rollback pass")
     if by_type.get("backup_purge") and not _backup_purge_ok(by_type["backup_purge"]):
@@ -205,6 +250,7 @@ def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
         "invalid_artifacts": invalid_artifacts,
         "secret_leak_artifacts": leaked_artifacts,
         "missing_external_proofs": missing_external_proofs,
+        "human_review_status": human_review_status,
         "candidate_blockers": candidate_blockers,
         "certified_blockers": certified_blockers,
         "production_ready_candidate_possible": not candidate_blockers,

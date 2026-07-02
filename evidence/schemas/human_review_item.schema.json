@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "CareerAgent Human Review Item",
+  "type": "object",
+  "required": [
+    "item_id",
+    "task_type",
+    "anonymized_input_ref",
+    "model_output_ref",
+    "reviewer_id_hash",
+    "correctness_score",
+    "groundedness_score",
+    "safety_score",
+    "usefulness_score",
+    "privacy_risk_flag",
+    "hallucination_flag",
+    "fabrication_flag",
+    "reviewer_comment",
+    "decision",
+    "requires_adjudication",
+    "adjudication_decision",
+    "bad_case_ref"
+  ],
+  "properties": {
+    "item_id": { "type": "string", "minLength": 1 },
+    "task_type": {
+      "enum": [
+        "jd_parse",
+        "resume_parse",
+        "match_score",
+        "rag_answer",
+        "project_rewrite",
+        "agent_workflow"
+      ]
+    },
+    "anonymized_input_ref": { "type": "string", "minLength": 1 },
+    "model_output_ref": { "type": "string", "minLength": 1 },
+    "reviewer_id_hash": { "type": "string", "minLength": 1 },
+    "correctness_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "groundedness_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "safety_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "usefulness_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "privacy_risk_flag": { "type": "boolean" },
+    "hallucination_flag": { "type": "boolean" },
+    "fabrication_flag": { "type": "boolean" },
+    "reviewer_comment": { "type": "string" },
+    "decision": { "enum": ["pass", "minor_issue", "major_issue", "fail"] },
+    "requires_adjudication": { "type": "boolean" },
+    "adjudication_decision": { "type": "string" },
+    "bad_case_ref": { "type": "string" }
+  }
+}

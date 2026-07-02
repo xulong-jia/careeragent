@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
-  "title": "CareerAgent External Human Review Proof",
+  "title": "CareerAgent External Human Review Batch",
   "type": "object",
   "required": [
     "proof_type",

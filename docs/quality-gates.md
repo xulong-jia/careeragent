@@ -36,6 +36,8 @@
 | AI provider validation | `PYTHONPATH=backend backend/.venv/bin/python scripts/validate_ai_providers.py --output /tmp/careeragent-provider-proof.json` | 验证 offline/provider_verified provider path，输出 masked proof | 无真实 key 时只能证明 offline path；真实 provider proof 不进 Git |
 | v3.5 provider proof readiness | `PYTHONPATH=backend backend/.venv/bin/python scripts/check_provider_proof_readiness.py` | 检查私有 provider proof env 是否齐备并输出 masked summary | 不调用真实 provider，不证明 provider 可用 |
 | v3.5 provider proof dry-run | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_external_provider_proof.py --dry-run --output /tmp/careeragent-v35-provider-proof-dry-run.json` | 验证外部 provider proof schema、redaction 和 dry-run 边界 | dry-run 必须是 `provider_mode=dry_run`，不是外部 provider proof |
+| v3.5-B human review import dry-run | `PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_batch.py --input evidence/templates/human_review_batch.template.csv --dry-run` | 验证 CSV/JSONL 导入、PII 拦截、review item shape 和 summary 生成 | 模板/dry-run 不能作为真实 human review proof |
+| v3.5-B human review summary | `PYTHONPATH=backend backend/.venv/bin/python scripts/summarize_human_review_evidence.py --input evidence/templates/human_review_batch.template.csv --output /tmp/careeragent-v35b-human-review-summary.json` | 汇总 pass/fail、平均分、hallucination/fabrication/privacy/adjudication 指标和阈值结果 | public template 只证明脚本可跑，不证明外部 review 完成 |
 | v3.5 evidence package validator | `PYTHONPATH=backend backend/.venv/bin/python scripts/validate_external_evidence_package.py --evidence-dir evidence/private_outputs --output /tmp/careeragent-v35-evidence-summary.json` | 汇总 private external evidence 的 schema、secret scan、candidate/certified blockers | 没有真实外部证明时应报告 blockers，不证明 production-ready |
 | AI quality report | `PYTHONPATH=backend backend/.venv/bin/python scripts/run_ai_quality_certification.py --eval-dir /tmp/careeragent-evals-anonymized --provider-proof /tmp/careeragent-provider-proof.json --output-dir /tmp/careeragent-ai-quality-report` | 汇总 provider mode、benchmark、human agreement、LLM judge 和 production_quality_candidate flag | `provider_mode=offline` 时不能声称 production-quality candidate |
 | Deployment proof validation | `PYTHONPATH=backend backend/.venv/bin/python scripts/validate_production_deployment.py --allow-local-placeholders --strict --output /tmp/careeragent-deployment-proof.json` | 验证 required env、DB URL shape、compose config、readiness docs、secret masking | 本地 proof，不是 cloud/managed KMS proof |
@@ -129,11 +131,20 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
   without printing API keys or runtime secrets.
 - `scripts/run_external_provider_proof.py --dry-run` must produce a redacted
   non-verified proof with `production_quality_candidate_signal=false`.
-- `scripts/import_human_review_proof.py` must redact reviewer identifiers and
-  compute agreement/privacy summary without writing raw review rows.
+- `scripts/import_human_review_batch.py --dry-run` must parse public-safe CSV or
+  JSONL templates, reject obvious PII/private raw fields and produce a redacted
+  summary without writing private review rows.
+- `scripts/summarize_human_review_evidence.py` must report total items,
+  pass/fail counts, average correctness/groundedness/safety scores,
+  hallucination/fabrication/privacy rates and adjudication completion.
 - `scripts/validate_external_evidence_package.py` must report blockers when
   external provider, human review, deployment, backup purge, monitoring or
   security review proofs are missing or incomplete.
+- Human review validator status must distinguish `missing_human_review`,
+  `template_only`, `insufficient_sample_size`, `thresholds_failed` and
+  `human_review_candidate_passed`.
+- `scripts/run_final_readiness_gates.sh` must fail when the external evidence
+  package lacks a real passing human review batch/summary.
 - A later production-ready candidate decision requires real private evidence,
   not templates, offline proofs, synthetic benchmarks or local dry-runs.
 
