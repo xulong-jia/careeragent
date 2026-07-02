@@ -33,7 +33,7 @@ def upgrade() -> None:
             sa.Column(
                 "added_to_eval_set",
                 sa.Boolean(),
-                server_default=sa.text("0"),
+                server_default=sa.false(),
                 nullable=False,
             )
         )

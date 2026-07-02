@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import re
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -65,3 +66,17 @@ def test_production_env_template_contains_no_concrete_provider_secret():
     assert "AKIA" not in template
     assert "APP_ENV=production" in template
     assert "VECTOR_STORE=local" in template
+
+
+def test_alembic_boolean_server_defaults_are_postgres_compatible():
+    migration_text = "\n".join(
+        path.read_text()
+        for path in sorted((ROOT_DIR / "backend" / "alembic" / "versions").glob("*.py"))
+    )
+
+    assert not re.search(
+        r"sa\.Boolean\(\)[\s\S]{0,120}server_default=sa\.text\([\"'][01][\"']\)",
+        migration_text,
+    )
+    assert "BOOLEAN DEFAULT 0" not in migration_text
+    assert "BOOLEAN DEFAULT 1" not in migration_text
