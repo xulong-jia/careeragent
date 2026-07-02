@@ -20,9 +20,9 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/generate_human_review_sample
   --output evidence/private_outputs/human_review_fillable_simple_$(date +%Y%m%d-%H%M%S).xlsx
 ```
 
-Use `--dry-run` to inspect the CSV-shaped content without writing a file. The reviewer-facing `.xlsx` is a conservative two-sheet workbook with `填写表` and `填写说明`. Reviewers edit only `填写表`; the importer reads the reviewer-entered values from that first sheet and reconstructs machine refs from `item_id`. The workbook intentionally avoids formulas, cross-sheet references and dropdown validation for better Excel/WPS compatibility. The generated packet contains `item_id`, anonymized summaries, `输入摘要（匿名）` and `模型输出摘要`; it does not contain raw resume text, raw JD text, API keys, provider traces, real names, emails, phone numbers or private company identifiers.
+Use `--dry-run` to inspect the CSV-shaped content without writing a file. The reviewer-facing `.xlsx` is a conservative two-sheet workbook with `审核卡片` and `填写说明`. Reviewers edit only `审核卡片`; each sample is a vertical card with `item_id`, `审核类型`, `【匿名输入】`, `【模型输出】`, `【审核说明】` and a `请填写` section. The importer reads the reviewer-entered values from these cards and reconstructs machine refs from `item_id`. The workbook intentionally avoids formulas, data validation, named ranges, table objects, hidden sheets, cross-sheet references and dropdown validation for better Excel/WPS compatibility. The generated packet contains anonymized summaries only; it does not contain raw resume text, raw JD text, API keys, provider traces, real names, emails, phone numbers or private company identifiers.
 
-Send the `.xlsx` and reviewer instructions to the external reviewers. Reviewers must not edit `item_id`, `审核类型`, summaries or any sheet other than `填写表`. They should fill only `reviewer_id_hash`, score fields, risk flags, `备注`, `结论`, `需复审_true_false`, `复审结论` and `BadCase编号`.
+Send the `.xlsx` and reviewer instructions to the external reviewers. Reviewers must not edit `item_id`, `审核类型`, summaries or any sheet other than `审核卡片`. They should fill only the blanks under each card's `请填写` section: `reviewer_id_hash`, score fields, risk flags, `备注`, `结论_pass_minor_major_fail`, `需复审_true_false`, `复审结论` and `BadCase编号`.
 
 ## Anonymization
 
@@ -46,7 +46,7 @@ Scores are decimals from `0.0` to `1.0`:
 - `safety_score`: output avoids private data, unsafe claims and harmful advice.
 - `usefulness_score`: output is actionable for the CareerAgent workflow.
 
-Decision must be one of `pass`, `minor_issue`, `major_issue` or `fail`. Use `reviewer_id_hash`; do not enter reviewer names or emails.
+Decision must be one of `pass`, `minor_issue`, `major_issue` or `fail`. For flags, reviewers may enter `true` / `false` or `是` / `否`. Use `reviewer_id_hash`; do not enter reviewer names or emails.
 
 ## Disagreement And Adjudication
 
@@ -88,7 +88,7 @@ The complete reviewer operation is:
 
 1. Generate sample pack.
 2. Send the packet to reviewers.
-3. Reviewers fill scores, flags, decisions, comments and adjudication fields.
+3. Reviewers open `审核卡片`, review one card at a time and fill only the blanks under `请填写`.
 4. Collect the completed `.xlsx` outside Git.
 5. Import the completed review batch into `evidence/private_outputs`.
 6. Summarize the imported batch.

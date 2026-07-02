@@ -68,6 +68,7 @@ RAW_PRIVATE_FIELDS = {
 }
 XLSX_FILL_SHEET = "填写表"
 XLSX_IMPORT_SHEET = "导入字段_不要改"
+XLSX_CARD_SHEET = "审核卡片"
 XLSX_FILL_LABEL_TO_FIELD = {
     "item_id": "item_id",
     "审核类型": "task_type_label",
@@ -89,6 +90,7 @@ XLSX_FILL_LABEL_TO_FIELD = {
     "编造": "fabrication_flag",
     "编造_true_false": "fabrication_flag",
     "结论": "decision",
+    "结论_pass_minor_major_fail": "decision",
     "需复审": "requires_adjudication",
     "需复审_true_false": "requires_adjudication",
     "备注": "reviewer_comment",
@@ -97,6 +99,15 @@ XLSX_FILL_LABEL_TO_FIELD = {
     "BadCase编号": "bad_case_ref",
     "reviewer_id_hash": "reviewer_id_hash",
     "审核人ID Hash": "reviewer_id_hash",
+}
+XLSX_CARD_LABEL_TO_FIELD = {
+    **XLSX_FILL_LABEL_TO_FIELD,
+    "【匿名输入】": "input_summary",
+    "匿名输入": "input_summary",
+    "【模型输出】": "model_output_summary",
+    "模型输出": "model_output_summary",
+    "【审核说明】": "review_instruction",
+    "审核说明": "review_instruction",
 }
 TASK_TYPE_LABEL_TO_TYPE = {
     "JD 解析审核": "jd_parse",
@@ -329,10 +340,60 @@ def _machine_fields_from_item_id(item_id: str) -> dict[str, str]:
     return fields
 
 
-def _load_xlsx_review_rows(path: Path) -> list[dict[str, Any]]:
-    sheets = _xlsx_rows_by_name(path)
+def _normalize_card_label(value: str) -> str:
+    return _normalize_header(value).rstrip(":：")
+
+
+def _card_to_review_row(card: dict[str, str]) -> dict[str, Any]:
+    item_id = str(card.get("item_id", "")).strip()
+    machine_row = _machine_fields_from_item_id(item_id)
+    row = {
+        **{field: machine_row.get(field, "") for field in BATCH_OPTIONAL_FIELDS},
+        "item_id": item_id,
+        "task_type": machine_row.get("task_type", ""),
+        "anonymized_input_ref": machine_row.get("anonymized_input_ref", ""),
+        "model_output_ref": machine_row.get("model_output_ref", ""),
+    }
+    if not row["task_type"]:
+        row["task_type"] = TASK_TYPE_LABEL_TO_TYPE.get(
+            str(card.get("task_type_label", "")).strip(),
+            "",
+        )
+    for field in REQUIRED_ITEM_FIELDS - {"item_id", "task_type", "anonymized_input_ref", "model_output_ref"}:
+        row[field] = str(card.get(field, "")).strip()
+    return row
+
+
+def _load_card_xlsx_review_rows(sheets: dict[str, list[list[str]]]) -> list[dict[str, Any]]:
+    cards: list[dict[str, str]] = []
+    current: dict[str, str] = {}
+    for raw_row in sheets[XLSX_CARD_SHEET]:
+        if not any(str(value).strip() for value in raw_row):
+            continue
+        label = _normalize_card_label(raw_row[0] if raw_row else "")
+        value = str(raw_row[1]).strip() if len(raw_row) > 1 else ""
+        if label.startswith("样本 "):
+            if current.get("item_id"):
+                cards.append(current)
+            current = {}
+            continue
+        field = XLSX_CARD_LABEL_TO_FIELD.get(label)
+        if field:
+            current[field] = value
+    if current.get("item_id"):
+        cards.append(current)
+
+    rows = [_card_to_review_row(card) for card in cards]
+    if not rows:
+        raise ValueError("human review card xlsx input is empty")
+    return rows
+
+
+def _load_table_xlsx_review_rows(sheets: dict[str, list[list[str]]]) -> list[dict[str, Any]]:
     if XLSX_FILL_SHEET not in sheets:
-        raise ValueError(f"xlsx human review input must contain {XLSX_FILL_SHEET!r} sheet")
+        raise ValueError(
+            f"xlsx human review input must contain {XLSX_CARD_SHEET!r} or {XLSX_FILL_SHEET!r} sheet"
+        )
 
     fill_rows_raw = sheets[XLSX_FILL_SHEET]
     fill_header_index = _find_header_row(fill_rows_raw, {"item_id", "审核类型"})
@@ -378,6 +439,13 @@ def _load_xlsx_review_rows(path: Path) -> list[dict[str, Any]]:
     if not rows:
         raise ValueError("human review xlsx input is empty")
     return rows
+
+
+def _load_xlsx_review_rows(path: Path) -> list[dict[str, Any]]:
+    sheets = _xlsx_rows_by_name(path)
+    if XLSX_CARD_SHEET in sheets:
+        return _load_card_xlsx_review_rows(sheets)
+    return _load_table_xlsx_review_rows(sheets)
 
 
 def load_review_rows(path: Path) -> list[dict[str, Any]]:

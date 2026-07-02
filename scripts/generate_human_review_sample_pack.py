@@ -13,7 +13,6 @@ import random
 import re
 import zipfile
 from typing import Any
-from xml.sax.saxutils import escape
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -124,16 +123,16 @@ BOOLEAN_FIELDS = [
     "requires_adjudication",
 ]
 DECISION_FIELDS = ["decision", "adjudication_decision"]
-FILL_SHEET_NAME = "填写表"
+CARD_SHEET_NAME = "审核卡片"
 INSTRUCTIONS_SHEET_NAME = "填写说明"
-FILL_HEADER_ROW = 1
-FILL_DATA_START_ROW = FILL_HEADER_ROW + 1
-FILL_COLUMNS = [
+CARD_CONTEXT_ROWS = [
     ("item_id", "item_id"),
     ("task_type_label", "审核类型"),
-    ("input_summary", "输入摘要（匿名）"),
-    ("model_output_summary", "模型输出摘要"),
-    ("review_instruction", "审核说明"),
+    ("input_summary", "【匿名输入】"),
+    ("model_output_summary", "【模型输出】"),
+    ("review_instruction", "【审核说明】"),
+]
+CARD_REVIEWER_ROWS = [
     ("reviewer_id_hash", "reviewer_id_hash"),
     ("correctness_score", "正确性_0到1"),
     ("groundedness_score", "有依据_0到1"),
@@ -142,13 +141,21 @@ FILL_COLUMNS = [
     ("privacy_risk_flag", "隐私风险_true_false"),
     ("hallucination_flag", "幻觉_true_false"),
     ("fabrication_flag", "编造_true_false"),
-    ("decision", "结论"),
+    ("decision", "结论_pass_minor_major_fail"),
     ("requires_adjudication", "需复审_true_false"),
     ("reviewer_comment", "备注"),
     ("adjudication_decision", "复审结论"),
     ("bad_case_ref", "BadCase编号"),
 ]
-FILL_REVIEWER_FIELDS = set(REVIEWER_FIELDS)
+FORBIDDEN_XLSX_XML_MARKERS = [
+    "dataValidations",
+    "tableParts",
+    "externalLinks",
+    "definedNames",
+    "pivot",
+    "slicer",
+    "calcChain",
+]
 PII_PATTERNS = [
     re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),
     re.compile(r"(?<!\d)(?:\+?\d[\d\s().-]{8,}\d)(?!\d)"),
@@ -469,188 +476,186 @@ def render_csv(rows: list[dict[str, str]]) -> str:
     return buffer.getvalue()
 
 
-def _column_letter(index: int) -> str:
-    result = ""
-    while index:
-        index, remainder = divmod(index - 1, 26)
-        result = chr(65 + remainder) + result
-    return result
-
-
-def _cell_xml(row_index: int, column_index: int, value: str, style_index: int) -> str:
-    ref = f"{_column_letter(column_index)}{row_index}"
-    text = str(value)
-    if text == "":
-        return f'<c r="{ref}" s="{style_index}"/>'
-    return (
-        f'<c r="{ref}" s="{style_index}" t="inlineStr">'
-        f"<is><t>{escape(text)}</t></is></c>"
-    )
-
-
-def _worksheet_xml(
+def _write_cell(
     *,
-    cols_xml: str,
-    rows_xml: str,
-    freeze_xml: str = "",
-    auto_filter_ref: str = "",
-) -> str:
-    auto_filter_xml = f'<autoFilter ref="{auto_filter_ref}"/>' if auto_filter_ref else ""
-    return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
- xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-{freeze_xml}
-<cols>{cols_xml}</cols>
-<sheetData>{rows_xml}</sheetData>
-{auto_filter_xml}
-</worksheet>'''
+    sheet: Any,
+    row_index: int,
+    label: str,
+    value: str,
+    label_fill: PatternFill,
+    value_fill: PatternFill | None = None,
+    bold_label: bool = True,
+) -> None:
+    from openpyxl.styles import Alignment, Font
+
+    label_cell = sheet.cell(row=row_index, column=1, value=label)
+    value_cell = sheet.cell(row=row_index, column=2, value=value)
+    label_cell.font = Font(bold=bold_label, size=11)
+    value_cell.font = Font(size=11)
+    label_cell.fill = label_fill
+    if value_fill:
+        value_cell.fill = value_fill
+    alignment = Alignment(wrap_text=True, vertical="top")
+    label_cell.alignment = alignment
+    value_cell.alignment = alignment
 
 
-def _cols_xml(widths: list[int]) -> str:
-    return "".join(
-        f'<col min="{index}" max="{index}" width="{width}" customWidth="1"/>'
-        for index, width in enumerate(widths, start=1)
-    )
+def _build_card_sheet(rows: list[dict[str, str]], sheet: Any) -> None:
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+    title_fill = PatternFill("solid", fgColor="D9EAF7")
+    context_fill = PatternFill("solid", fgColor="EAF4EA")
+    entry_fill = PatternFill("solid", fgColor="FFF2CC")
+    separator_fill = PatternFill("solid", fgColor="F3F6F9")
+    thin = Side(style="thin", color="D9DDE3")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    sheet.column_dimensions["A"].width = 28
+    sheet.column_dimensions["B"].width = 112
+    sheet.sheet_view.showGridLines = True
+
+    current_row = 1
+    total = len(rows)
+    for index, item in enumerate(rows, start=1):
+        title = sheet.cell(row=current_row, column=1, value=f"样本 {index} / {total}")
+        title.font = Font(bold=True, size=13)
+        title.fill = title_fill
+        title.alignment = Alignment(wrap_text=True, vertical="center")
+        sheet.cell(row=current_row, column=2, value="").fill = title_fill
+        sheet.row_dimensions[current_row].height = 24
+        current_row += 1
+
+        for field, label in CARD_CONTEXT_ROWS:
+            _write_cell(
+                sheet=sheet,
+                row_index=current_row,
+                label=label,
+                value=item.get(field, ""),
+                label_fill=context_fill,
+            )
+            sheet.row_dimensions[current_row].height = 32 if field in {"item_id", "task_type_label"} else 92
+            current_row += 1
+
+        _write_cell(
+            sheet=sheet,
+            row_index=current_row,
+            label="请填写",
+            value="只填写本段右侧空白；不要修改 item_id、审核类型或上方摘要。",
+            label_fill=entry_fill,
+            value_fill=entry_fill,
+        )
+        sheet.row_dimensions[current_row].height = 30
+        current_row += 1
+
+        for field, label in CARD_REVIEWER_ROWS:
+            _write_cell(
+                sheet=sheet,
+                row_index=current_row,
+                label=label,
+                value=item.get(field, ""),
+                label_fill=entry_fill,
+                value_fill=entry_fill,
+            )
+            sheet.row_dimensions[current_row].height = 26 if field != "reviewer_comment" else 54
+            current_row += 1
+
+        for column in range(1, 3):
+            cell = sheet.cell(row=current_row, column=column, value="")
+            cell.fill = separator_fill
+        sheet.row_dimensions[current_row].height = 18
+        current_row += 1
+
+    for row in sheet.iter_rows():
+        for cell in row:
+            cell.border = border
 
 
-def _freeze_xml(split_row: int, top_left_cell: str) -> str:
-    return (
-        '<sheetViews><sheetView workbookViewId="0">'
-        f'<pane ySplit="{split_row}" topLeftCell="{top_left_cell}" '
-        'activePane="bottomLeft" state="frozen"/>'
-        "</sheetView></sheetViews>"
-    )
+def _build_instruction_sheet(sheet: Any) -> None:
+    from openpyxl.styles import Alignment, Font
 
-
-def _fill_sheet_xml(rows: list[dict[str, str]]) -> str:
-    last_row = FILL_DATA_START_ROW + len(rows) - 1
-    last_column = _column_letter(len(FILL_COLUMNS))
-    widths = [34, 18, 64, 64, 46, 22, 14, 14, 14, 14, 18, 18, 18, 15, 18, 34, 15, 18]
-    row_xml: list[str] = []
-    header_cells = [
-        _cell_xml(FILL_HEADER_ROW, index, label, 1)
-        for index, (_field, label) in enumerate(FILL_COLUMNS, start=1)
-    ]
-    row_xml.append(
-        f'<row r="{FILL_HEADER_ROW}" ht="38" customHeight="1">'
-        + "".join(header_cells)
-        + "</row>"
-    )
-    for offset, row in enumerate(rows, start=0):
-        row_index = FILL_DATA_START_ROW + offset
-        cells = []
-        for column_index, (field, _label) in enumerate(FILL_COLUMNS, start=1):
-            style = 3 if field in FILL_REVIEWER_FIELDS else 2
-            cells.append(_cell_xml(row_index, column_index, row.get(field, ""), style))
-        row_xml.append(f'<row r="{row_index}" ht="108" customHeight="1">{"".join(cells)}</row>')
-    return _worksheet_xml(
-        cols_xml=_cols_xml(widths),
-        rows_xml="".join(row_xml),
-        freeze_xml=_freeze_xml(FILL_HEADER_ROW, f"A{FILL_DATA_START_ROW}"),
-        auto_filter_ref=f"A{FILL_HEADER_ROW}:{last_column}{last_row}",
-    )
-
-
-def _simple_table_sheet_xml(rows: list[list[str]], widths: list[int]) -> str:
-    row_xml = []
-    for row_index, row in enumerate(rows, start=1):
-        style = 1 if row_index == 1 else 2
-        cells = [
-            _cell_xml(row_index, column_index, value, style)
-            for column_index, value in enumerate(row, start=1)
-        ]
-        row_xml.append(f'<row r="{row_index}">{"".join(cells)}</row>')
-    return _worksheet_xml(
-        cols_xml=_cols_xml(widths),
-        rows_xml="".join(row_xml),
-        freeze_xml=_freeze_xml(1, "A2"),
-    )
-
-
-def _instructions_sheet_xml() -> str:
+    sheet.column_dimensions["A"].width = 110
     rows = [
-        ["CareerAgent 人工审核填写说明"],
-        [""],
-        ["1. 只填写第一页“填写表”，不要修改 item_id。"],
-        ["2. 每一行只根据：审核类型、输入摘要（匿名）、模型输出摘要、审核说明来判断。"],
-        ["3. 四个分数填写 0 到 1。没问题时建议填写 1.0。"],
-        ["4. 隐私风险_true_false、幻觉_true_false、编造_true_false、需复审_true_false 填 true/false，也可填 是/否。"],
-        ["5. 结论可填 pass、minor_issue、major_issue、fail。没问题时建议填 pass。"],
-        ["6. 没问题时建议：四个分数 1.0，三个风险 false，结论 pass，需复审 false。"],
-        ["7. 如果匿名摘要不足以判断，不要猜；在备注中说明并标记需复审 true。"],
-        ["8. 不需要访问源码、API key、数据库、provider trace、真实简历、真实 JD 或真实用户数据。"],
-        ["9. 不要写入真实姓名、邮箱、电话、API key、真实简历/JD 原文或私有证据。"],
+        "CareerAgent 人工审核填写说明",
+        "",
+        "1. 打开第一页“审核卡片”，每个样本是一张纵向卡片。",
+        "2. 只填写每张卡片“请填写”下面右侧的空白；不要修改 item_id。",
+        "3. 只根据【匿名输入】、【模型输出】、【审核说明】判断，不需要源码、数据库、API key 或真实用户数据。",
+        "4. 四个分数填写 0 到 1：1.0 = good，0.8 = minor issue，0.5 = major issue，0.0 = fail。",
+        "5. true/false 字段可填 true / false，也可填 是 / 否；空白会被导入器拒绝。",
+        "6. 结论和复审结论可填 pass、minor_issue、major_issue、fail。",
+        "7. 没问题时建议：四个分数 1.0，三个风险 false，结论 pass，需复审 false。",
+        "8. 如果匿名摘要不足以判断，不要猜；在备注中说明并标记需复审 true。",
+        "9. 不要写入真实姓名、邮箱、电话、API key、真实简历/JD 原文或私有证据。",
     ]
-    return _simple_table_sheet_xml(rows, [110])
+    for row_index, text in enumerate(rows, start=1):
+        cell = sheet.cell(row=row_index, column=1, value=text)
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+        cell.font = Font(bold=(row_index == 1), size=12 if row_index == 1 else 11)
+        sheet.row_dimensions[row_index].height = 26 if row_index == 1 else 36
+
+
+def _strip_openpyxl_default_ooxml_features(path: Path) -> None:
+    """Remove empty/default OOXML nodes that are harmless but fail our compatibility smoke check."""
+    rewritten: dict[str, bytes] = {}
+    with zipfile.ZipFile(path) as archive:
+        for name in archive.namelist():
+            data = archive.read(name)
+            if name == "xl/workbook.xml":
+                text = data.decode("utf-8")
+                text = re.sub(r"<definedNames\s*/>", "", text)
+                text = re.sub(r"<definedNames>.*?</definedNames>", "", text, flags=re.DOTALL)
+                text = re.sub(r"<calcPr\b[^>]*/>", "", text)
+                data = text.encode("utf-8")
+            elif name == "xl/styles.xml":
+                text = data.decode("utf-8")
+                text = re.sub(r'\sdefaultPivotStyle="[^"]*"', "", text)
+                text = re.sub(r'\spivotButton="[^"]*"', "", text)
+                data = text.encode("utf-8")
+            rewritten[name] = data
+
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    with zipfile.ZipFile(temp_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in rewritten.items():
+            archive.writestr(name, data)
+    temp_path.replace(path)
+
+
+def assert_xlsx_compatibility_smoke(path: Path) -> None:
+    with zipfile.ZipFile(path) as archive:
+        names = archive.namelist()
+        xml_payload = "\n".join(
+            archive.read(name).decode("utf-8", errors="ignore")
+            for name in names
+            if name.endswith(".xml")
+        )
+    if re.search(r"<f(?:\s|>)", xml_payload):
+        raise ValueError("xlsx contains formulas")
+    for marker in FORBIDDEN_XLSX_XML_MARKERS:
+        if marker in xml_payload or any(marker in name for name in names):
+            raise ValueError(f"xlsx contains forbidden OOXML marker: {marker}")
 
 
 def render_xlsx(rows: list[dict[str, str]], output_path: Path) -> None:
-    sheet_names = [FILL_SHEET_NAME, INSTRUCTIONS_SHEET_NAME]
-    sheet_overrides = "\n".join(
-        f'<Override PartName="/xl/worksheets/sheet{index}.xml" '
-        'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
-        for index in range(1, len(sheet_names) + 1)
-    )
-    content_types = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-{sheet_overrides}
-<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-</Types>'''.format(sheet_overrides=sheet_overrides)
-    rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
-</Relationships>'''
-    workbook_sheets = "".join(
-        f'<sheet name="{escape(name)}" sheetId="{index}" r:id="rId{index}"/>'
-        for index, name in enumerate(sheet_names, start=1)
-    )
-    workbook = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
- xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets>{workbook_sheets}</sheets>
-</workbook>'''
-    workbook_sheet_rels = "\n".join(
-        f'<Relationship Id="rId{index}" '
-        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
-        f'Target="worksheets/sheet{index}.xml"/>'
-        for index in range(1, len(sheet_names) + 1)
-    )
-    workbook_rels = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-{workbook_sheet_rels}
-<Relationship Id="rId{len(sheet_names) + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>'''
-    styles = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
-<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9EAF7"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/></patternFill></fill></fills>
-<borders count="1"><border/></borders>
-<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf></cellXfs>
-<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
-</styleSheet>'''
-    core = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-<dc:creator>CareerAgent</dc:creator><cp:lastModifiedBy>CareerAgent</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">{datetime.now(timezone.utc).isoformat()}</dcterms:created></cp:coreProperties>'''
-    app = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>CareerAgent</Application></Properties>'''
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", content_types)
-        archive.writestr("_rels/.rels", rels)
-        archive.writestr("xl/workbook.xml", workbook)
-        archive.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
-        archive.writestr("xl/worksheets/sheet1.xml", _fill_sheet_xml(rows))
-        archive.writestr("xl/worksheets/sheet2.xml", _instructions_sheet_xml())
-        archive.writestr("xl/styles.xml", styles)
-        archive.writestr("docProps/core.xml", core)
-        archive.writestr("docProps/app.xml", app)
+    from openpyxl import Workbook, load_workbook
+
+    for row in rows:
+        for field in [*REVIEW_CONTEXT_FIELDS, "item_id"]:
+            _assert_public_safe(row.get(field, ""))
+
+    workbook = Workbook()
+    card_sheet = workbook.active
+    card_sheet.title = CARD_SHEET_NAME
+    instruction_sheet = workbook.create_sheet(INSTRUCTIONS_SHEET_NAME)
+    _build_card_sheet(rows, card_sheet)
+    _build_instruction_sheet(instruction_sheet)
+    workbook.save(output_path)
+
+    _strip_openpyxl_default_ooxml_features(output_path)
+    loaded = load_workbook(output_path, data_only=False)
+    if loaded.sheetnames != [CARD_SHEET_NAME, INSTRUCTIONS_SHEET_NAME]:
+        raise ValueError(f"unexpected xlsx sheets: {loaded.sheetnames}")
+    loaded.close()
+    assert_xlsx_compatibility_smoke(output_path)
 
 
 def main() -> int:

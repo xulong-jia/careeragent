@@ -5,7 +5,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import io
 import json
 from pathlib import Path
+import re
 import subprocess
+import sys
 import threading
 import zipfile
 
@@ -189,13 +191,37 @@ def _xlsx_workbook_xml(path: Path) -> str:
         )
 
 
-def _xlsx_table(path: Path, sheet_name: str, required_headers: set[str]) -> tuple[list[str], list[dict[str, str]]]:
+def _xlsx_card_rows(path: Path) -> list[dict[str, str]]:
     rows_by_sheet = import_human_review_batch._xlsx_rows_by_name(path)
-    raw_rows = rows_by_sheet[sheet_name]
-    header_index = import_human_review_batch._find_header_row(raw_rows, required_headers)
-    headers = [import_human_review_batch._normalize_header(value) for value in raw_rows[header_index]]
-    rows = import_human_review_batch._rows_after_header(raw_rows, header_index)
-    return headers, rows
+    raw_rows = rows_by_sheet["审核卡片"]
+    cards: list[dict[str, str]] = []
+    current: dict[str, str] = {}
+    for raw_row in raw_rows:
+        if not any(str(value).strip() for value in raw_row):
+            continue
+        label = import_human_review_batch._normalize_card_label(raw_row[0] if raw_row else "")
+        value = str(raw_row[1]).strip() if len(raw_row) > 1 else ""
+        if label.startswith("样本 "):
+            if current.get("item_id"):
+                cards.append(current)
+            current = {}
+            continue
+        field = import_human_review_batch.XLSX_CARD_LABEL_TO_FIELD.get(label)
+        if field:
+            current[field] = value
+    if current.get("item_id"):
+        cards.append(current)
+    return cards
+
+
+def _assert_xlsx_has_no_complex_ooxml(path: Path) -> None:
+    with zipfile.ZipFile(path) as archive:
+        names = archive.namelist()
+    workbook_xml = _xlsx_workbook_xml(path)
+    assert not re.search(r"<f(?:\s|>)", workbook_xml)
+    for marker in generate_human_review_sample_pack.FORBIDDEN_XLSX_XML_MARKERS:
+        assert marker not in workbook_xml
+        assert not any(marker in name for name in names)
 
 
 def _human_review_batch_payload(sample_size: int = 30) -> dict:
@@ -539,7 +565,7 @@ def test_human_review_summary_metrics_and_thresholds(tmp_path):
 def test_human_review_sample_pack_dry_run_generates_blank_reviewer_csv():
     result = subprocess.run(
         [
-            "python3",
+            sys.executable,
             "scripts/generate_human_review_sample_pack.py",
             "--sample-size",
             "30",
@@ -622,7 +648,7 @@ def test_human_review_sample_pack_generates_simple_fillable_xlsx(tmp_path):
 
     result = subprocess.run(
         [
-            "python3",
+            sys.executable,
             "scripts/generate_human_review_sample_pack.py",
             "--sample-size",
             "30",
@@ -641,37 +667,16 @@ def test_human_review_sample_pack_generates_simple_fillable_xlsx(tmp_path):
 
     assert result.stdout.strip() == str(output)
     workbook_xml = _xlsx_workbook_xml(output)
-    for sheet_name in ["填写表", "填写说明"]:
+    for sheet_name in ["审核卡片", "填写说明"]:
         assert f'name="{sheet_name}"' in workbook_xml
+    assert 'name="填写表"' not in workbook_xml
     assert 'name="导入字段_不要改"' not in workbook_xml
     assert 'name="选项"' not in workbook_xml
-    assert "<autoFilter" in workbook_xml
-    assert 'state="frozen"' in workbook_xml
-    assert "<dataValidations" not in workbook_xml
-    assert "<f>" not in workbook_xml
+    assert "<autoFilter" not in workbook_xml
+    assert 'state="hidden"' not in workbook_xml
+    _assert_xlsx_has_no_complex_ooxml(output)
+    generate_human_review_sample_pack.assert_xlsx_compatibility_smoke(output)
 
-    fill_headers, fill_rows = _xlsx_table(output, "填写表", {"item_id", "审核类型"})
-    for field in [
-        "item_id",
-        "审核类型",
-        "输入摘要（匿名）",
-        "模型输出摘要",
-        "审核说明",
-        "reviewer_id_hash",
-        "正确性_0到1",
-        "有依据_0到1",
-        "安全性_0到1",
-        "有用性_0到1",
-        "隐私风险_true_false",
-        "幻觉_true_false",
-        "编造_true_false",
-        "结论",
-        "需复审_true_false",
-        "复审结论",
-        "BadCase编号",
-        "备注",
-    ]:
-        assert field in fill_headers
     for field in [
         "dataset_name",
         "sampling_method",
@@ -680,17 +685,27 @@ def test_human_review_sample_pack_generates_simple_fillable_xlsx(tmp_path):
         "anonymized_input_ref",
         "model_output_ref",
     ]:
-        assert field not in fill_headers
-    assert len(fill_rows) == 30
-    assert all(row["正确性_0到1"] == "" for row in fill_rows)
-    assert all(row["结论"] == "" for row in fill_rows)
-    for row in fill_rows:
-        _assert_readable_review_context(row)
-    rendered = "\n".join(",".join(row.values()) for row in fill_rows)
+        assert field not in workbook_xml
+
+    cards = _xlsx_card_rows(output)
+    assert len(cards) == 30
+    assert {card["task_type_label"] for card in cards} == set(
+        generate_human_review_sample_pack.TASK_TYPE_LABELS.values()
+    )
+    for card in cards:
+        assert card["item_id"].startswith("hr_")
+        assert card["task_type_label"]
+        assert card["input_summary"]
+        assert card["model_output_summary"]
+        assert card["review_instruction"]
+        assert card["correctness_score"] == ""
+        assert card["decision"] == ""
+        _assert_readable_review_context(card)
+    rendered = "\n".join(",".join(card.values()) for card in cards)
     assert not any(pattern.search(rendered) for pattern in generate_human_review_sample_pack.PII_PATTERNS)
 
 
-def test_human_review_sample_pack_openpyxl_smoke_loads_when_available(tmp_path):
+def test_human_review_sample_pack_openpyxl_smoke_loads_card_workbook(tmp_path):
     openpyxl = pytest.importorskip("openpyxl")
     output = tmp_path / "reviewer-pack.xlsx"
     rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
@@ -698,11 +713,13 @@ def test_human_review_sample_pack_openpyxl_smoke_loads_when_available(tmp_path):
     generate_human_review_sample_pack.render_xlsx(rows, output)
 
     workbook = openpyxl.load_workbook(output)
-    assert workbook.sheetnames == ["填写表", "填写说明"]
-    assert workbook["填写表"]["A1"].value == "item_id"
+    assert workbook.sheetnames == ["审核卡片", "填写说明"]
+    assert workbook["审核卡片"]["A1"].value == "样本 1 / 30"
+    assert workbook["审核卡片"]["A2"].value == "item_id"
+    workbook.close()
 
 
-def test_human_review_simple_xlsx_import_reads_fill_sheet_values(tmp_path):
+def test_human_review_card_xlsx_import_reads_filled_values(tmp_path):
     output = tmp_path / "completed-review.xlsx"
     rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
     for row in rows:
@@ -735,7 +752,7 @@ def test_human_review_simple_xlsx_import_reads_fill_sheet_values(tmp_path):
     assert batch["review_items"][0]["privacy_risk_flag"] is False
 
 
-def test_human_review_simple_xlsx_import_rejects_blank_scores_not_cached_zero(tmp_path):
+def test_human_review_card_xlsx_import_rejects_blank_scores_not_cached_zero(tmp_path):
     output = tmp_path / "blank-review.xlsx"
     rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
     for row in rows:
@@ -752,7 +769,7 @@ def test_human_review_simple_xlsx_import_rejects_blank_scores_not_cached_zero(tm
         import_human_review_batch.build_human_review_batch(output)
 
 
-def test_human_review_simple_xlsx_import_rejects_blank_flags(tmp_path):
+def test_human_review_card_xlsx_import_rejects_blank_flags(tmp_path):
     output = tmp_path / "blank-flag-review.xlsx"
     rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
     for row in rows:
@@ -773,7 +790,7 @@ def test_human_review_simple_xlsx_import_rejects_blank_flags(tmp_path):
         import_human_review_batch.build_human_review_batch(output)
 
 
-def test_human_review_simple_xlsx_import_normalizes_bool_and_decision_values(tmp_path):
+def test_human_review_card_xlsx_import_normalizes_bool_and_decision_values(tmp_path):
     output = tmp_path / "localized-review.xlsx"
     rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
     for row in rows:
