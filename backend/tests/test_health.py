@@ -91,6 +91,34 @@ def test_liveness_and_metrics_return_operational_snapshot():
     assert "rag_answer_runs_total" in metrics["runs"]
 
 
+def test_health_endpoints_support_head_for_uptime_monitors():
+    client = get_client()
+
+    live_response = client.head("/live")
+    ready_response = client.head("/ready")
+    metrics_response = client.head("/metrics")
+
+    assert live_response.status_code == 200
+    assert ready_response.status_code == 200
+    assert metrics_response.status_code == 200
+    assert live_response.content == b""
+    assert ready_response.content == b""
+    assert metrics_response.content == b""
+
+
+def test_health_get_responses_keep_existing_schema():
+    client = get_client()
+
+    live_payload = client.get("/live").json()
+    ready_payload = client.get("/ready").json()
+
+    assert set(live_payload) == {"data", "request_id"}
+    assert live_payload["data"]["status"] == "ok"
+    assert set(ready_payload) == {"data", "request_id"}
+    assert "database_reachable" in ready_payload["data"]
+    assert "config" in ready_payload["data"]
+
+
 def test_unknown_route_returns_error_envelope():
     response = get_client().get("/missing")
 

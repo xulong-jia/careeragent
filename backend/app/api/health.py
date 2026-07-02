@@ -142,6 +142,8 @@ async def get_health(request: Request) -> dict[str, object]:
 
 @router.get("/live", response_model=LivenessResponse)
 @router.get("/api/live", response_model=LivenessResponse)
+@router.head("/live")
+@router.head("/api/live")
 async def get_liveness(request: Request) -> dict[str, object]:
     settings = get_settings()
     return {
@@ -152,6 +154,8 @@ async def get_liveness(request: Request) -> dict[str, object]:
 
 @router.get("/ready", response_model=ReadinessResponse)
 @router.get("/api/ready", response_model=ReadinessResponse)
+@router.head("/ready")
+@router.head("/api/ready")
 async def get_readiness(
     request: Request,
     db: Session = Depends(get_db),
@@ -215,6 +219,8 @@ async def get_readiness(
 
 @router.get("/metrics", response_model=MetricsResponse)
 @router.get("/api/metrics", response_model=MetricsResponse)
+@router.head("/metrics")
+@router.head("/api/metrics")
 async def get_metrics(
     request: Request,
     db: Session = Depends(get_db),
