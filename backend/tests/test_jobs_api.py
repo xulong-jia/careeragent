@@ -115,6 +115,55 @@ def test_job_create_extracts_role_category_from_title_and_skills_from_text():
     assert profile["responsibilities"]
 
 
+def test_job_create_does_not_infer_unsupported_rest_from_api_text():
+    client = make_client()
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "company": "Mock Company",
+            "job_title": "Backend Platform Engineer",
+            "location": "Sydney",
+            "raw_text": (
+                "Must build Python FastAPI services backed by PostgreSQL. "
+                "Responsibilities include API reliability checks. "
+                "Docker is a plus."
+            ),
+            "source_url": None,
+        },
+    )
+
+    assert response.status_code == 201
+    profile = get_data(response)["job_profile"]
+    assert profile["required_skills"] == ["Python", "FastAPI", "PostgreSQL"]
+    assert "REST" not in profile["required_skills"]
+
+
+def test_job_create_marks_backend_mobile_role_ambiguity():
+    client = make_client()
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "company": "Mock Company",
+            "job_title": "Backend Platform Engineer",
+            "location": "Sydney",
+            "raw_text": (
+                "Must build React Native mobile workflows with TypeScript. "
+                "Responsibilities include offline sync and API integration for mobile users."
+            ),
+            "source_url": None,
+        },
+    )
+
+    assert response.status_code == 201
+    profile = get_data(response)["job_profile"]
+    assert profile["role_category"] == "Other"
+    assert "role_category_ambiguous_backend_mobile" in profile["warnings"]
+    assert profile["parse_confidence"] < 0.8
+    assert profile["risk_level"] == "medium"
+
+
 def test_job_create_classifies_data_platform_without_backend_misclassification():
     client = make_client()
 

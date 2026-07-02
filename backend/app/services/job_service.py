@@ -177,6 +177,17 @@ def build_deterministic_job_profile(jd_id: str, payload: JobCreateRequest) -> Jo
     role_category, role_evidence = infer_role_category(payload.job_title, payload.raw_text)
     hidden_requirements = _extract_hidden_requirements(statements, role_category)
     warnings = _job_warnings(payload.raw_text, required_skills, responsibilities)
+    if _has_backend_mobile_conflict(payload.job_title, payload.raw_text):
+        role_category = "Other"
+        warnings.append("role_category_ambiguous_backend_mobile")
+        role_evidence.append(
+            _evidence_item(
+                "role_category",
+                "ambiguous_backend_mobile",
+                payload.job_title,
+                0.52,
+            )
+        )
     evidence.extend(role_evidence)
     evidence.extend(
         _evidence_item(
@@ -584,6 +595,17 @@ def _has_role_term(text: str, cues: tuple[str, ...]) -> bool:
         if re.search(rf"(?<![a-z0-9]){re.escape(cue)}(?![a-z0-9])", text):
             return True
     return False
+
+
+def _has_backend_mobile_conflict(job_title: str, raw_text: str) -> bool:
+    title = job_title.lower()
+    combined = f"{job_title} {raw_text}".lower()
+    backend_title = _has_role_term(title, ("backend", "api developer"))
+    mobile_signal = _has_role_term(
+        combined,
+        ("mobile", "react native", "ios", "android", "offline sync"),
+    )
+    return backend_title and mobile_signal
 
 
 def _dedupe(values: Any) -> list[Any]:

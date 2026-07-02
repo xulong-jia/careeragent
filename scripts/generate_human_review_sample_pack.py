@@ -45,7 +45,18 @@ REVIEW_INSTRUCTIONS = {
     "project_rewrite": "判断项目改写是否真实增强表达：是否贴合目标 JD，是否保留事实边界并避免编造经历、指标或工具。",
     "agent_workflow": "判断 Agent workflow 是否合理、安全、可执行：步骤、下一步、缺失信息和 Bad Case 处理是否正确。",
 }
-ROLE_ORDER = ["backend", "frontend", "data", "ai", "product", "security"]
+ROLE_ORDER = [
+    "backend",
+    "frontend",
+    "data",
+    "ai",
+    "product",
+    "security",
+    "analytics_engineering",
+    "mobile",
+    "platform",
+    "qa",
+]
 ROLE_CONTEXT = {
     "backend": {
         "title": "Backend Graduate Engineer",
@@ -76,6 +87,26 @@ ROLE_CONTEXT = {
         "title": "Security Graduate Engineer",
         "responsibilities": "review threat models, improve logging, reason about IAM and security monitoring controls",
         "experience": "graduate/junior security role",
+    },
+    "analytics_engineering": {
+        "title": "Analytics Engineering Graduate",
+        "responsibilities": "model analytics data, validate SQL metrics, communicate data quality tradeoffs",
+        "experience": "graduate/junior analytics engineering role",
+    },
+    "mobile": {
+        "title": "Mobile Graduate Engineer",
+        "responsibilities": "build React Native screens, integrate APIs, handle offline sync and mobile testing",
+        "experience": "graduate/junior mobile role",
+    },
+    "platform": {
+        "title": "Platform Graduate Engineer",
+        "responsibilities": "support CI/CD, Kubernetes, observability, and reliability workflows",
+        "experience": "graduate/junior platform role",
+    },
+    "qa": {
+        "title": "QA Automation Graduate Engineer",
+        "responsibilities": "write automated tests, validate CI checks, and report quality risks",
+        "experience": "graduate/junior QA automation role",
     },
 }
 MACHINE_FIELDS = [

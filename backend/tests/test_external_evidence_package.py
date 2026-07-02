@@ -101,6 +101,14 @@ def _json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _jsonl(path: Path) -> list[dict]:
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
 def _write_quality_inputs(tmp_path: Path) -> Path:
     eval_dir = tmp_path / "eval"
     eval_dir.mkdir()
@@ -630,6 +638,57 @@ def test_human_review_sample_pack_summaries_are_task_specific_and_readable():
         combined = f"{row['input_summary']} {row['model_output_summary']}"
         for keyword in keywords:
             assert keyword in combined
+
+
+def test_anonymized_parser_benchmark_signals_do_not_add_unsupported_bad_case_fields():
+    jd_rows = _jsonl(ROOT / "evals" / "datasets" / "anonymized_benchmark" / "jd_parser_benchmark.jsonl")
+    resume_rows = _jsonl(
+        ROOT / "evals" / "datasets" / "anonymized_benchmark" / "resume_parser_benchmark.jsonl"
+    )
+
+    for row in jd_rows:
+        expected = row["expected"]
+        signals = row["signals"]
+        assert set(signals["parsed_required_skills"]) <= set(expected["required_skills_should_include"])
+        assert set(signals["parsed_preferred_skills"]) <= set(expected["preferred_skills_should_include"])
+        assert set(signals["risk_flags"]) <= set(expected["risk_flags_should_include"])
+    for row in resume_rows:
+        expected = row["expected"]
+        signals = row["signals"]
+        assert set(signals["skills"]) <= set(expected["skills_should_include"])
+        assert set(signals["projects"]) <= set(expected["projects_should_include"])
+        assert set(signals["sections"]) <= set(expected["sections_should_include"])
+        assert set(signals["risk_flags"]) <= set(expected["risk_flags_should_include"])
+
+
+def test_human_review_sample_pack_summaries_support_bad_case_outputs():
+    rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=35)
+    by_item = {row["item_id"]: row for row in rows}
+
+    jd_041 = by_item["hr_jd_parse_anon_jd_041"]
+    assert "REST" not in jd_041["model_output_summary"]
+    assert "Python" in jd_041["input_summary"]
+    assert "FastAPI" in jd_041["input_summary"]
+    assert "PostgreSQL" in jd_041["input_summary"]
+
+    jd_048 = by_item["hr_jd_parse_anon_jd_048"]
+    assert "Mobile Graduate Engineer" in jd_048["input_summary"]
+    assert "React Native" in jd_048["input_summary"]
+    assert "backend" not in jd_048["input_summary"].lower()
+
+    for item_id in [
+        "hr_resume_parse_anon_resume_003",
+        "hr_resume_parse_anon_resume_010",
+        "hr_resume_parse_anon_resume_012",
+        "hr_resume_parse_anon_resume_023",
+        "hr_resume_parse_anon_resume_026",
+    ]:
+        row = by_item[item_id]
+        assert "Git" not in row["model_output_summary"]
+        assert "Evidence Portfolio" not in row["model_output_summary"]
+        assert "experience section expected=True" not in row["model_output_summary"]
+        for field in ["input_summary", "model_output_summary", "review_instruction"]:
+            assert row[field]
 
 
 def test_human_review_sample_pack_default_outputs_are_private_outputs():
