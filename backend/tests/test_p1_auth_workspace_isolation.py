@@ -5,6 +5,7 @@ from app.agents import state
 from app.core.security import create_access_token, hash_password
 from app.core.tenant import DEFAULT_WORKSPACE_ID
 from app.models.auth import AuditLog, AuthSession, User, Workspace, WorkspaceMembership
+from app.services import privacy_service
 
 
 def _client_for(user_id: str, email: str):
@@ -513,3 +514,47 @@ def test_privacy_export_delete_all_and_audit_are_tenant_scoped():
     assert "raw_text" not in audit_text
     assert "secret" not in audit_text
     assert DEFAULT_WORKSPACE_ID not in audit_text
+
+
+def test_privacy_delete_all_legal_hold_blocks_purge_complete_behavior(db_session):
+    user = _client_for("privacy_hold", "privacy-hold@example.com")
+    other_user = _client_for("privacy_hold_other", "privacy-hold-other@example.com")
+    held_job_id = _create_job(user)
+    other_job_id = _create_job(other_user)
+    db_session.add(
+        AuditLog(
+            id="audit_legal_hold_test",
+            user_id="privacy_hold",
+            workspace_id="workspace_privacy_hold",
+            action=privacy_service.LEGAL_HOLD_STATUS_ACTION,
+            resource_type=privacy_service.LEGAL_HOLD_RESOURCE_TYPE,
+            resource_id="privacy_hold",
+            metadata_json={
+                "active": True,
+                "reason": "test_hold",
+                "scope": "current_user_workspace",
+            },
+        )
+    )
+    db_session.commit()
+
+    dry_run = user.delete("/api/privacy/delete-all", params={"dry_run": "true"})
+    assert dry_run.status_code == 200
+    dry_run_data = get_data(dry_run)
+    assert dry_run_data["status"] == "legal_hold_blocked"
+    assert dry_run_data["legal_hold_blocked"] is True
+    assert dry_run_data["verification_status"] == "legal_hold_blocked"
+    assert dry_run_data["backup_purge_status"] == "legal_hold"
+    assert dry_run_data["deleted_counts"]["job_descriptions"] == 0
+    assert user.get(f"/api/jobs/{held_job_id}").status_code == 200
+
+    execute = user.delete("/api/privacy/delete-all")
+    assert execute.status_code == 200
+    execute_data = get_data(execute)
+    assert execute_data["status"] == "legal_hold_blocked"
+    assert execute_data["legal_hold_blocked"] is True
+    assert execute_data["verification_status"] == "legal_hold_blocked"
+    assert execute_data["backup_purge_status"] == "legal_hold"
+    assert execute_data["deleted_counts"]["job_descriptions"] == 0
+    assert user.get(f"/api/jobs/{held_job_id}").status_code == 200
+    assert other_user.get(f"/api/jobs/{other_job_id}").status_code == 200

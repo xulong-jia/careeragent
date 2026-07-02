@@ -21,6 +21,9 @@ from app.models.resume import Resume, ResumeVersion
 from app.models.study_plan import StudyPlan
 from app.services.audit_service import record_audit_event
 
+LEGAL_HOLD_RESOURCE_TYPE = "privacy_legal_hold"
+LEGAL_HOLD_STATUS_ACTION = "privacy.legal_hold_status"
+
 
 def _count(db: Session, model) -> int:
     return db.scalar(select(func.count()).select_from(model).where(*owner_filter(model))) or 0
@@ -192,6 +195,45 @@ def _build_retained_records() -> list[dict[str, object]]:
     ]
 
 
+def set_legal_hold_for_current_subject(
+    db: Session,
+    *,
+    active: bool,
+    reason: str = "policy_control",
+) -> AuditLog:
+    return record_audit_event(
+        db,
+        action=LEGAL_HOLD_STATUS_ACTION,
+        resource_type=LEGAL_HOLD_RESOURCE_TYPE,
+        resource_id=current_user_id(),
+        metadata={
+            "active": active,
+            "reason": reason,
+            "scope": "current_user_workspace",
+        },
+    )
+
+
+def _legal_hold_state(db: Session) -> dict[str, object]:
+    log = db.scalars(
+        select(AuditLog)
+        .where(AuditLog.user_id == current_user_id())
+        .where(AuditLog.workspace_id == current_workspace_id())
+        .where(AuditLog.action == LEGAL_HOLD_STATUS_ACTION)
+        .where(AuditLog.resource_type == LEGAL_HOLD_RESOURCE_TYPE)
+        .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        .limit(1)
+    ).first()
+    if log is None:
+        return {"active": False, "source_audit_event_id": None}
+    metadata = dict(log.metadata_json or {})
+    return {
+        "active": metadata.get("active") is True,
+        "source_audit_event_id": log.id,
+        "scope": metadata.get("scope", "current_user_workspace"),
+    }
+
+
 def _proof_payload(
     *,
     status: str,
@@ -200,11 +242,27 @@ def _proof_payload(
     finished_at: datetime,
     counts: dict[str, int],
     audit_event_id: str | None,
+    legal_hold_state: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    legal_hold_state = legal_hold_state or {"active": False, "source_audit_event_id": None}
+    legal_hold_active = legal_hold_state.get("active") is True
     deleted_counts = {
-        key: (0 if status == "dry_run" or key in {"users", "workspace_memberships"} else value)
+        key: (
+            0
+            if status in {"dry_run", "legal_hold_blocked"}
+            or key in {"users", "workspace_memberships"}
+            else value
+        )
         for key, value in counts.items()
     }
+    backup_purge_status = "legal_hold" if legal_hold_active else "not_implemented"
+    verification_status = (
+        "legal_hold_blocked"
+        if status == "legal_hold_blocked"
+        else "dry_run_not_deleted"
+        if status == "dry_run"
+        else "database_rows_deleted"
+    )
     return {
         "status": status,
         "deletion_proof_id": proof_id,
@@ -217,17 +275,24 @@ def _proof_payload(
         "deleted_counts": deleted_counts,
         "retained_records": _build_retained_records(),
         "retention_reason": (
-            "Workspace business data is deleted; account, membership and redacted audit tombstone are retained."
+            "Legal hold is active; workspace business data was not deleted."
+            if legal_hold_active
+            else "Workspace business data is deleted; account, membership and redacted audit tombstone are retained."
         ),
         "retention_note": (
             "Database rows are scoped to the current workspace. This proof does not purge backups, logs, exports, or external systems."
         ),
-        "backup_purge_status": "not_implemented",
+        "backup_purge_status": backup_purge_status,
         "backup_purge_note": (
-            "v3.1 defines retention/backup policy and restore runbooks, but automated managed-backup purge is not implemented."
+            "Legal hold blocks purge-complete marking until the hold is released."
+            if legal_hold_active
+            else "v3.1 defines retention/backup policy and restore runbooks, but automated managed-backup purge is not implemented."
         ),
+        "legal_hold_status": "active" if legal_hold_active else "none",
+        "legal_hold_blocked": legal_hold_active,
+        "legal_hold_source_audit_event_id": legal_hold_state.get("source_audit_event_id"),
         "audit_event_id": audit_event_id,
-        "verification_status": "dry_run_not_deleted" if status == "dry_run" else "database_rows_deleted",
+        "verification_status": verification_status,
     }
 
 
@@ -238,6 +303,34 @@ def delete_current_user_data(db: Session, *, dry_run: bool = False) -> dict[str,
     proof_id = f"deletion_{uuid4().hex[:12]}"
     started_at = _now()
     action = "privacy.delete_dry_run" if dry_run else "privacy.delete_execute"
+    legal_hold_state = _legal_hold_state(db)
+
+    if legal_hold_state.get("active") is True:
+        audit = record_audit_event(
+            db,
+            action=f"{action}_legal_hold_blocked",
+            resource_type="privacy",
+            resource_id=user_id,
+            metadata={
+                "deletion_proof_id": proof_id,
+                "resource_counts_before": counts,
+                "legal_hold_status": "active",
+                "legal_hold_source_audit_event_id": legal_hold_state.get(
+                    "source_audit_event_id"
+                ),
+                "dry_run": dry_run,
+            },
+        )
+        db.commit()
+        return _proof_payload(
+            status="legal_hold_blocked",
+            proof_id=proof_id,
+            started_at=started_at,
+            finished_at=_now(),
+            counts=counts,
+            audit_event_id=audit.id,
+            legal_hold_state=legal_hold_state,
+        )
 
     if dry_run:
         audit = record_audit_event(
@@ -256,6 +349,7 @@ def delete_current_user_data(db: Session, *, dry_run: bool = False) -> dict[str,
             finished_at=finished_at,
             counts=counts,
             audit_event_id=audit.id,
+            legal_hold_state=legal_hold_state,
         )
 
     resume_ids = select(Resume.id).where(*owner_filter(Resume))
@@ -317,6 +411,7 @@ def delete_current_user_data(db: Session, *, dry_run: bool = False) -> dict[str,
         finished_at=_now(),
         counts=counts,
         audit_event_id=audit.id,
+        legal_hold_state=legal_hold_state,
     )
 
 
