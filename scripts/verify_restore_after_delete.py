@@ -130,7 +130,9 @@ def _redacted_database_ref(database_url: str, confirmation_label: str | None) ->
 
 
 def _execute_count(conn: Connection, sql: str, params: dict[str, Any]) -> int:
-    statement = text(sql).bindparams(bindparam("workspace_ids", expanding=True))
+    statement = text(sql)
+    if ":workspace_ids" in sql:
+        statement = statement.bindparams(bindparam("workspace_ids", expanding=True))
     return int(conn.execute(statement, params).scalar_one() or 0)
 
 
