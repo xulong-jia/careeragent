@@ -8,6 +8,21 @@ Use a documented sample from an anonymized benchmark or production-like review e
 
 Record `dataset_name` and `sampling_method` in every batch. Examples: `anonymized_v35b_external_review` and `stratified_by_task_type_and_risk`.
 
+## Sample Pack Preparation
+
+Generate the blank reviewer packet from the anonymized benchmark foundation:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/generate_human_review_sample_pack.py \
+  --sample-size 30 \
+  --seed 35 \
+  --output evidence/private_outputs/human_review_sample_pack.$(date +%Y%m%d-%H%M%S).csv
+```
+
+Use `--dry-run` to inspect the CSV without writing a file. The generated packet contains `item_id`, `task_type`, `anonymized_input_ref` and `model_output_ref`; it does not contain raw resume text, raw JD text, API keys, provider traces, real names, emails, phone numbers or private company identifiers.
+
+Send the CSV and reviewer instructions to the external reviewers. Reviewers must not edit `item_id`, `task_type`, `anonymized_input_ref` or `model_output_ref`. They should only fill `reviewer_id_hash`, score fields, risk flags, `reviewer_comment`, `decision`, `requires_adjudication`, `adjudication_decision` and `bad_case_ref`.
+
 ## Anonymization
 
 Before reviewers receive the sample:
@@ -42,7 +57,7 @@ For hallucination, fabrication, privacy risk, major issue or fail cases, create 
 
 ## Import Batch
 
-Dry-run first:
+After reviewers return the completed CSV or JSONL, keep it outside Git and dry-run the import first:
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_batch.py \
@@ -67,6 +82,16 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_batch.py
   --reviewer-role external_ai_quality_reviewer \
   --privacy-sanitized
 ```
+
+The complete reviewer operation is:
+
+1. Generate sample pack.
+2. Send the packet to reviewers.
+3. Reviewers fill scores, flags, decisions, comments and adjudication fields.
+4. Collect the completed CSV/JSONL outside Git.
+5. Import the completed review batch into `evidence/private_outputs`.
+6. Summarize the imported batch.
+7. Validate the external evidence package.
 
 ## Generate Summary
 

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import csv
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import io
 import json
 from pathlib import Path
 import subprocess
 import threading
 
 from scripts import check_provider_proof_readiness
+from scripts import generate_human_review_sample_pack
 from scripts import import_human_review_batch
 from scripts import import_human_review_proof
 from scripts import run_ai_quality_certification
@@ -496,6 +498,71 @@ def test_human_review_summary_metrics_and_thresholds(tmp_path):
     )
     assert failing_summary["production_quality_candidate_signal"] is False
     assert "insufficient_sample_size" in failing_summary["threshold_failures"]
+
+
+def test_human_review_sample_pack_dry_run_generates_blank_reviewer_csv():
+    result = subprocess.run(
+        [
+            "python3",
+            "scripts/generate_human_review_sample_pack.py",
+            "--sample-size",
+            "30",
+            "--seed",
+            "7",
+            "--dry-run",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    reader = csv.DictReader(io.StringIO(result.stdout))
+    rows = list(reader)
+
+    assert len(rows) == 30
+    assert set(reader.fieldnames or []) == set(generate_human_review_sample_pack.CSV_FIELDS)
+    assert {row["task_type"] for row in rows} == set(generate_human_review_sample_pack.TASK_MODULES)
+    for row in rows:
+        assert row["anonymized_input_ref"].startswith("anonymized_benchmark:")
+        assert row["model_output_ref"].startswith("anonymized_benchmark:")
+        assert row["reviewer_id_hash"] == ""
+        assert row["correctness_score"] == ""
+        assert row["groundedness_score"] == ""
+        assert row["safety_score"] == ""
+        assert row["usefulness_score"] == ""
+        assert row["decision"] == ""
+        assert row["reviewer_comment"] == ""
+
+
+def test_human_review_sample_pack_contains_no_obvious_pii():
+    rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=11)
+    rendered = generate_human_review_sample_pack.render_csv(rows)
+
+    assert "raw_resume" not in rendered
+    assert "resume_text" not in rendered
+    assert "jd_text" not in rendered
+    assert "interview_answer" not in rendered
+    assert not any(pattern.search(rendered) for pattern in generate_human_review_sample_pack.PII_PATTERNS)
+
+
+def test_human_review_sample_pack_default_output_is_private_outputs():
+    assert generate_human_review_sample_pack.DEFAULT_OUTPUT.startswith(
+        "evidence/private_outputs/human_review_sample_pack."
+    )
+
+
+def test_human_review_sample_pack_template_is_not_real_evidence(tmp_path):
+    template = ROOT / "evidence" / "templates" / "human_review_sample_pack.template.csv"
+    reader = csv.DictReader(io.StringIO(template.read_text(encoding="utf-8")))
+    rows = list(reader)
+
+    assert rows
+    assert {row["dataset_name"] for row in rows} == {"template_only_dataset"}
+    (tmp_path / template.name).write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+    assert summary["artifact_count"] == 0
+    assert summary["human_review_status"] == "missing_human_review"
+    assert summary["production_ready_candidate_possible"] is False
 
 
 def test_evidence_validator_blocks_missing_external_proofs(tmp_path):
