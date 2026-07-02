@@ -68,6 +68,18 @@ OPS_PROOF_STATUS = {
         "passed": "security_review_candidate_passed",
     },
 }
+MONITORING_CANDIDATE_REQUIRED_FIELDS = [
+    "logs_enabled",
+    "metrics_enabled",
+    "alert_rules_configured",
+    "health_check_alert_verified",
+    "incident_runbook_exists",
+]
+MONITORING_CERTIFIED_REQUIRED_FIELDS = [
+    *MONITORING_CANDIDATE_REQUIRED_FIELDS,
+    "tracing_enabled",
+    "error_reporting_enabled",
+]
 
 
 def _utc_now() -> str:
@@ -190,6 +202,28 @@ def _has_non_empty_list(proof: dict[str, Any], field: str) -> bool:
     return isinstance(value, list) and bool(value)
 
 
+def _limitations_text(proof: dict[str, Any]) -> str:
+    return " ".join(str(item) for item in proof.get("limitations", [])).lower()
+
+
+def _monitoring_candidate_passes(proof: dict[str, Any]) -> bool:
+    if not all(
+        [
+            _all_true(proof, MONITORING_CANDIDATE_REQUIRED_FIELDS),
+            _has_non_empty_list(proof, "dashboard_refs"),
+        ]
+    ):
+        return False
+    limitations = _limitations_text(proof)
+    if proof.get("tracing_enabled") is not True and "tracing" not in limitations:
+        return False
+    if proof.get("error_reporting_enabled") is not True and not any(
+        marker in limitations for marker in ["error", "sentry", "logfire", "runtime log"]
+    ):
+        return False
+    return True
+
+
 def _ops_candidate_passes(proof_type: str, proof: dict[str, Any]) -> bool:
     if _is_template_proof(proof) or proof.get("production_quality_candidate_signal") is not True:
         return False
@@ -232,23 +266,7 @@ def _ops_candidate_passes(proof_type: str, proof: dict[str, Any]) -> bool:
             ]
         )
     if proof_type == "monitoring":
-        return all(
-            [
-                _all_true(
-                    proof,
-                    [
-                        "logs_enabled",
-                        "metrics_enabled",
-                        "tracing_enabled",
-                        "error_reporting_enabled",
-                        "alert_rules_configured",
-                        "health_check_alert_verified",
-                        "incident_runbook_exists",
-                    ],
-                ),
-                _has_non_empty_list(proof, "dashboard_refs"),
-            ]
-        )
+        return _monitoring_candidate_passes(proof)
     if proof_type == "security_review":
         return all(
             [
@@ -270,6 +288,15 @@ def _ops_candidate_passes(proof_type: str, proof: dict[str, Any]) -> bool:
             ]
         )
     return False
+
+
+def _monitoring_certified_passes(proofs: list[dict[str, Any]]) -> bool:
+    real_proofs = [proof for proof in proofs if not _is_template_proof(proof)]
+    return any(
+        _monitoring_candidate_passes(proof)
+        and _all_true(proof, MONITORING_CERTIFIED_REQUIRED_FIELDS)
+        for proof in real_proofs
+    )
 
 
 def _ops_proof_status(proof_type: str, proofs: list[dict[str, Any]]) -> str:
@@ -348,6 +375,14 @@ def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
             candidate_blockers.append(f"{proof_type} proof status: {status}")
 
     certified_blockers = list(candidate_blockers)
+    if (
+        ops_statuses["monitoring_status"] == OPS_PROOF_STATUS["monitoring"]["passed"]
+        and by_type.get("monitoring")
+        and not _monitoring_certified_passes(by_type["monitoring"])
+    ):
+        certified_blockers.append(
+            "monitoring proof lacks certified observability: tracing/error reporting"
+        )
 
     return {
         "generated_at": _utc_now(),

@@ -1354,6 +1354,58 @@ def test_evidence_validator_reports_external_ops_threshold_failures(tmp_path):
     assert "deployment proof status: deployment_thresholds_failed" in summary["candidate_blockers"]
 
 
+def test_evidence_validator_rejects_monitoring_without_alerts(tmp_path):
+    proof = _ops_proof_payload("monitoring")
+    proof["alert_rules_configured"] = False
+    (tmp_path / "monitoring.json").write_text(json.dumps(proof), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["monitoring_status"] == "monitoring_thresholds_failed"
+
+
+def test_evidence_validator_rejects_monitoring_without_incident_runbook(tmp_path):
+    proof = _ops_proof_payload("monitoring")
+    proof["incident_runbook_exists"] = False
+    (tmp_path / "monitoring.json").write_text(json.dumps(proof), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["monitoring_status"] == "monitoring_thresholds_failed"
+
+
+def test_evidence_validator_accepts_monitoring_candidate_without_tracing(tmp_path):
+    proof = _ops_proof_payload("monitoring")
+    proof["tracing_enabled"] = False
+    proof["error_reporting_enabled"] = False
+    proof["limitations"] = [
+        "no_distributed_tracing",
+        "no_external_sentry",
+        "service_error_visibility_covered_by_runtime_logs_and_alert_delivery",
+    ]
+    (tmp_path / "monitoring.json").write_text(json.dumps(proof), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["monitoring_status"] == "monitoring_candidate_passed"
+    assert (
+        "monitoring proof lacks certified observability: tracing/error reporting"
+        in summary["certified_blockers"]
+    )
+
+
+def test_evidence_validator_rejects_monitoring_missing_observability_limitations(tmp_path):
+    proof = _ops_proof_payload("monitoring")
+    proof["tracing_enabled"] = False
+    proof["error_reporting_enabled"] = False
+    proof["limitations"] = []
+    (tmp_path / "monitoring.json").write_text(json.dumps(proof), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["monitoring_status"] == "monitoring_thresholds_failed"
+
+
 def test_evidence_validator_accepts_external_ops_candidate_statuses(tmp_path):
     for proof_type in ["deployment", "backup_purge", "monitoring", "security_review"]:
         (tmp_path / f"{proof_type}.json").write_text(

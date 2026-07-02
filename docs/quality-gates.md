@@ -149,6 +149,12 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 - Ops evidence validator status must distinguish `missing_*`, `*_template_only`,
   `*_thresholds_failed` and `*_candidate_passed` for `deployment`,
   `backup_purge`, `monitoring` and `security_review`.
+- Monitoring candidate proof must still require real logs, metrics, alert rules,
+  verified health/readiness alert delivery, an incident runbook, non-empty
+  redacted dashboard/evidence refs and `production_quality_candidate_signal=true`.
+  Distributed tracing and external error reporting are certified/enhanced
+  observability requirements; if absent from a candidate proof, the proof must
+  record the limitation and final certified status remains blocked.
 - `scripts/run_final_readiness_gates.sh` must fail when the external evidence
   package lacks a real passing human review batch/summary.
 - A later production-ready candidate decision requires real private evidence,
