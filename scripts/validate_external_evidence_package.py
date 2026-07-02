@@ -33,6 +33,14 @@ REQUIRED_CANDIDATE_PROOFS = [
     "backup_purge",
     "monitoring",
 ]
+SUPPORTED_PROOF_TYPES = {
+    "provider",
+    "human_review",
+    "deployment",
+    "backup_purge",
+    "monitoring",
+    "security_review",
+}
 
 
 def _utc_now() -> str:
@@ -44,7 +52,7 @@ def _load_schemas() -> dict[str, dict[str, Any]]:
     for path in sorted(SCHEMA_DIR.glob("*.schema.json")):
         schema = json.loads(path.read_text(encoding="utf-8"))
         proof_type = schema.get("properties", {}).get("proof_type", {}).get("const")
-        if proof_type:
+        if proof_type in SUPPORTED_PROOF_TYPES:
             schemas[proof_type] = schema
     return schemas
 
@@ -188,6 +196,7 @@ def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
     schemas = _load_schemas()
     artifacts: list[dict[str, Any]] = []
     invalid_artifacts: list[dict[str, Any]] = []
+    ignored_artifacts: list[dict[str, str]] = []
     leaked_artifacts: list[str] = []
 
     json_paths = sorted(evidence_dir.glob("*.json")) if evidence_dir.exists() else []
@@ -200,7 +209,18 @@ def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
         except json.JSONDecodeError as exc:
             invalid_artifacts.append({"path": path.name, "errors": [str(exc)]})
             continue
-        schema = schemas.get(str(payload.get("proof_type", "")))
+        proof_type = str(payload.get("proof_type", ""))
+        if proof_type not in SUPPORTED_PROOF_TYPES:
+            ignored_artifacts.append(
+                {
+                    "path": path.name,
+                    "reason": "not_supported_proof_artifact"
+                    if proof_type
+                    else "missing_proof_type_non_proof_artifact",
+                }
+            )
+            continue
+        schema = schemas.get(proof_type)
         if not schema:
             invalid_artifacts.append(
                 {"path": path.name, "errors": ["unknown or missing proof_type"]}
@@ -242,12 +262,14 @@ def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
     return {
         "generated_at": _utc_now(),
         "evidence_dir": str(evidence_dir),
-        "artifact_count": len(json_paths),
+        "scanned_json_count": len(json_paths),
+        "artifact_count": len(artifacts),
         "valid_artifact_count": len(artifacts),
         "proof_types_found": sorted(key for key in by_type if key),
         "schema_validation_passed": not invalid_artifacts,
         "secret_leak_check_passed": not leaked_artifacts,
         "invalid_artifacts": invalid_artifacts,
+        "ignored_artifacts": ignored_artifacts,
         "secret_leak_artifacts": leaked_artifacts,
         "missing_external_proofs": missing_external_proofs,
         "human_review_status": human_review_status,

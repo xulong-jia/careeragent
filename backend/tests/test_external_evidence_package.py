@@ -17,6 +17,7 @@ from scripts import check_provider_proof_readiness
 from scripts import generate_human_review_sample_pack
 from scripts import import_human_review_batch
 from scripts import import_human_review_proof
+from scripts import merge_human_review_batches
 from scripts import run_ai_quality_certification
 from scripts import run_external_provider_proof
 from scripts import summarize_human_review_evidence
@@ -263,6 +264,37 @@ def _human_review_batch_payload(sample_size: int = 30) -> dict:
         "summary": summary,
         "production_quality_candidate_signal": True,
         "limitations": [],
+    }
+
+
+def _single_reviewer_human_review_batch(reviewer: str, sample_size: int = 30) -> dict:
+    rows = [
+        _human_review_row(index, reviewer=reviewer)
+        for index in range(1, sample_size + 1)
+    ]
+    items = import_human_review_batch.normalize_review_items(rows)
+    summary = import_human_review_batch.summarize_items(items)
+    return {
+        "proof_type": "human_review",
+        "review_batch_id": f"human-review-{reviewer.replace(':', '-')}",
+        "created_at": "2026-07-02T00:00:00Z",
+        "reviewer_count": 1,
+        "reviewer_roles": ["external_ai_quality_reviewer"],
+        "dataset_name": "anonymized_external_review_test",
+        "sample_size": sample_size,
+        "sampling_method": "stratified_by_task_type_and_risk",
+        "privacy_sanitized": True,
+        "review_items": items,
+        "agreement_metrics": {
+            "comparable_item_count": 0,
+            "decision_agreement_rate": 0.0,
+        },
+        "adjudication_required_count": summary["adjudication_required_count"],
+        "adjudication_completed_count": summary["adjudication_completed_count"],
+        "bad_case_count": summary["bad_case_count"],
+        "summary": summary,
+        "production_quality_candidate_signal": False,
+        "limitations": ["At least two independent reviewers are required."],
     }
 
 
@@ -516,6 +548,77 @@ def test_human_review_batch_csv_and_jsonl_dry_run(tmp_path):
         payload = json.loads(result.stdout)
         assert payload["proof_type"] == "human_review"
         assert output_path.exists() is False
+
+
+def test_merge_human_review_batches_preserves_two_reviewer_judgments(tmp_path):
+    batch_a = _single_reviewer_human_review_batch("reviewer:external_a")
+    batch_b = _single_reviewer_human_review_batch("reviewer:external_b")
+    path_a = tmp_path / "reviewer_a.json"
+    path_b = tmp_path / "reviewer_b.json"
+    path_a.write_text(json.dumps(batch_a), encoding="utf-8")
+    path_b.write_text(json.dumps(batch_b), encoding="utf-8")
+
+    merged = merge_human_review_batches.merge_human_review_batches(
+        [path_a, path_b],
+        batch_id="human-review-merged-test",
+    )
+
+    assert merged["proof_type"] == "human_review"
+    assert merged["reviewer_count"] == 2
+    assert merged["sample_size"] == 30
+    assert len(merged["review_items"]) == 60
+    assert merged["agreement_metrics"]["comparable_item_count"] == 30
+    assert merged["agreement_metrics"]["decision_agreement_rate"] == 1.0
+    assert merged["summary"]["pass_rate"] == 1.0
+    assert merged["production_quality_candidate_signal"] is True
+    assert import_human_review_batch.validate_human_review_batch_payload(merged) == []
+
+
+def test_merge_human_review_batches_rejects_same_reviewer_duplicate_item(tmp_path):
+    batch_a = _single_reviewer_human_review_batch("reviewer:external_a")
+    path_a = tmp_path / "reviewer_a.json"
+    path_b = tmp_path / "reviewer_a_copy.json"
+    path_a.write_text(json.dumps(batch_a), encoding="utf-8")
+    path_b.write_text(json.dumps(batch_a), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate review"):
+        merge_human_review_batches.merge_human_review_batches([path_a, path_b])
+
+
+def test_merge_human_review_batches_dry_run_cli(tmp_path):
+    path_a = tmp_path / "reviewer_a.json"
+    path_b = tmp_path / "reviewer_b.json"
+    path_a.write_text(
+        json.dumps(_single_reviewer_human_review_batch("reviewer:external_a")),
+        encoding="utf-8",
+    )
+    path_b.write_text(
+        json.dumps(_single_reviewer_human_review_batch("reviewer:external_b")),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/merge_human_review_batches.py",
+            "--input",
+            str(path_a),
+            "--input",
+            str(path_b),
+            "--output",
+            str(tmp_path / "merged.json"),
+            "--dry-run",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["reviewer_count"] == 2
+    assert payload["agreement_metrics"]["comparable_item_count"] == 30
+    assert (tmp_path / "merged.json").exists() is False
 
 
 def test_human_review_batch_blocks_pii_and_raw_private_fields(tmp_path):
@@ -926,6 +1029,74 @@ def test_evidence_validator_reports_human_review_threshold_statuses(tmp_path):
     summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
 
     assert summary["human_review_status"] == "thresholds_failed"
+
+
+def test_evidence_validator_ignores_summary_and_validator_outputs(tmp_path):
+    (tmp_path / "human_review_summary.json").write_text(
+        json.dumps(
+            {
+                "summary_type": "human_review_summary",
+                "source_review_batch_id": "human-review-test",
+                "total_items": 30,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "external_evidence_validation.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-07-02T00:00:00Z",
+                "artifact_count": 1,
+                "human_review_status": "thresholds_failed",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["schema_validation_passed"] is True
+    assert summary["artifact_count"] == 0
+    assert summary["valid_artifact_count"] == 0
+    assert summary["human_review_status"] == "missing_human_review"
+    assert summary["invalid_artifacts"] == []
+    assert {item["path"] for item in summary["ignored_artifacts"]} == {
+        "human_review_summary.json",
+        "external_evidence_validation.json",
+    }
+
+
+def test_evidence_validator_keeps_single_reviewer_human_review_blocked(tmp_path):
+    (tmp_path / "human_review.json").write_text(
+        json.dumps(_single_reviewer_human_review_batch("reviewer:external_a")),
+        encoding="utf-8",
+    )
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["human_review_status"] == "thresholds_failed"
+    assert summary["production_ready_candidate_possible"] is False
+    assert "human review proof status: thresholds_failed" in summary["candidate_blockers"]
+
+
+def test_evidence_validator_accepts_two_reviewer_human_review_status(tmp_path):
+    path_a = tmp_path / "reviewer_a.json"
+    path_b = tmp_path / "reviewer_b.json"
+    path_a.write_text(
+        json.dumps(_single_reviewer_human_review_batch("reviewer:external_a")),
+        encoding="utf-8",
+    )
+    path_b.write_text(
+        json.dumps(_single_reviewer_human_review_batch("reviewer:external_b")),
+        encoding="utf-8",
+    )
+    merged = merge_human_review_batches.merge_human_review_batches([path_a, path_b])
+    (tmp_path / "human_review.json").write_text(json.dumps(merged), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["human_review_status"] == "human_review_candidate_passed"
+    assert "human review proof status" not in "\n".join(summary["candidate_blockers"])
 
 
 def test_evidence_validator_accepts_complete_redacted_package(tmp_path):
