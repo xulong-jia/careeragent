@@ -2,14 +2,19 @@
   "proof_type": "backup_purge",
   "proof_id": "backup-purge-proof-template",
   "created_at": "YYYY-MM-DDTHH:MM:SSZ",
-  "deletion_proof_id": "privacy-delete-proof-id",
-  "affected_backup_ids_redacted": [],
-  "backup_purge_status": "not_implemented",
-  "legal_hold_status": "not_reviewed",
-  "restore_block_rule_verified": false,
-  "audit_artifact_redacted": "",
+  "database_backup_verified": false,
+  "restore_test_passed": false,
+  "delete_all_test_passed": false,
+  "backup_purge_verified": false,
+  "legal_hold_behavior_verified": false,
+  "restore_after_delete_blocked_or_redacted": false,
+  "retention_policy_documented": false,
+  "evidence_refs": [],
+  "production_quality_candidate_signal": false,
+  "template_only": true,
   "limitations": [
-    "Template only; real backup purge attestations belong in ignored private outputs.",
-    "Do not commit backup IDs, customer identifiers, raw deletion logs or legal documents."
+    "template_only",
+    "Real backup purge proof must be generated in evidence/private_outputs and must not be committed.",
+    "Do not include backup ids, customer identifiers, raw deletion logs or legal documents."
   ]
 }

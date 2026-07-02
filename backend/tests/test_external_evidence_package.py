@@ -14,6 +14,7 @@ import zipfile
 import pytest
 
 from scripts import check_provider_proof_readiness
+from scripts import create_external_ops_proof_template
 from scripts import generate_human_review_sample_pack
 from scripts import import_human_review_batch
 from scripts import import_human_review_proof
@@ -298,6 +299,116 @@ def _single_reviewer_human_review_batch(reviewer: str, sample_size: int = 30) ->
     }
 
 
+def _provider_proof_payload() -> dict:
+    return {
+        "proof_type": "provider",
+        "proof_id": "provider-proof-test",
+        "created_at": "2026-07-02T00:00:00Z",
+        "provider": "openai_compatible",
+        "provider_mode": "external_verified",
+        "llm_provider": "openai_compatible",
+        "embedding_provider": "openai_compatible",
+        "base_url_redacted": {
+            "llm": "[set length=20 sha256:abcdef123456]",
+            "embedding": "[set length=22 sha256:abcdef123456]",
+        },
+        "embedding_model": "embedding-model",
+        "llm_model": "llm-model",
+        "embedding_validation_passed": True,
+        "llm_validation_passed": True,
+        "timeout_retry_validation": True,
+        "schema_validation_passed": True,
+        "rag_grounded_answer_sample_passed": True,
+        "llm_judge_sample_passed": True,
+        "secret_leak_check_passed": True,
+        "production_quality_candidate_signal": True,
+        "limitations": [],
+    }
+
+
+def _ops_proof_payload(proof_type: str) -> dict:
+    payloads = {
+        "deployment": {
+            "proof_type": "deployment",
+            "proof_id": "deployment-proof-test",
+            "created_at": "2026-07-02T00:00:00Z",
+            "environment": "production-redacted",
+            "deployment_provider": "managed-cloud-redacted",
+            "app_url_redacted": "https://careeragent-redacted.example.invalid",
+            "backend_health_passed": True,
+            "readiness_passed": True,
+            "migration_status": "up_to_date",
+            "managed_database": True,
+            "secret_manager_used": True,
+            "kms_or_encryption_key_used": True,
+            "tls_enabled": True,
+            "rollback_plan_verified": True,
+            "smoke_tests_passed": True,
+            "evidence_refs": ["deployment-run-redacted"],
+            "production_quality_candidate_signal": True,
+            "limitations": [],
+        },
+        "backup_purge": {
+            "proof_type": "backup_purge",
+            "proof_id": "backup-purge-test",
+            "created_at": "2026-07-02T00:00:00Z",
+            "database_backup_verified": True,
+            "restore_test_passed": True,
+            "delete_all_test_passed": True,
+            "backup_purge_verified": True,
+            "legal_hold_behavior_verified": True,
+            "restore_after_delete_blocked_or_redacted": True,
+            "retention_policy_documented": True,
+            "evidence_refs": ["backup-purge-run-redacted"],
+            "production_quality_candidate_signal": True,
+            "limitations": [],
+        },
+        "monitoring": {
+            "proof_type": "monitoring",
+            "proof_id": "monitoring-proof-test",
+            "created_at": "2026-07-02T00:00:00Z",
+            "logs_enabled": True,
+            "metrics_enabled": True,
+            "tracing_enabled": True,
+            "error_reporting_enabled": True,
+            "alert_rules_configured": True,
+            "health_check_alert_verified": True,
+            "incident_runbook_exists": True,
+            "dashboard_refs": ["monitoring-dashboard-redacted"],
+            "production_quality_candidate_signal": True,
+            "limitations": [],
+        },
+        "security_review": {
+            "proof_type": "security_review",
+            "proof_id": "security-review-test",
+            "created_at": "2026-07-02T00:00:00Z",
+            "reviewer": "external-reviewer-redacted",
+            "review_scope": ["auth", "privacy", "deployment", "dependencies"],
+            "auth_session_review_passed": True,
+            "privacy_review_passed": True,
+            "dependency_scan_passed": True,
+            "secret_scan_passed": True,
+            "pii_redaction_review_passed": True,
+            "rate_limit_review_passed": True,
+            "vulnerability_findings": [],
+            "critical_findings_count": 0,
+            "high_findings_count": 0,
+            "unresolved_findings_count": 0,
+            "production_quality_candidate_signal": True,
+            "limitations": [],
+        },
+    }
+    return payloads[proof_type]
+
+
+def _write_proofs(path: Path, proofs: list[dict]) -> None:
+    for proof in proofs:
+        path.joinpath(f"{proof['proof_type']}.json").write_text(
+            json.dumps(proof),
+            encoding="utf-8",
+        )
+
+
 def test_evidence_templates_match_schema_required_fields():
     for schema_path in sorted((ROOT / "evidence" / "schemas").glob("*.schema.json")):
         schema = _json(schema_path)
@@ -311,6 +422,77 @@ def test_evidence_templates_match_schema_required_fields():
         template = _json(template_path)
         for field in schema["required"]:
             assert field in template, f"{field} missing from {template_path.name}"
+
+
+def test_external_ops_schemas_and_templates_are_v35c_template_only():
+    required_fields = {
+        "deployment": {
+            "environment",
+            "deployment_provider",
+            "app_url_redacted",
+            "backend_health_passed",
+            "readiness_passed",
+            "migration_status",
+            "managed_database",
+            "secret_manager_used",
+            "kms_or_encryption_key_used",
+            "tls_enabled",
+            "rollback_plan_verified",
+            "smoke_tests_passed",
+            "evidence_refs",
+            "production_quality_candidate_signal",
+            "limitations",
+        },
+        "backup_purge": {
+            "database_backup_verified",
+            "restore_test_passed",
+            "delete_all_test_passed",
+            "backup_purge_verified",
+            "legal_hold_behavior_verified",
+            "restore_after_delete_blocked_or_redacted",
+            "retention_policy_documented",
+            "evidence_refs",
+            "production_quality_candidate_signal",
+            "limitations",
+        },
+        "monitoring": {
+            "logs_enabled",
+            "metrics_enabled",
+            "tracing_enabled",
+            "error_reporting_enabled",
+            "alert_rules_configured",
+            "health_check_alert_verified",
+            "incident_runbook_exists",
+            "dashboard_refs",
+            "production_quality_candidate_signal",
+            "limitations",
+        },
+        "security_review": {
+            "reviewer",
+            "review_scope",
+            "auth_session_review_passed",
+            "privacy_review_passed",
+            "dependency_scan_passed",
+            "secret_scan_passed",
+            "pii_redaction_review_passed",
+            "rate_limit_review_passed",
+            "vulnerability_findings",
+            "critical_findings_count",
+            "high_findings_count",
+            "unresolved_findings_count",
+            "production_quality_candidate_signal",
+            "limitations",
+        },
+    }
+
+    for proof_type, fields in required_fields.items():
+        schema = _json(ROOT / "evidence" / "schemas" / f"{proof_type}_proof.schema.json")
+        template = _json(ROOT / "evidence" / "templates" / f"{proof_type}_proof.template.json")
+
+        assert set(schema["required"]) >= fields | {"proof_type", "proof_id", "created_at"}
+        assert template["template_only"] is True
+        assert template["production_quality_candidate_signal"] is False
+        assert "template_only" in template["limitations"]
 
 
 def test_human_review_input_template_has_required_columns():
@@ -331,6 +513,45 @@ def test_private_outputs_are_gitignored():
         check=False,
     )
     assert result.returncode == 0
+
+
+def test_external_ops_template_generator_dry_run_does_not_write(tmp_path):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/create_external_ops_proof_template.py",
+            "--proof-type",
+            "deployment",
+            "--output-dir",
+            str(tmp_path),
+            "--timestamp",
+            "20260702T000000Z",
+            "--dry-run",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    proof = payload["deployment"]
+    assert proof["template_only"] is True
+    assert proof["production_quality_candidate_signal"] is False
+    assert "template_only" in proof["limitations"]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_external_ops_template_generator_writes_to_requested_dir(tmp_path):
+    create_external_ops_proof_template.write_ops_templates(
+        ["monitoring"],
+        output_dir=tmp_path,
+        generated_at="20260702T000000Z",
+    )
+
+    output = tmp_path / "monitoring_proof.template.20260702T000000Z.json"
+    assert output.exists()
+    assert _json(output)["proof_type"] == "monitoring"
 
 
 def test_provider_readiness_checker_reports_missing_env():
@@ -1099,100 +1320,89 @@ def test_evidence_validator_accepts_two_reviewer_human_review_status(tmp_path):
     assert "human review proof status" not in "\n".join(summary["candidate_blockers"])
 
 
-def test_evidence_validator_accepts_complete_redacted_package(tmp_path):
-    proofs = [
-        {
-            "proof_type": "provider",
-            "proof_id": "provider-proof-test",
-            "created_at": "2026-07-02T00:00:00Z",
-            "provider": "openai_compatible",
-            "provider_mode": "external_verified",
-            "llm_provider": "openai_compatible",
-            "embedding_provider": "openai_compatible",
-            "base_url_redacted": {
-                "llm": "[set length=20 sha256:abcdef123456]",
-                "embedding": "[set length=22 sha256:abcdef123456]",
-            },
-            "embedding_model": "embedding-model",
-            "llm_model": "llm-model",
-            "embedding_validation_passed": True,
-            "llm_validation_passed": True,
-            "timeout_retry_validation": True,
-            "schema_validation_passed": True,
-            "rag_grounded_answer_sample_passed": True,
-            "llm_judge_sample_passed": True,
-            "secret_leak_check_passed": True,
-            "production_quality_candidate_signal": True,
-            "limitations": [],
-        },
-        _human_review_batch_payload(),
-        {
-            "proof_type": "deployment",
-            "proof_id": "deployment-proof-test",
-            "created_at": "2026-07-02T00:00:00Z",
-            "provider": "cloud",
-            "region": "region",
-            "service": "careeragent",
-            "git_commit": "abcdef",
-            "cloud_deployment_validation_passed": True,
-            "managed_db_validation_passed": True,
-            "secret_manager_validation_passed": True,
-            "kms_validation_passed": True,
-            "tls_validation_passed": True,
-            "readiness_validation_passed": True,
-            "rollback_validation_passed": True,
-            "proof_artifacts_redacted": ["redacted-runbook-ref"],
-            "limitations": [],
-        },
-        {
-            "proof_type": "backup_purge",
-            "proof_id": "backup-purge-test",
-            "created_at": "2026-07-02T00:00:00Z",
-            "deletion_proof_id": "delete-proof-test",
-            "affected_backup_ids_redacted": ["backup:redacted"],
-            "backup_purge_status": "complete",
-            "legal_hold_status": "none",
-            "restore_block_rule_verified": True,
-            "audit_artifact_redacted": "redacted-audit-ref",
-            "limitations": [],
-        },
-        {
-            "proof_type": "monitoring",
-            "proof_id": "monitoring-proof-test",
-            "created_at": "2026-07-02T00:00:00Z",
-            "metrics_backend": "managed-metrics",
-            "log_drain": "managed-logs",
-            "tracing_backend": "managed-tracing",
-            "error_reporting": "managed-errors",
-            "alert_rules_verified": True,
-            "privacy_redaction_verified": True,
-            "incident_runbook_verified": True,
-            "limitations": [],
-        },
-        {
-            "proof_type": "security_review",
-            "proof_id": "security-review-test",
-            "created_at": "2026-07-02T00:00:00Z",
-            "reviewer_redacted": "external-reviewer",
-            "scope": ["api", "auth", "deployment"],
-            "critical_findings_open": 0,
-            "high_findings_open": 0,
-            "privacy_review_passed": True,
-            "remediation_plan_attached": True,
-            "limitations": [],
-        },
-    ]
-    for proof in proofs:
-        (tmp_path / f"{proof['proof_type']}.json").write_text(
-            json.dumps(proof),
+def test_evidence_validator_reports_external_ops_statuses(tmp_path):
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+    assert summary["deployment_status"] == "missing_deployment"
+    assert summary["backup_purge_status"] == "missing_backup_purge"
+    assert summary["monitoring_status"] == "missing_monitoring"
+    assert summary["security_review_status"] == "missing_security_review"
+
+    for proof_type in ["deployment", "backup_purge", "monitoring", "security_review"]:
+        template = _json(ROOT / "evidence" / "templates" / f"{proof_type}_proof.template.json")
+        (tmp_path / f"{proof_type}.json").write_text(json.dumps(template), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+    assert summary["deployment_status"] == "deployment_template_only"
+    assert summary["backup_purge_status"] == "backup_purge_template_only"
+    assert summary["monitoring_status"] == "monitoring_template_only"
+    assert summary["security_review_status"] == "security_review_template_only"
+    assert summary["production_ready_candidate_possible"] is False
+
+
+def test_evidence_validator_reports_external_ops_threshold_failures(tmp_path):
+    for proof_type in ["deployment", "backup_purge", "monitoring", "security_review"]:
+        proof = _ops_proof_payload(proof_type)
+        proof["production_quality_candidate_signal"] = False
+        (tmp_path / f"{proof_type}.json").write_text(json.dumps(proof), encoding="utf-8")
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["deployment_status"] == "deployment_thresholds_failed"
+    assert summary["backup_purge_status"] == "backup_purge_thresholds_failed"
+    assert summary["monitoring_status"] == "monitoring_thresholds_failed"
+    assert summary["security_review_status"] == "security_review_thresholds_failed"
+    assert "deployment proof status: deployment_thresholds_failed" in summary["candidate_blockers"]
+
+
+def test_evidence_validator_accepts_external_ops_candidate_statuses(tmp_path):
+    for proof_type in ["deployment", "backup_purge", "monitoring", "security_review"]:
+        (tmp_path / f"{proof_type}.json").write_text(
+            json.dumps(_ops_proof_payload(proof_type)),
             encoding="utf-8",
         )
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["deployment_status"] == "deployment_candidate_passed"
+    assert summary["backup_purge_status"] == "backup_purge_candidate_passed"
+    assert summary["monitoring_status"] == "monitoring_candidate_passed"
+    assert summary["security_review_status"] == "security_review_candidate_passed"
+    assert "deployment proof status" not in "\n".join(summary["candidate_blockers"])
+
+
+def test_evidence_validator_requires_security_review_for_candidate_and_certified(tmp_path):
+    proofs = [_provider_proof_payload(), _human_review_batch_payload()]
+    proofs.extend(
+        _ops_proof_payload(proof_type)
+        for proof_type in ["deployment", "backup_purge", "monitoring"]
+    )
+    _write_proofs(tmp_path, proofs)
+
+    summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
+
+    assert summary["production_ready_candidate_possible"] is False
+    assert summary["production_readiness_certified_possible"] is False
+    assert "missing external proof: security_review" in summary["candidate_blockers"]
+    assert "missing external proof: security_review" in summary["certified_blockers"]
+
+
+def test_evidence_validator_accepts_complete_redacted_package(tmp_path):
+    proofs = [_provider_proof_payload(), _human_review_batch_payload()]
+    proofs.extend(
+        _ops_proof_payload(proof_type)
+        for proof_type in ["deployment", "backup_purge", "monitoring", "security_review"]
+    )
+    _write_proofs(tmp_path, proofs)
 
     summary = validate_external_evidence_package.validate_evidence_package(tmp_path)
 
     assert summary["schema_validation_passed"] is True
     assert summary["secret_leak_check_passed"] is True
     assert summary["human_review_status"] == "human_review_candidate_passed"
+    assert summary["deployment_status"] == "deployment_candidate_passed"
+    assert summary["backup_purge_status"] == "backup_purge_candidate_passed"
+    assert summary["monitoring_status"] == "monitoring_candidate_passed"
+    assert summary["security_review_status"] == "security_review_candidate_passed"
     assert summary["production_ready_candidate_possible"] is True
     assert summary["production_readiness_certified_possible"] is True
 

@@ -32,6 +32,7 @@ REQUIRED_CANDIDATE_PROOFS = [
     "deployment",
     "backup_purge",
     "monitoring",
+    "security_review",
 ]
 SUPPORTED_PROOF_TYPES = {
     "provider",
@@ -40,6 +41,32 @@ SUPPORTED_PROOF_TYPES = {
     "backup_purge",
     "monitoring",
     "security_review",
+}
+OPS_PROOF_STATUS = {
+    "deployment": {
+        "missing": "missing_deployment",
+        "template": "deployment_template_only",
+        "failed": "deployment_thresholds_failed",
+        "passed": "deployment_candidate_passed",
+    },
+    "backup_purge": {
+        "missing": "missing_backup_purge",
+        "template": "backup_purge_template_only",
+        "failed": "backup_purge_thresholds_failed",
+        "passed": "backup_purge_candidate_passed",
+    },
+    "monitoring": {
+        "missing": "missing_monitoring",
+        "template": "monitoring_template_only",
+        "failed": "monitoring_thresholds_failed",
+        "passed": "monitoring_candidate_passed",
+    },
+    "security_review": {
+        "missing": "missing_security_review",
+        "template": "security_review_template_only",
+        "failed": "security_review_thresholds_failed",
+        "passed": "security_review_candidate_passed",
+    },
 }
 
 
@@ -111,6 +138,12 @@ def _is_template_human_review(proof: dict[str, Any]) -> bool:
     return "template" in text or proof.get("sample_size") == 0
 
 
+def _is_template_proof(proof: dict[str, Any]) -> bool:
+    limitations = " ".join(str(item) for item in proof.get("limitations", []))
+    text = f"{proof.get('proof_id', '')} {limitations}".lower()
+    return proof.get("template_only") is True or "template_only" in text or "template" in text
+
+
 def _human_review_candidate_passes(proof: dict[str, Any]) -> bool:
     summary = proof.get("summary") or {}
     sample_size = int(proof.get("sample_size") or summary.get("total_items") or 0)
@@ -148,48 +181,107 @@ def _human_review_status(proofs: list[dict[str, Any]]) -> str:
     return "thresholds_failed"
 
 
-def _deployment_ok(proofs: list[dict[str, Any]]) -> bool:
-    fields = [
-        "cloud_deployment_validation_passed",
-        "managed_db_validation_passed",
-        "secret_manager_validation_passed",
-        "kms_validation_passed",
-        "tls_validation_passed",
-        "readiness_validation_passed",
-        "rollback_validation_passed",
-    ]
-    return any(all(proof.get(field) is True for field in fields) for proof in proofs)
+def _all_true(proof: dict[str, Any], fields: list[str]) -> bool:
+    return all(proof.get(field) is True for field in fields)
 
 
-def _backup_purge_ok(proofs: list[dict[str, Any]]) -> bool:
-    return any(
-        proof.get("backup_purge_status") == "complete"
-        and proof.get("restore_block_rule_verified") is True
-        for proof in proofs
-    )
+def _has_non_empty_list(proof: dict[str, Any], field: str) -> bool:
+    value = proof.get(field)
+    return isinstance(value, list) and bool(value)
 
 
-def _monitoring_ok(proofs: list[dict[str, Any]]) -> bool:
-    return any(
-        proof.get("metrics_backend")
-        and proof.get("log_drain")
-        and proof.get("tracing_backend")
-        and proof.get("error_reporting")
-        and proof.get("alert_rules_verified") is True
-        and proof.get("privacy_redaction_verified") is True
-        and proof.get("incident_runbook_verified") is True
-        for proof in proofs
-    )
+def _ops_candidate_passes(proof_type: str, proof: dict[str, Any]) -> bool:
+    if _is_template_proof(proof) or proof.get("production_quality_candidate_signal") is not True:
+        return False
+    if proof_type == "deployment":
+        return all(
+            [
+                _all_true(
+                    proof,
+                    [
+                        "backend_health_passed",
+                        "readiness_passed",
+                        "managed_database",
+                        "secret_manager_used",
+                        "kms_or_encryption_key_used",
+                        "tls_enabled",
+                        "rollback_plan_verified",
+                        "smoke_tests_passed",
+                    ],
+                ),
+                proof.get("migration_status") in {"applied", "up_to_date", "completed"},
+                _has_non_empty_list(proof, "evidence_refs"),
+            ]
+        )
+    if proof_type == "backup_purge":
+        return all(
+            [
+                _all_true(
+                    proof,
+                    [
+                        "database_backup_verified",
+                        "restore_test_passed",
+                        "delete_all_test_passed",
+                        "backup_purge_verified",
+                        "legal_hold_behavior_verified",
+                        "restore_after_delete_blocked_or_redacted",
+                        "retention_policy_documented",
+                    ],
+                ),
+                _has_non_empty_list(proof, "evidence_refs"),
+            ]
+        )
+    if proof_type == "monitoring":
+        return all(
+            [
+                _all_true(
+                    proof,
+                    [
+                        "logs_enabled",
+                        "metrics_enabled",
+                        "tracing_enabled",
+                        "error_reporting_enabled",
+                        "alert_rules_configured",
+                        "health_check_alert_verified",
+                        "incident_runbook_exists",
+                    ],
+                ),
+                _has_non_empty_list(proof, "dashboard_refs"),
+            ]
+        )
+    if proof_type == "security_review":
+        return all(
+            [
+                _all_true(
+                    proof,
+                    [
+                        "auth_session_review_passed",
+                        "privacy_review_passed",
+                        "dependency_scan_passed",
+                        "secret_scan_passed",
+                        "pii_redaction_review_passed",
+                        "rate_limit_review_passed",
+                    ],
+                ),
+                proof.get("critical_findings_count") == 0,
+                proof.get("high_findings_count") == 0,
+                proof.get("unresolved_findings_count") == 0,
+                _has_non_empty_list(proof, "review_scope"),
+            ]
+        )
+    return False
 
 
-def _security_review_ok(proofs: list[dict[str, Any]]) -> bool:
-    return any(
-        proof.get("critical_findings_open") == 0
-        and proof.get("high_findings_open") == 0
-        and proof.get("privacy_review_passed") is True
-        and proof.get("remediation_plan_attached") is True
-        for proof in proofs
-    )
+def _ops_proof_status(proof_type: str, proofs: list[dict[str, Any]]) -> str:
+    statuses = OPS_PROOF_STATUS[proof_type]
+    if not proofs:
+        return statuses["missing"]
+    real_proofs = [proof for proof in proofs if not _is_template_proof(proof)]
+    if not real_proofs:
+        return statuses["template"]
+    if any(_ops_candidate_passes(proof_type, proof) for proof in real_proofs):
+        return statuses["passed"]
+    return statuses["failed"]
 
 
 def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
@@ -233,6 +325,10 @@ def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
         artifacts.append(payload)
 
     by_type = _proofs_by_type(artifacts)
+    ops_statuses = {
+        f"{proof_type}_status": _ops_proof_status(proof_type, by_type.get(proof_type, []))
+        for proof_type in OPS_PROOF_STATUS
+    }
     missing_external_proofs = [
         proof_type for proof_type in REQUIRED_CANDIDATE_PROOFS if proof_type not in by_type
     ]
@@ -246,18 +342,12 @@ def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
     human_review_status = _human_review_status(by_type.get("human_review", []))
     if human_review_status != "human_review_candidate_passed" and by_type.get("human_review"):
         candidate_blockers.append(f"human review proof status: {human_review_status}")
-    if by_type.get("deployment") and not _deployment_ok(by_type["deployment"]):
-        candidate_blockers.append("deployment proof lacks cloud/DB/KMS/readiness/rollback pass")
-    if by_type.get("backup_purge") and not _backup_purge_ok(by_type["backup_purge"]):
-        candidate_blockers.append("backup purge proof is not complete")
-    if by_type.get("monitoring") and not _monitoring_ok(by_type["monitoring"]):
-        candidate_blockers.append("monitoring proof lacks observability/privacy/incident pass")
+    for proof_type in OPS_PROOF_STATUS:
+        status = ops_statuses[f"{proof_type}_status"]
+        if by_type.get(proof_type) and status != OPS_PROOF_STATUS[proof_type]["passed"]:
+            candidate_blockers.append(f"{proof_type} proof status: {status}")
 
     certified_blockers = list(candidate_blockers)
-    if "security_review" not in by_type:
-        certified_blockers.append("missing external proof: security_review")
-    elif not _security_review_ok(by_type["security_review"]):
-        certified_blockers.append("external security review proof is not clean")
 
     return {
         "generated_at": _utc_now(),
@@ -273,6 +363,7 @@ def validate_evidence_package(evidence_dir: Path) -> dict[str, Any]:
         "secret_leak_artifacts": leaked_artifacts,
         "missing_external_proofs": missing_external_proofs,
         "human_review_status": human_review_status,
+        **ops_statuses,
         "candidate_blockers": candidate_blockers,
         "certified_blockers": certified_blockers,
         "production_ready_candidate_possible": not candidate_blockers,

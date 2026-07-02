@@ -137,12 +137,18 @@ Production 必须使用 secret manager 或部署环境注入强随机值。`APP_
 - `scripts/summarize_human_review_evidence.py` must report total items,
   pass/fail counts, average correctness/groundedness/safety scores,
   hallucination/fabrication/privacy rates and adjudication completion.
+- `scripts/create_external_ops_proof_template.py --dry-run` must only produce
+  `template_only=true` deployment, backup purge, monitoring and security review
+  starting files with `production_quality_candidate_signal=false`.
 - `scripts/validate_external_evidence_package.py` must report blockers when
   external provider, human review, deployment, backup purge, monitoring or
   security review proofs are missing or incomplete.
 - Human review validator status must distinguish `missing_human_review`,
   `template_only`, `insufficient_sample_size`, `thresholds_failed` and
   `human_review_candidate_passed`.
+- Ops evidence validator status must distinguish `missing_*`, `*_template_only`,
+  `*_thresholds_failed` and `*_candidate_passed` for `deployment`,
+  `backup_purge`, `monitoring` and `security_review`.
 - `scripts/run_final_readiness_gates.sh` must fail when the external evidence
   package lacks a real passing human review batch/summary.
 - A later production-ready candidate decision requires real private evidence,

@@ -22,6 +22,21 @@ The current conservative tag is `v3.4.0-production-foundation-reaudit-passed`. T
 - `monitoring`: metrics, logs, tracing, error reporting, alerts and incident runbook proof.
 - `security_review`: external security/privacy review outcome.
 
+## Ops Proof Templates
+
+Generate template-only private starting files when needed:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python scripts/create_external_ops_proof_template.py \
+  --proof-type all \
+  --output-dir evidence/private_outputs
+```
+
+The generated files are still `template_only=true` and
+`production_quality_candidate_signal=false`. They are not proof until a human
+operator replaces them with redacted results from real deployment, backup,
+monitoring and security-review execution.
+
 ## Dry-Run Shape Check
 
 ```bash
@@ -96,7 +111,18 @@ Templates and dry-runs are not human review proof. The evidence package validato
 PYTHONPATH=backend backend/.venv/bin/python scripts/validate_external_evidence_package.py --evidence-dir evidence/private_outputs --output /tmp/careeragent-v35-evidence-summary.json
 ```
 
-The validator reports blockers for production-ready candidate and production-readiness certified status. Missing external proofs are expected until real external evidence is collected.
+The validator reports blockers for production-ready candidate and
+production-readiness certified status. It distinguishes:
+
+- `missing_deployment`, `deployment_template_only`, `deployment_thresholds_failed`, `deployment_candidate_passed`
+- `missing_backup_purge`, `backup_purge_template_only`, `backup_purge_thresholds_failed`, `backup_purge_candidate_passed`
+- `missing_monitoring`, `monitoring_template_only`, `monitoring_thresholds_failed`, `monitoring_candidate_passed`
+- `missing_security_review`, `security_review_template_only`, `security_review_thresholds_failed`, `security_review_candidate_passed`
+
+Summary JSON, validator output JSON and other non-proof files are ignored as
+non-proof artifacts, but every JSON file is still scanned for secret-like
+material. Missing external proofs are expected until real external evidence is
+collected.
 
 ## Completion Boundary
 

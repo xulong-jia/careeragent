@@ -2,15 +2,19 @@
   "proof_type": "monitoring",
   "proof_id": "monitoring-proof-template",
   "created_at": "YYYY-MM-DDTHH:MM:SSZ",
-  "metrics_backend": "",
-  "log_drain": "",
-  "tracing_backend": "",
-  "error_reporting": "",
-  "alert_rules_verified": false,
-  "privacy_redaction_verified": false,
-  "incident_runbook_verified": false,
+  "logs_enabled": false,
+  "metrics_enabled": false,
+  "tracing_enabled": false,
+  "error_reporting_enabled": false,
+  "alert_rules_configured": false,
+  "health_check_alert_verified": false,
+  "incident_runbook_exists": false,
+  "dashboard_refs": [],
+  "production_quality_candidate_signal": false,
+  "template_only": true,
   "limitations": [
-    "Template only; real observability screenshots, alert IDs and traces belong in ignored private outputs.",
-    "Do not commit logs containing resume text, JD text, RAG chunks, interview answers or tokens."
+    "template_only",
+    "Real monitoring proof must be generated in evidence/private_outputs and must not be committed.",
+    "Do not include raw logs, trace payloads, customer data, resume text, JD text, RAG chunks or tokens."
   ]
 }

@@ -2,14 +2,23 @@
   "proof_type": "security_review",
   "proof_id": "security-review-proof-template",
   "created_at": "YYYY-MM-DDTHH:MM:SSZ",
-  "reviewer_redacted": "external-reviewer-redacted",
-  "scope": [],
-  "critical_findings_open": 0,
-  "high_findings_open": 0,
+  "reviewer": "external-reviewer-redacted",
+  "review_scope": [],
+  "auth_session_review_passed": false,
   "privacy_review_passed": false,
-  "remediation_plan_attached": false,
+  "dependency_scan_passed": false,
+  "secret_scan_passed": false,
+  "pii_redaction_review_passed": false,
+  "rate_limit_review_passed": false,
+  "vulnerability_findings": [],
+  "critical_findings_count": 0,
+  "high_findings_count": 0,
+  "unresolved_findings_count": 0,
+  "production_quality_candidate_signal": false,
+  "template_only": true,
   "limitations": [
-    "Template only; external security report details belong in ignored private outputs.",
-    "Do not commit pentest reports, vulnerability details, customer data or infrastructure identifiers."
+    "template_only",
+    "Real external security review proof must be generated in evidence/private_outputs and must not be committed.",
+    "Do not include pentest reports, exploit details, customer data, infrastructure identifiers or credentials."
   ]
 }
