@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 import subprocess
 import threading
+import xml.etree.ElementTree as ET
+import zipfile
 
 from scripts import check_provider_proof_readiness
 from scripts import generate_human_review_sample_pack
@@ -160,6 +162,24 @@ def _write_human_review_csv(path: Path, rows: list[dict]) -> None:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _xlsx_sheet_rows(path: Path) -> tuple[list[str], list[dict[str, str]], str]:
+    ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    with zipfile.ZipFile(path) as archive:
+        workbook_xml = archive.read("xl/workbook.xml").decode("utf-8")
+        sheet_xml = archive.read("xl/worksheets/sheet1.xml").decode("utf-8")
+    root = ET.fromstring(sheet_xml)
+    parsed_rows: list[list[str]] = []
+    for row in root.findall(".//main:sheetData/main:row", ns):
+        values: list[str] = []
+        for cell in row.findall("main:c", ns):
+            text = cell.findtext("main:is/main:t", default="", namespaces=ns)
+            values.append(text)
+        parsed_rows.append(values)
+    headers = parsed_rows[0]
+    data = [dict(zip(headers, row)) for row in parsed_rows[1:]]
+    return headers, data, workbook_xml + sheet_xml
 
 
 def _human_review_batch_payload(sample_size: int = 30) -> dict:
@@ -525,6 +545,10 @@ def test_human_review_sample_pack_dry_run_generates_blank_reviewer_csv():
     for row in rows:
         assert row["anonymized_input_ref"].startswith("anonymized_benchmark:")
         assert row["model_output_ref"].startswith("anonymized_benchmark:")
+        assert row["task_type_label"]
+        assert row["input_summary"]
+        assert row["model_output_summary"]
+        assert row["review_instruction"]
         assert row["reviewer_id_hash"] == ""
         assert row["correctness_score"] == ""
         assert row["groundedness_score"] == ""
@@ -545,10 +569,62 @@ def test_human_review_sample_pack_contains_no_obvious_pii():
     assert not any(pattern.search(rendered) for pattern in generate_human_review_sample_pack.PII_PATTERNS)
 
 
-def test_human_review_sample_pack_default_output_is_private_outputs():
-    assert generate_human_review_sample_pack.DEFAULT_OUTPUT.startswith(
+def test_human_review_sample_pack_default_outputs_are_private_outputs():
+    assert generate_human_review_sample_pack.default_output_for_format("csv").startswith(
         "evidence/private_outputs/human_review_sample_pack."
     )
+    assert generate_human_review_sample_pack.default_output_for_format("csv").endswith(".csv")
+    assert generate_human_review_sample_pack.default_output_for_format("xlsx").startswith(
+        "evidence/private_outputs/human_review_sample_pack."
+    )
+    assert generate_human_review_sample_pack.default_output_for_format("xlsx").endswith(".xlsx")
+
+
+def test_human_review_sample_pack_generates_reviewer_friendly_xlsx(tmp_path):
+    output = tmp_path / "reviewer-pack.xlsx"
+
+    result = subprocess.run(
+        [
+            "python3",
+            "scripts/generate_human_review_sample_pack.py",
+            "--sample-size",
+            "30",
+            "--seed",
+            "7",
+            "--format",
+            "xlsx",
+            "--output",
+            str(output),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.strip() == str(output)
+    headers, rows, workbook_xml = _xlsx_sheet_rows(output)
+    assert "name=\"Human Review\"" in workbook_xml
+    assert "<autoFilter" in workbook_xml
+    assert 'state="frozen"' in workbook_xml
+    assert "<dataValidations" in workbook_xml
+    for field in [
+        "item_id",
+        "task_type",
+        "anonymized_input_ref",
+        "model_output_ref",
+        "task_type_label",
+        "input_summary",
+        "model_output_summary",
+        "review_instruction",
+        "correctness_score",
+        "decision",
+    ]:
+        assert field in headers
+    assert len(rows) == 30
+    assert {row["task_type"] for row in rows} == set(generate_human_review_sample_pack.TASK_MODULES)
+    rendered = "\n".join(",".join(row.values()) for row in rows)
+    assert not any(pattern.search(rendered) for pattern in generate_human_review_sample_pack.PII_PATTERNS)
 
 
 def test_human_review_sample_pack_template_is_not_real_evidence(tmp_path):

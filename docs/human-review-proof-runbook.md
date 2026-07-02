@@ -16,10 +16,11 @@ Generate the blank reviewer packet from the anonymized benchmark foundation:
 PYTHONPATH=backend backend/.venv/bin/python scripts/generate_human_review_sample_pack.py \
   --sample-size 30 \
   --seed 35 \
-  --output evidence/private_outputs/human_review_sample_pack.$(date +%Y%m%d-%H%M%S).csv
+  --format xlsx \
+  --output evidence/private_outputs/human_review_sample_pack.$(date +%Y%m%d-%H%M%S).xlsx
 ```
 
-Use `--dry-run` to inspect the CSV without writing a file. The generated packet contains `item_id`, `task_type`, `anonymized_input_ref` and `model_output_ref`; it does not contain raw resume text, raw JD text, API keys, provider traces, real names, emails, phone numbers or private company identifiers.
+Use `--dry-run` to inspect the CSV-shaped content without writing a file. The reviewer-friendly `.xlsx` has a `Human Review` sheet, readable summaries, filters, frozen header row and dropdowns for reviewer fields. The generated packet contains `item_id`, `task_type`, `anonymized_input_ref`, `model_output_ref`, `input_summary` and `model_output_summary`; it does not contain raw resume text, raw JD text, API keys, provider traces, real names, emails, phone numbers or private company identifiers.
 
 Send the CSV and reviewer instructions to the external reviewers. Reviewers must not edit `item_id`, `task_type`, `anonymized_input_ref` or `model_output_ref`. They should only fill `reviewer_id_hash`, score fields, risk flags, `reviewer_comment`, `decision`, `requires_adjudication`, `adjudication_decision` and `bad_case_ref`.
 
@@ -57,7 +58,7 @@ For hallucination, fabrication, privacy risk, major issue or fail cases, create 
 
 ## Import Batch
 
-After reviewers return the completed CSV or JSONL, keep it outside Git and dry-run the import first:
+After reviewers return the completed `.xlsx`, keep it outside Git and export the `Human Review` sheet to CSV or JSONL. Then dry-run the import first:
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python scripts/import_human_review_batch.py \
