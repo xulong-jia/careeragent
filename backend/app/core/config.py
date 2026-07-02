@@ -66,6 +66,12 @@ class Settings:
     enable_real_embedding: bool
     data_encryption_key: str
     data_encryption_key_id: str
+    sentry_dsn: str
+    sentry_environment: str
+    sentry_release: str
+    sentry_traces_sample_rate: float
+    sentry_send_default_pii: bool
+    enable_observability_test_endpoint: bool
 
 
 def is_sqlite_database_url(database_url: str) -> bool:
@@ -122,6 +128,10 @@ def validate_runtime_settings(settings: Settings) -> None:
         raise RuntimeError("DB_MAX_OVERFLOW must be 0 or greater.")
     if settings.db_pool_timeout_seconds <= 0:
         raise RuntimeError("DB_POOL_TIMEOUT_SECONDS must be greater than 0.")
+    if not 0 <= settings.sentry_traces_sample_rate <= 1:
+        raise RuntimeError("SENTRY_TRACES_SAMPLE_RATE must be between 0 and 1.")
+    if settings.sentry_send_default_pii:
+        raise RuntimeError("SENTRY_SEND_DEFAULT_PII must be false.")
 
     if settings.app_env != "production":
         return
@@ -183,6 +193,12 @@ def settings_summary(settings: Settings) -> dict[str, object]:
         "enable_real_embedding": settings.enable_real_embedding,
         "data_encryption_key": _mask_config_value(settings.data_encryption_key),
         "data_encryption_key_id": settings.data_encryption_key_id,
+        "sentry_enabled": bool(settings.sentry_dsn),
+        "sentry_environment": settings.sentry_environment,
+        "sentry_release": settings.sentry_release,
+        "sentry_traces_sample_rate": settings.sentry_traces_sample_rate,
+        "sentry_send_default_pii": settings.sentry_send_default_pii,
+        "enable_observability_test_endpoint": settings.enable_observability_test_endpoint,
     }
 
 
@@ -228,4 +244,16 @@ def get_settings() -> Settings:
         enable_real_embedding=_bool_env("ENABLE_REAL_EMBEDDING", False),
         data_encryption_key=os.getenv("DATA_ENCRYPTION_KEY", "").strip(),
         data_encryption_key_id=os.getenv("DATA_ENCRYPTION_KEY_ID", "local-dev-v1").strip(),
+        sentry_dsn=os.getenv("SENTRY_DSN", "").strip(),
+        sentry_environment=os.getenv(
+            "SENTRY_ENVIRONMENT",
+            os.getenv("APP_ENV", "development").strip().lower(),
+        ).strip(),
+        sentry_release=os.getenv("SENTRY_RELEASE", "").strip(),
+        sentry_traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0")),
+        sentry_send_default_pii=_bool_env("SENTRY_SEND_DEFAULT_PII", False),
+        enable_observability_test_endpoint=_bool_env(
+            "ENABLE_OBSERVABILITY_TEST_ENDPOINT",
+            False,
+        ),
     )

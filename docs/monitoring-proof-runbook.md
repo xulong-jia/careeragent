@@ -17,21 +17,29 @@ This runbook collects external observability evidence. It does not create proof 
 
 1. Verify logs and metrics receive events from the deployed app.
 2. Trigger or simulate a safe health/readiness alert.
-3. Verify error visibility through external error reporting or platform runtime error logs.
-4. Verify dashboards and alert rules use redacted identifiers only.
-5. If distributed tracing is not enabled, record that limitation explicitly.
-6. If external Sentry/Logfire/New Relic-style error reporting is not enabled,
+3. Configure backend `SENTRY_DSN` and frontend `VITE_SENTRY_DSN` through the
+   deployment secret manager. Keep `SENTRY_SEND_DEFAULT_PII=false`.
+4. Set `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`, and trace sample rates for both
+   backend and frontend. Use the same release string for a single deployed build.
+5. Verify external error reporting with a synthetic backend/frontend event that
+   contains no resume, JD, interview, RAG chunk, token or raw user text.
+6. Verify distributed tracing links a frontend request to the backend without
+   propagating trace headers to unrelated origins.
+7. Verify dashboards and alert rules use redacted identifiers only.
+8. If distributed tracing is not enabled, record that limitation explicitly.
+9. If external Sentry/Logfire/New Relic-style error reporting is not enabled,
    record `no_external_sentry` or an equivalent limitation explicitly.
-7. Confirm incident runbook location and ownership.
-8. Copy `evidence/templates/monitoring_proof.template.json` to `evidence/private_outputs/`.
-9. Fill redacted dashboard refs and boolean outcomes.
-10. Set `production_quality_candidate_signal=true` only when all candidate monitoring checks pass.
+10. Confirm incident runbook location and ownership.
+11. Copy `evidence/templates/monitoring_proof.template.json` to `evidence/private_outputs/`.
+12. Fill redacted dashboard refs and boolean outcomes.
+13. Set `production_quality_candidate_signal=true` only when all candidate monitoring checks pass.
 
 ## Counts As Proof
 
 - Redacted dashboard ids or links.
 - Alert rule verification refs.
 - Logs/metrics/traces/error-reporting evidence that excludes private payloads.
+- Redacted Sentry issue/event ids and trace ids.
 - Incident runbook ref.
 
 ## Does Not Count
@@ -59,6 +67,34 @@ and/or `error_reporting_enabled=false` only when the limitations clearly state
 the missing capability and the proof still covers runtime error visibility,
 alert delivery and incident response. Missing alerts or missing incident
 runbook always fails candidate status.
+
+For certified observability, set `tracing_enabled=true` and
+`error_reporting_enabled=true` only after real external evidence exists. The
+proof must not include raw Sentry event payloads, stack locals, request bodies,
+authorization headers, cookies, resume text, JD text, interview answers, RAG
+chunks or tokens.
+
+## Sentry Runtime Variables
+
+Backend runtime:
+
+- `SENTRY_DSN`
+- `SENTRY_ENVIRONMENT`
+- `SENTRY_RELEASE`
+- `SENTRY_TRACES_SAMPLE_RATE`
+- `SENTRY_SEND_DEFAULT_PII=false`
+- `ENABLE_OBSERVABILITY_TEST_ENDPOINT=false`
+
+Frontend runtime/build vars:
+
+- `VITE_SENTRY_DSN`
+- `VITE_SENTRY_ENVIRONMENT`
+- `VITE_SENTRY_RELEASE`
+- `VITE_SENTRY_TRACES_SAMPLE_RATE`
+- `VITE_SENTRY_TRACE_TARGETS`
+
+`SENTRY_AUTH_TOKEN` is build-time only for source map upload. Store it in CI or
+Render build secrets, never in committed env files and never in runtime JS.
 
 ## Validate
 

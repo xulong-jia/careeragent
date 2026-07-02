@@ -14,11 +14,14 @@ This runbook collects external security and privacy review evidence. It does not
 1. Provide the reviewer with redacted docs, configs and test commands.
 2. Review auth/session controls, token revoke, RBAC and workspace isolation.
 3. Review privacy, PII redaction, delete proof and backup purge behavior.
-4. Run or review dependency scan and secret scan results.
-5. Review rate limit and abuse-control posture.
-6. Record findings counts and unresolved blockers.
-7. Copy `evidence/templates/security_review_proof.template.json` to `evidence/private_outputs/`.
-8. Set `production_quality_candidate_signal=true` only when no critical, high or unresolved findings remain.
+4. Review observability event scrubbing for Sentry or equivalent telemetry:
+   authorization headers, cookies, request bodies, resume/JD/interview/RAG text,
+   emails, phones and tokens must be removed or redacted before export.
+5. Run or review dependency scan and secret scan results.
+6. Review rate limit and abuse-control posture.
+7. Record findings counts and unresolved blockers.
+8. Copy `evidence/templates/security_review_proof.template.json` to `evidence/private_outputs/`.
+9. Set `production_quality_candidate_signal=true` only when no critical, high or unresolved findings remain.
 
 ## Counts As Proof
 

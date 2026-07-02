@@ -16,6 +16,7 @@ from app.api.health import router as health_router
 from app.api.interviews import router as interviews_router
 from app.api.jobs import router as jobs_router
 from app.api.matches import router as matches_router
+from app.api.observability import router as observability_router
 from app.api.privacy import router as privacy_router
 from app.api.profiles import router as profiles_router
 from app.api.project_rewrites import router as project_rewrites_router
@@ -34,6 +35,7 @@ from app.core.errors import (
 )
 from app.core.logging import configure_logging, log_event
 from app.core.metrics import record_http_request
+from app.core.observability import initialize_sentry
 
 
 def _validate_startup_security(settings) -> None:
@@ -44,6 +46,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     _validate_startup_security(settings)
     configure_logging()
+    initialize_sentry(settings)
     app = FastAPI(title=settings.app_name)
 
     app.add_middleware(
@@ -120,6 +123,8 @@ def create_app() -> FastAPI:
     app.include_router(applications_router, dependencies=protected)
     app.include_router(evaluations_router, dependencies=protected)
     app.include_router(bad_cases_router, dependencies=protected)
+    if settings.enable_observability_test_endpoint:
+        app.include_router(observability_router)
 
     return app
 
