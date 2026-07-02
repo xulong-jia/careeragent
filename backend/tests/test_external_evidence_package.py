@@ -165,6 +165,21 @@ def _write_human_review_csv(path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
+def _assert_readable_review_context(row: dict[str, str]) -> None:
+    input_summary = row.get("input_summary") or row.get("输入摘要（匿名）", "")
+    output_summary = row.get("model_output_summary") or row.get("模型输出摘要", "")
+    instruction = row.get("review_instruction") or row.get("审核说明", "")
+
+    for value in [input_summary, output_summary]:
+        assert len(value) >= 40
+    assert len(instruction) >= 20
+    assert "判断" in instruction or "检查" in instruction
+    ref_only_markers = ["input_ref=", "expected_output_ref=", "signals={"]
+    assert not any(marker in input_summary for marker in ref_only_markers)
+    assert not any(marker in output_summary for marker in ref_only_markers)
+    assert "Synthetic/anonymized review sample" in input_summary
+
+
 def _xlsx_workbook_xml(path: Path) -> str:
     with zipfile.ZipFile(path) as archive:
         return "\n".join(
@@ -550,6 +565,7 @@ def test_human_review_sample_pack_dry_run_generates_blank_reviewer_csv():
         assert row["input_summary"]
         assert row["model_output_summary"]
         assert row["review_instruction"]
+        _assert_readable_review_context(row)
         assert row["reviewer_id_hash"] == ""
         assert row["correctness_score"] == ""
         assert row["groundedness_score"] == ""
@@ -568,6 +584,26 @@ def test_human_review_sample_pack_contains_no_obvious_pii():
     assert "jd_text" not in rendered
     assert "interview_answer" not in rendered
     assert not any(pattern.search(rendered) for pattern in generate_human_review_sample_pack.PII_PATTERNS)
+
+
+def test_human_review_sample_pack_summaries_are_task_specific_and_readable():
+    rows = generate_human_review_sample_pack.build_sample_pack_rows(sample_size=30, seed=7)
+    by_task = {row["task_type"]: row for row in rows}
+
+    expected_keywords = {
+        "jd_parse": ["Anonymized job title", "responsibilities", "required skills", "role_category"],
+        "resume_parse": ["Anonymized candidate profile", "visible sections", "project keywords", "skills="],
+        "match_score": ["Anonymized JD/resume pair", "candidate evidence areas", "Model/system match score"],
+        "rag_answer": ["User question", "safe evidence/citation summary", "Model answer summary"],
+        "project_rewrite": ["Original project summary", "target JD requirement summary", "Model rewrite summary"],
+        "agent_workflow": ["User goal", "expected state", "Agent output summary"],
+    }
+    for task_type, keywords in expected_keywords.items():
+        row = by_task[task_type]
+        _assert_readable_review_context(row)
+        combined = f"{row['input_summary']} {row['model_output_summary']}"
+        for keyword in keywords:
+            assert keyword in combined
 
 
 def test_human_review_sample_pack_default_outputs_are_private_outputs():
@@ -636,6 +672,8 @@ def test_human_review_sample_pack_generates_simple_fillable_xlsx(tmp_path):
     assert len(fill_rows) == 30
     assert all(row["正确性 0-1"] == "" for row in fill_rows)
     assert all(row["结论"] == "" for row in fill_rows)
+    for row in fill_rows:
+        _assert_readable_review_context(row)
 
     import_headers, import_rows = _xlsx_table(output, "导入字段_不要改", {"item_id", "task_type"})
     for field in [

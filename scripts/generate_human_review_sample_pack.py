@@ -39,12 +39,45 @@ TASK_TYPE_LABELS = {
     "agent_workflow": "Agent 流程审核",
 }
 REVIEW_INSTRUCTIONS = {
-    "jd_parse": "检查 JD 解析结果是否正确抽取岗位类别、技能、风险和隐藏要求。",
-    "resume_parse": "检查简历解析结果是否正确抽取章节、技能、项目和风险信号。",
-    "match_score": "检查匹配分数、证据、差距和风险扣分是否合理。",
-    "rag_answer": "检查回答是否基于证据、引用正确且没有 unsupported claim。",
-    "project_rewrite": "检查项目改写是否贴合 JD 且没有编造事实。",
-    "agent_workflow": "检查 Agent 流程状态、下一步和 Bad Case 处理是否合理。",
+    "jd_parse": "判断 JD 解析是否准确：岗位类别、技能、职责、风险提示是否与匿名输入一致；标记遗漏或编造。",
+    "resume_parse": "判断简历解析是否准确：技能、项目、教育/经历章节和风险信号是否与匿名输入一致；标记隐私风险或编造经历。",
+    "match_score": "判断匹配分数和理由是否合理：分数区间、证据、项目推荐和风险提示是否支持结论。",
+    "rag_answer": "判断回答是否基于匿名 evidence/citation：引用是否覆盖关键证据，是否有 unsupported claim 或幻觉。",
+    "project_rewrite": "判断项目改写是否真实增强表达：是否贴合目标 JD，是否保留事实边界并避免编造经历、指标或工具。",
+    "agent_workflow": "判断 Agent workflow 是否合理、安全、可执行：步骤、下一步、缺失信息和 Bad Case 处理是否正确。",
+}
+ROLE_ORDER = ["backend", "frontend", "data", "ai", "product", "security"]
+ROLE_CONTEXT = {
+    "backend": {
+        "title": "Backend Graduate Engineer",
+        "responsibilities": "build API endpoints, integrate PostgreSQL-backed services, add tests and reliability checks",
+        "experience": "graduate/junior backend role; seniority wording may be ambiguous",
+    },
+    "frontend": {
+        "title": "Frontend Graduate Engineer",
+        "responsibilities": "build React UI, manage TypeScript state, verify responsive CSS and component behavior",
+        "experience": "graduate/junior frontend role",
+    },
+    "data": {
+        "title": "Data Graduate Analyst",
+        "responsibilities": "write SQL analysis, build analytics workflows, explain metrics and data quality tradeoffs",
+        "experience": "graduate/junior data role",
+    },
+    "ai": {
+        "title": "AI Application Graduate Engineer",
+        "responsibilities": "build RAG flows, manage embeddings, evaluate retrieval and grounded answer quality",
+        "experience": "graduate/junior AI application role",
+    },
+    "product": {
+        "title": "Product Graduate Associate",
+        "responsibilities": "conduct user research, maintain roadmap items, reason about experiments and metrics",
+        "experience": "graduate/junior product role",
+    },
+    "security": {
+        "title": "Security Graduate Engineer",
+        "responsibilities": "review threat models, improve logging, reason about IAM and security monitoring controls",
+        "experience": "graduate/junior security role",
+    },
 }
 MACHINE_FIELDS = [
     "review_batch_id",
@@ -174,18 +207,187 @@ def _safe_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
-def _case_input_summary(case: dict[str, Any]) -> str:
-    return (
-        f"{case.get('summary', '')}; input_ref={_safe_json(case.get('input', {}))}; "
-        f"difficulty={case.get('difficulty', '')}"
-    )
+def _list_text(value: Any) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value) if value else "none"
+    if value in (None, "", []):
+        return "none"
+    return str(value)
 
 
-def _case_output_summary(case: dict[str, Any]) -> str:
-    return (
-        f"signals={_safe_json(case.get('signals', {}))}; "
-        f"expected_output_ref={_safe_json(case.get('expected_output', case.get('expected', {})))}"
-    )
+def _expected(case: dict[str, Any]) -> dict[str, Any]:
+    expected = case.get("expected_output", case.get("expected", {}))
+    return expected if isinstance(expected, dict) else {}
+
+
+def _case_number(case: dict[str, Any]) -> int | None:
+    candidates = [str(case.get("case_id", "")), _safe_json(case.get("input", {}))]
+    for value in candidates:
+        match = re.search(r"(\d+)", value)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def _role_family(case: dict[str, Any]) -> str:
+    input_payload = case.get("input", {})
+    signals = case.get("signals", {})
+    if isinstance(input_payload, dict) and input_payload.get("role_family"):
+        return str(input_payload["role_family"])
+    if isinstance(signals, dict) and signals.get("role_category"):
+        return str(signals["role_category"])
+    summary = str(case.get("summary", "")).lower()
+    for family in ROLE_ORDER:
+        if family in summary:
+            return family
+    number = _case_number(case)
+    if number:
+        return ROLE_ORDER[(number - 1) % len(ROLE_ORDER)]
+    return "backend"
+
+
+def _role_context(case: dict[str, Any]) -> dict[str, str]:
+    return ROLE_CONTEXT.get(_role_family(case), ROLE_CONTEXT["backend"])
+
+
+def _case_input_summary(task_type: str, case: dict[str, Any]) -> str:
+    input_payload = case.get("input", {})
+    signals = case.get("signals", {})
+    expected = _expected(case)
+    context = _role_context(case)
+    case_id = str(case.get("case_id", ""))
+    prefix = "Synthetic/anonymized review sample."
+
+    if task_type == "jd_parse":
+        required = expected.get("required_skills_should_include") or signals.get("parsed_required_skills")
+        preferred = expected.get("preferred_skills_should_include") or signals.get("parsed_preferred_skills")
+        risks = expected.get("risk_flags_should_include") or signals.get("risk_flags")
+        return (
+            f"{prefix} Anonymized job title: {context['title']}; responsibilities: "
+            f"{context['responsibilities']}; required skills in source JD summary: {_list_text(required)}; "
+            f"preferred skills: {_list_text(preferred)}; experience requirement: {context['experience']}; "
+            f"known source risk cues: {_list_text(risks)}; source case: {case_id}."
+        )
+
+    if task_type == "resume_parse":
+        sections = expected.get("sections_should_include") or signals.get("sections")
+        skills = expected.get("skills_should_include") or signals.get("skills")
+        projects = expected.get("projects_should_include") or signals.get("projects")
+        risks = expected.get("risk_flags_should_include") or signals.get("risk_flags")
+        layout = input_payload.get("layout", "general") if isinstance(input_payload, dict) else "general"
+        return (
+            f"{prefix} Anonymized candidate profile for {context['title']}; education/contact details are "
+            f"generalized; visible sections: {_list_text(sections)}; skills in candidate summary: "
+            f"{_list_text(skills)}; project keywords: {_list_text(projects)}; layout signal: {layout}; "
+            f"known privacy/parser risk cues: {_list_text(risks)}; source case: {case_id}."
+        )
+
+    if task_type == "match_score":
+        evidence = expected.get("evidence_should_include") or signals.get("evidence")
+        gaps = expected.get("gaps_should_include") or signals.get("gaps")
+        score_range = expected.get("score_range", [])
+        return (
+            f"{prefix} Anonymized JD/resume pair for {context['title']}; JD requirement summary: "
+            f"{context['responsibilities']}; candidate evidence areas available: {_list_text(evidence)}; "
+            f"known gaps to consider: {_list_text(gaps)}; acceptable calibration range: "
+            f"{_list_text(score_range)}; source refs: {_safe_json(input_payload)}."
+        )
+
+    if task_type == "rag_answer":
+        citation_required = expected.get("citation_required", False)
+        refusal_expected = expected.get("refusal_expected", False)
+        cited_chunks = signals.get("cited_chunk_ids", [])
+        return (
+            f"{prefix} User question asks for a CareerAgent answer over an anonymized evidence packet; "
+            f"question ref: {input_payload.get('question_ref', case_id) if isinstance(input_payload, dict) else case_id}; "
+            f"safe evidence/citation summary: chunks expected for grounding include {_list_text(cited_chunks)}; "
+            f"citation required: {citation_required}; refusal expected when evidence is insufficient: {refusal_expected}."
+        )
+
+    if task_type == "project_rewrite":
+        matched = expected.get("matched_requirements_should_include") or signals.get("matched_requirements")
+        risks = expected.get("risk_flags_should_include") or signals.get("risk_flags")
+        return (
+            f"{prefix} Original project summary: anonymized {context['title']} capstone/project with private "
+            f"details removed; target JD requirement summary: {context['responsibilities']}; requirements to "
+            f"preserve in rewrite: {_list_text(matched)}; factuality constraints: no fabricated metrics, tools, "
+            f"employers, or outcomes; known risk cues: {_list_text(risks)}; source refs: {_safe_json(input_payload)}."
+        )
+
+    if task_type == "agent_workflow":
+        expected_status = expected.get("status", "unknown")
+        expected_more_info = expected.get("need_more_info", False)
+        expected_bad_case = expected.get("bad_case_payload_expected", False)
+        return (
+            f"{prefix} User goal: complete an anonymized CareerAgent workflow for resume/JD/application review; "
+            f"current state ref: {input_payload.get('workflow_ref', case_id) if isinstance(input_payload, dict) else case_id}; "
+            f"expected state: {expected_status}; should ask for more info: {expected_more_info}; "
+            f"Bad Case payload expected: {expected_bad_case}; reviewer should judge if the workflow is safe and executable."
+        )
+
+    return f"{prefix} {case.get('summary', '')}; source refs: {_safe_json(input_payload)}."
+
+
+def _case_output_summary(task_type: str, case: dict[str, Any]) -> str:
+    signals = case.get("signals", {})
+    expected = _expected(case)
+    context = _role_context(case)
+
+    if task_type == "jd_parse":
+        return (
+            f"Model parsed role_category={signals.get('role_category', 'unknown')}; required_skills="
+            f"{_list_text(signals.get('parsed_required_skills'))}; preferred_skills="
+            f"{_list_text(signals.get('parsed_preferred_skills'))}; responsibilities should map to "
+            f"{context['responsibilities']}; risk/warnings={_list_text(signals.get('risk_flags'))}; "
+            f"parse_confidence={signals.get('confidence', 'unknown')}."
+        )
+
+    if task_type == "resume_parse":
+        return (
+            f"Model extracted skills={_list_text(signals.get('skills'))}; projects="
+            f"{_list_text(signals.get('projects'))}; sections={_list_text(signals.get('sections'))}; "
+            f"education section expected={ 'education' in expected.get('sections_should_include', []) }; "
+            f"risk_flags={_list_text(signals.get('risk_flags'))}; parse_confidence={signals.get('confidence', 'unknown')}."
+        )
+
+    if task_type == "match_score":
+        return (
+            f"Model/system match score={signals.get('system_score', 'unknown')}; score breakdown/evidence="
+            f"{_list_text(signals.get('evidence'))}; recommended project evidence={ 'projects' if 'projects' in signals.get('evidence', []) else 'none' }; "
+            f"risk or gap notes={_list_text(signals.get('gaps'))}; ranking_consistent={signals.get('ranking_consistent', 'unknown')}; "
+            f"score_stability_delta={signals.get('stability_delta', 'unknown')}."
+        )
+
+    if task_type == "rag_answer":
+        unsupported = signals.get("unsupported_claims", [])
+        answer_status = "grounded answer with citations" if signals.get("grounded") else "answer needs grounding review"
+        return (
+            f"Model answer summary: {answer_status}; cited chunks={_list_text(signals.get('cited_chunk_ids'))}; "
+            f"grounded={signals.get('grounded', 'unknown')}; answer_schema_valid={signals.get('answer_schema_valid', 'unknown')}; "
+            f"refused_due_to_no_evidence={signals.get('refused_due_to_no_evidence', 'unknown')}; "
+            f"unsupported_claims={_list_text(unsupported)}."
+        )
+
+    if task_type == "project_rewrite":
+        return (
+            f"Model rewrite summary: rewritten bullet should emphasize {_list_text(signals.get('matched_requirements'))}; "
+            f"rewrite_schema_valid={signals.get('rewrite_schema_valid', 'unknown')}; fabricated_claims="
+            f"{signals.get('fabricated_claims', 'unknown')}; evidence_required_present="
+            f"{signals.get('evidence_required_present', 'unknown')}; forbidden changes: no fabricated metrics, "
+            f"tools, employers, or outcomes; risk_flags={_list_text(signals.get('risk_flags'))}."
+        )
+
+    if task_type == "agent_workflow":
+        need_more_info = signals.get("need_more_info", False)
+        next_action = "ask for missing details before final output" if need_more_info else "continue/complete workflow output"
+        return (
+            f"Agent output summary: status={signals.get('status', 'unknown')}; steps implied="
+            f"validate inputs, run task, produce safe result or Bad Case payload; next action={next_action}; "
+            f"need_more_info={need_more_info}; output_schema_valid={signals.get('output_schema_valid', 'unknown')}; "
+            f"bad_case_payload_present={signals.get('bad_case_payload_present', 'unknown')}."
+        )
+
+    return f"Model output summary: {_safe_json(signals)}."
 
 
 def _load_cases(dataset_dir: Path) -> dict[str, list[dict[str, Any]]]:
@@ -251,8 +453,8 @@ def build_sample_pack_rows(
                 "anonymized_input_ref": f"anonymized_benchmark:{task_type}:{case_id}:input",
                 "model_output_ref": f"anonymized_benchmark:{task_type}:{case_id}:model_output",
                 "task_type_label": TASK_TYPE_LABELS[task_type],
-                "input_summary": _case_input_summary(case),
-                "model_output_summary": _case_output_summary(case),
+                "input_summary": _case_input_summary(task_type, case),
+                "model_output_summary": _case_output_summary(task_type, case),
                 "review_instruction": REVIEW_INSTRUCTIONS[task_type],
                 "reviewer_id_hash": "",
                 "correctness_score": "",
@@ -384,7 +586,7 @@ def _first_reviewer_id(rows: list[dict[str, str]]) -> str:
 def _fill_sheet_xml(rows: list[dict[str, str]]) -> str:
     last_row = FILL_DATA_START_ROW + len(rows) - 1
     last_column = _column_letter(len(FILL_COLUMNS))
-    widths = [8, 18, 46, 46, 34, 12, 12, 12, 12, 12, 12, 12, 15, 12, 32, 15, 18, 34]
+    widths = [8, 18, 64, 64, 44, 12, 12, 12, 12, 12, 12, 12, 15, 12, 32, 15, 18, 34]
     row_xml: list[str] = []
     row_xml.append(
         '<row r="1" ht="24" customHeight="1">'
@@ -417,7 +619,7 @@ def _fill_sheet_xml(rows: list[dict[str, str]]) -> str:
             value = str(offset + 1) if field == "sequence" else row.get(field, "")
             style = 3 if field in FILL_REVIEWER_FIELDS else 2
             cells.append(_cell_xml(row_index, column_index, value, style))
-        row_xml.append(f'<row r="{row_index}" ht="72" customHeight="1">{"".join(cells)}</row>')
+        row_xml.append(f'<row r="{row_index}" ht="108" customHeight="1">{"".join(cells)}</row>')
     return _worksheet_xml(
         cols_xml=_cols_xml(widths),
         rows_xml="".join(row_xml),
@@ -484,11 +686,13 @@ def _instructions_sheet_xml() -> str:
         ["CareerAgent 人工审核填写说明"],
         [""],
         ["1. 只填写“填写表”。不要修改 item_id，也不要修改“导入字段_不要改”。"],
-        ["2. 每一行看：审核类型、输入摘要（匿名）、模型输出摘要、审核说明。"],
-        ["3. 分数：1.0=good，0.8=minor issue，0.5=major issue，0.0=fail。"],
-        ["4. 隐私风险、幻觉、编造、需复审必须显式选择 true 或 false。"],
-        ["5. 结论/复审结论只能使用 pass、minor_issue、major_issue、fail。"],
-        ["6. 不要写入真实姓名、邮箱、电话、API key、真实简历/JD 原文或私有证据。"],
+        ["2. 每一行只根据：审核类型、输入摘要（匿名）、模型输出摘要、审核说明来判断。"],
+        ["3. 不需要访问源码、API key、数据库、provider trace 或真实用户数据。"],
+        ["4. 如果匿名摘要不足以判断，不要猜；在备注中说明并标记需复审。"],
+        ["5. 分数：1.0=good，0.8=minor issue，0.5=major issue，0.0=fail。"],
+        ["6. 隐私风险、幻觉、编造、需复审必须显式选择 true 或 false。"],
+        ["7. 结论/复审结论只能使用 pass、minor_issue、major_issue、fail。"],
+        ["8. 不要写入真实姓名、邮箱、电话、API key、真实简历/JD 原文或私有证据。"],
     ]
     return _simple_table_sheet_xml(rows, [110])
 
